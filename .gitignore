@@ -34,12 +34,3 @@ build/
 
 # Environment variables
 .env
-*.env
-.env.*
-!.env.example
-
-# Application specific
-application-*.properties
-application-*.yml
-!application.properties
-!application.yml
