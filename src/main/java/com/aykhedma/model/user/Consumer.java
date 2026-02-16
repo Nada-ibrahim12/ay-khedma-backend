@@ -20,7 +20,7 @@ public class Consumer extends User {
 
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average rating cannot exceed 5.0")
-    @Column(precision = 3, scale = 2)
+    //@Column(precision = 3, scale = 2)
     private Double averageRating;
 
     @OneToMany(mappedBy = "consumer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

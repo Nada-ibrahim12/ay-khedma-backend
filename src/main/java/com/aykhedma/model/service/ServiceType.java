@@ -45,7 +45,7 @@ public class ServiceType {
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Base price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Base price cannot exceed 100,000")
-    @Column(precision = 10, scale = 2)
+    //@Column(precision = 10, scale = 2)
     private Double basePrice;
 
     @NotNull(message = "Default price type is required")

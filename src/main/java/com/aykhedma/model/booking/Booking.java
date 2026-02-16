@@ -57,12 +57,12 @@ public class Booking {
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Initial price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Initial price cannot exceed 100,000")
-    @Column(precision = 10, scale = 2)
+    //@Column(precision = 10, scale = 2)
     private Double initialPrice;
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Final price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Final price cannot exceed 100,000")
-    @Column(precision = 10, scale = 2)
+    //@Column(precision = 10, scale = 2)
     private Double finalPrice;
 
     @NotNull(message = "Booking status is required")

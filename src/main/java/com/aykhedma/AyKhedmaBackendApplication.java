@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.PropertySource;
 
 @SpringBootApplication
-@PropertySource("file:.env")
+@PropertySource("file:app.env")
 public class AyKhedmaBackendApplication {
 
     public static void main(String[] args) {

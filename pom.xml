@@ -211,8 +211,8 @@
         <dependency>
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-spatial</artifactId>
-            <version>6.4.0.Final</version>
         </dependency>
+
 
         <!-- LocationTech JTS for geometry types -->
         <dependency>

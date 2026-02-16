@@ -20,13 +20,13 @@ public class Location {
     @NotNull(message = "Latitude is required")
     @DecimalMin(value = "-90.0", message = "Latitude must be between -90 and 90")
     @DecimalMax(value = "90.0", message = "Latitude must be between -90 and 90")
-    @Column(nullable = false, precision = 10, scale = 8)
+    //@Column(nullable = false, precision = 10, scale = 8)
     private Double latitude;
 
     @NotNull(message = "Longitude is required")
     @DecimalMin(value = "-180.0", message = "Longitude must be between -180 and 180")
     @DecimalMax(value = "180.0", message = "Longitude must be between -180 and 180")
-    @Column(nullable = false, precision = 11, scale = 8)
+    //@Column(nullable = false, precision = 11, scale = 8)
     private Double longitude;
 
     @Size(max = 255, message = "Address cannot exceed 255 characters")

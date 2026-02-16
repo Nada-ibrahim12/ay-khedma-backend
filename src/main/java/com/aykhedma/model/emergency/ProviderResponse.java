@@ -47,7 +47,7 @@ public class ProviderResponse {
     @NotNull(message = "Proposed price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Proposed price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Proposed price cannot exceed 100,000")
-    @Column(nullable = false, precision = 10, scale = 2)
+    //@Column(nullable = false, precision = 10, scale = 2)
     private Double proposedPrice;
 
     @Min(value = 1, message = "Estimated arrival time must be at least 1 minute")
@@ -56,7 +56,7 @@ public class ProviderResponse {
 
     @DecimalMin(value = "0.0", message = "Distance cannot be negative")
     @DecimalMax(value = "100.0", message = "Distance cannot exceed 100 km")
-    @Column(precision = 10, scale = 2)
+    //@Column(precision = 10, scale = 2)
     private Double distance;
 
     private Boolean selected = false;

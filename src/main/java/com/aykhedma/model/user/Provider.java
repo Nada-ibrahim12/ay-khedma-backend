@@ -71,7 +71,7 @@ public class Provider extends User {
 
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average rating cannot exceed 5.0")
-    @Column(precision = 3, scale = 2)
+    //@Column(precision = 3, scale = 2)
     private Double averageRating = 0.0;
 
     @Min(value = 0, message = "Booking rate cannot be negative")
@@ -81,7 +81,7 @@ public class Provider extends User {
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Price cannot exceed 100,000")
-    @Column(nullable = false, precision = 10, scale = 2)
+    //@Column(nullable = false, precision = 10, scale = 2)
     private Double price;
 
     @NotNull(message = "Price type is required")
