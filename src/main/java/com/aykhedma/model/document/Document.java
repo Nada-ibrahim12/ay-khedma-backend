@@ -40,6 +40,11 @@ public class Document {
     @UpdateTimestamp
     private LocalDateTime updatedDate;
 
+    @PastOrPresent(message = "Updated date cannot be in the future")
+    @UpdateTimestamp
+    private LocalDateTime uploadedDate;
+
+
     @NotNull(message = "Provider is required")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "provider_id", nullable = false)

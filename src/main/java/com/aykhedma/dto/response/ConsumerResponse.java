@@ -1,5 +1,6 @@
 package com.aykhedma.dto.response;
 
+import com.aykhedma.model.user.UserType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +20,7 @@ public class ConsumerResponse {
     private String phoneNumber;
     private String profileImage;
     private String preferredLanguage;
+    private UserType role;
     private Double averageRating;
     private Integer totalBookings;
     private List<ProviderSummaryResponse> savedProviders;

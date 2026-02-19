@@ -13,20 +13,30 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ScheduleResponse {
-
-    private List<String> workingDays;
-    private LocalTime workStartTime;
-    private LocalTime workEndTime;
-    private List<BreakTimeResponse> breaks;
-    private Integer slotDuration;
+    private Long id;
+    private List<WorkingDayResponse> workingDays;
+    private List<TimeSlotResponse> availableSlots;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class BreakTimeResponse {
+    public static class WorkingDayResponse {
+        private Long id;
+        private String dayOfWeek;
         private LocalTime startTime;
         private LocalTime endTime;
-        private String description;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TimeSlotResponse {
+        private Long id;
+        private String date;
+        private LocalTime startTime;
+        private LocalTime endTime;
+        private boolean isBooked;
     }
 }

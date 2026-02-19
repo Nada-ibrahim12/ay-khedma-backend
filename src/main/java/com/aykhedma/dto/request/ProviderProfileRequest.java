@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UpdateProfileRequest {
+public class ProviderProfileRequest {
 
     @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
     @Pattern(regexp = "^[\\p{L} .'-]+$", message = "Name can only contain letters, spaces, dots, apostrophes, and hyphens")
@@ -29,6 +29,10 @@ public class UpdateProfileRequest {
 
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
     private String bio;
+
+    // ADD THIS MISSING FIELD
+    @Positive(message = "Service type ID must be positive")
+    private Long serviceTypeId;
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Price cannot exceed 100,000")

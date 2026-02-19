@@ -1,10 +1,9 @@
 package com.aykhedma.model.booking;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
 import lombok.*;
-
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,30 +20,15 @@ public class Schedule {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotEmpty(message = "At least one working day must be selected")
-    @ElementCollection
-    @CollectionTable(name = "schedule_working_days", joinColumns = @JoinColumn(name = "schedule_id"))
-    @Enumerated(EnumType.STRING)
-    @Column(name = "working_day", length = 20)
+    @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<DayOfWeek> workingDays = new ArrayList<>();
+    private List<WorkingDay> workingDays = new ArrayList<>();
 
-    @NotNull(message = "Work start time is required")
-    private LocalTime workStartTime;
+    @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<TimeSlot> availableSlots = new ArrayList<>();
 
-    @NotNull(message = "Work end time is required")
-    private LocalTime workEndTime;
-
-    @AssertTrue(message = "Work end time must be after start time")
-    private boolean isValidWorkHours() {
-        if (workStartTime == null || workEndTime == null) return true;
-        return workEndTime.isAfter(workStartTime);
-    }
-
-    @Min(value = 15, message = "Slot duration must be at least 15 minutes")
-    @Max(value = 240, message = "Slot duration cannot exceed 4 hours (240 minutes)")
-    @Column(nullable = false)
-    private Integer slotDuration = 60;
-
-
+//    @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL)
+//    @Builder.Default
+//    private List<Booking> bookings = new ArrayList<>();
 }

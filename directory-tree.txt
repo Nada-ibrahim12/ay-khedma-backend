@@ -1,0 +1,139 @@
+ay-khedma-backend/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   ├── com/
+│   │   │       ├── aykhedma/
+│   │   │           ├── config/
+│   │   │           │   ├── CorsConfig.java
+│   │   │           │   ├── RedisConfig.java
+│   │   │           │   └── WebSocketConfig.java
+│   │   │           ├── controller/
+│   │   │           │   ├── AdminController.java
+│   │   │           │   ├── AuthController.java
+│   │   │           │   ├── BookingController.java
+│   │   │           │   ├── ChatController.java
+│   │   │           │   ├── ConsumerController.java
+│   │   │           │   ├── EmergencyController.java
+│   │   │           │   ├── NotificationController.java
+│   │   │           │   ├── ProviderController.java
+│   │   │           │   ├── RatingController.java
+│   │   │           │   ├── ServiceCatalogController.java
+│   │   │           │   └── UserController.java
+│   │   │           ├── dto/
+│   │   │           │   ├── location/
+│   │   │           │   │   └── LocationDTO.java
+│   │   │           │   ├── request/
+│   │   │           │   │   ├── BookingRequest.java
+│   │   │           │   │   ├── ChatMessageRequest.java
+│   │   │           │   │   ├── EmergencyRequestDTO.java
+│   │   │           │   │   ├── LoginRequest.java
+│   │   │           │   │   ├── OTPRequest.java
+│   │   │           │   │   ├── ProviderResponseDTO.java
+│   │   │           │   │   ├── RatingRequest.java
+│   │   │           │   │   ├── RegisterRequest.java
+│   │   │           │   │   ├── UpdateProfileRequest.java
+│   │   │           │   │   └── VerifyOTPRequest.java
+│   │   │           │   ├── response/
+│   │   │           │   │   ├── AuthResponse.java
+│   │   │           │   │   ├── BookingResponse.java
+│   │   │           │   │   ├── ChatMessageResponse.java
+│   │   │           │   │   ├── ChatResponse.java
+│   │   │           │   │   ├── ConsumerResponse.java
+│   │   │           │   │   ├── ConsumerSummaryResponse.java
+│   │   │           │   │   ├── DocumentResponse.java
+│   │   │           │   │   ├── EmergencyResponse.java
+│   │   │           │   │   ├── ErrorResponse.java
+│   │   │           │   │   ├── NotificationResponse.java
+│   │   │           │   │   ├── OTPResponse.java
+│   │   │           │   │   ├── ProviderEmergencyResponse.java
+│   │   │           │   │   ├── ProviderResponse.java
+│   │   │           │   │   ├── ProviderSummaryResponse.java
+│   │   │           │   │   ├── ScheduleResponse.java
+│   │   │           │   │   └── UserResponse.java
+│   │   │           │   ├── service/
+│   │   │           │       ├── CategoryWithServicesDTO.java
+│   │   │           │       ├── ServiceCategoryDTO.java
+│   │   │           │       ├── ServiceTypeDTO.java
+│   │   │           │       └── ServicesResponse.java
+│   │   │           ├── exception/
+│   │   │           ├── mapper/
+│   │   │           │   ├── BookingMapper.java
+│   │   │           │   ├── ChatMapper.java
+│   │   │           │   ├── ConsumerMapper.java
+│   │   │           │   ├── EmergencyMapper.java
+│   │   │           │   ├── ProviderMapper.java
+│   │   │           │   ├── ServiceMapper.java
+│   │   │           │   └── UserMapper.java
+│   │   │           ├── model/
+│   │   │           │   ├── booking/
+│   │   │           │   │   ├── Booking.java
+│   │   │           │   │   ├── BookingStatus.java
+│   │   │           │   │   └── Schedule.java
+│   │   │           │   ├── chat/
+│   │   │           │   │   ├── ChatMessage.java
+│   │   │           │   │   ├── ChatResponseType.java
+│   │   │           │   │   ├── ChatRoom.java
+│   │   │           │   │   ├── ChatSession.java
+│   │   │           │   │   ├── MessageRole.java
+│   │   │           │   │   └── MessageType.java
+│   │   │           │   ├── document/
+│   │   │           │   │   └── Document.java
+│   │   │           │   ├── emergency/
+│   │   │           │   │   ├── EmergencyRequest.java
+│   │   │           │   │   ├── EmergencyStatus.java
+│   │   │           │   │   ├── ProviderResponse.java
+│   │   │           │   │   └── ProviderResponseType.java
+│   │   │           │   ├── location/
+│   │   │           │   │   ├── DistanceResult.java
+│   │   │           │   │   └── Location.java
+│   │   │           │   ├── notification/
+│   │   │           │   │   ├── Notification.java
+│   │   │           │   │   └── NotificationType.java
+│   │   │           │   ├── service/
+│   │   │           │   │   ├── PriceType.java
+│   │   │           │   │   ├── RiskLevel.java
+│   │   │           │   │   ├── ServiceCategory.java
+│   │   │           │   │   └── ServiceType.java
+│   │   │           │   ├── user/
+│   │   │           │       ├── Admin.java
+│   │   │           │       ├── Consumer.java
+│   │   │           │       ├── Provider.java
+│   │   │           │       ├── User.java
+│   │   │           │       ├── UserType.java
+│   │   │           │       └── VerificationStatus.java
+│   │   │           ├── repository/
+│   │   │           │   ├── BookingRepository.java
+│   │   │           │   ├── ChatMessageRepository.java
+│   │   │           │   ├── ChatRoomRepository.java
+│   │   │           │   ├── ChatSessionRepository.java
+│   │   │           │   ├── ConsumerRepository.java
+│   │   │           │   ├── DocumentRepository.java
+│   │   │           │   ├── EmergencyRequestRepository.java
+│   │   │           │   ├── NotificationRepository.java
+│   │   │           │   ├── ProviderRepository.java
+│   │   │           │   ├── ProviderResponseRepository.java
+│   │   │           │   ├── ServiceCategoryRepository.java
+│   │   │           │   ├── ServiceTypeRepository.java
+│   │   │           │   └── UserRepository.java
+│   │   │           ├── security/
+│   │   │           ├── service/
+│   │   │           └── AyKhedmaBackendApplication.java
+│   │   ├── resources/
+│   │       ├── db/
+│   │       │   ├── migration/
+│   │       ├── static/
+│   │       ├── templates/
+│   │       └── application.properties
+│   ├── test/
+│       ├── java/
+│           ├── com/
+│               ├── aykhedma/
+│                   ├── AyKhedmaBackendApplicationTests.java
+│                   ├── TestAyKhedmaBackendApplication.java
+│                   └── TestcontainersConfiguration.java.disabled
+├── README.md
+├── compose.yaml
+├── mvnw
+├── mvnw.cmd
+└── pom.xml
