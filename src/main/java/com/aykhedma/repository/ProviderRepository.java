@@ -4,6 +4,7 @@ import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.model.user.VerificationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -41,4 +42,8 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
                                        @Param("longitude") Double longitude,
                                        @Param("radius") Double radius,
                                        @Param("serviceTypeId") Long serviceTypeId);
+
+    @Modifying
+    @Query("UPDATE Provider c SET c.profileImage = :profileImage WHERE c.id = :consumerId")
+    void updateProfileImage(@Param("providerId") Long consumerId, @Param("profileImage") String profileImage);
 }

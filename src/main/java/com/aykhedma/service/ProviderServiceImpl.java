@@ -14,6 +14,7 @@ import com.aykhedma.model.booking.WorkingDay;
 import com.aykhedma.model.document.Document;
 import com.aykhedma.model.location.Location;
 import com.aykhedma.model.service.ServiceType;
+import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.repository.*;
 import com.aykhedma.service.FileStorageService;
@@ -55,7 +56,6 @@ public class ProviderServiceImpl implements ProviderService {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
 
-        // Update basic info
         if (request.getName() != null) {
             provider.setName(request.getName());
         }
@@ -105,15 +105,37 @@ public class ProviderServiceImpl implements ProviderService {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
-        if (provider.getProfileImage() != null) {
-            fileStorageService.deleteFile(provider.getProfileImage());
+        String oldProfileImage = provider.getProfileImage();
+        String newFileUrl = null;
+
+        try {
+            newFileUrl = fileStorageService.storeFile(file, "profile-images");
+
+            providerRepository.updateProfileImage(providerId, newFileUrl);
+
+            if (oldProfileImage != null && !oldProfileImage.isEmpty()) {
+                try {
+                    fileStorageService.deleteFile(oldProfileImage);
+                } catch (Exception e) {
+                    // Ignore deletion error
+                }
+            }
+
+            Provider updatedProvider = providerRepository.findById(providerId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Consumer not found with id: " + providerId));
+
+            return providerMapper.toProviderResponse(updatedProvider);
+
+        } catch (Exception e) {
+            // If upload succeeded but update failed, clean up the uploaded file
+            if (newFileUrl != null) {
+                try {
+                    fileStorageService.deleteFile(newFileUrl);
+                } catch (Exception cleanupEx) {
+                }
+            }
+            throw e;
         }
-
-        String fileUrl = fileStorageService.storeFile(file, "profile-images");
-        provider.setProfileImage(fileUrl);
-
-        Provider updatedProvider = providerRepository.save(provider);
-        return providerMapper.toProviderResponse(updatedProvider);
     }
 
     @Override
@@ -199,7 +221,6 @@ public class ProviderServiceImpl implements ProviderService {
 
         workingDayRepository.deleteById(workingDayId);
 
-        // USE THE MAPPER INSTEAD OF MANUAL MAPPING
         return scheduleMapper.toScheduleResponse(provider.getSchedule());
     }
 
@@ -212,7 +233,6 @@ public class ProviderServiceImpl implements ProviderService {
             return new ScheduleResponse();
         }
 
-        // USE THE MAPPER INSTEAD OF MANUAL MAPPING
         return scheduleMapper.toScheduleResponse(provider.getSchedule());
     }
 
