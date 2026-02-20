@@ -159,7 +159,7 @@ public class ConsumerController {
     public ResponseEntity<Void> deleteProfilePicture(
             @Parameter(description = "ID of the consumer", required = true)
             @PathVariable Long consumerId) throws IOException {
-        consumerService.updateProfilePicture(consumerId, null);
+        consumerService.deleteProfilePicture(consumerId);
         return ResponseEntity.noContent().build();
     }
 

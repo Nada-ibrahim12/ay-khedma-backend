@@ -63,21 +63,74 @@ public class ConsumerServiceImpl implements ConsumerService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public ConsumerResponse updateProfilePicture(Long consumerId, MultipartFile file) throws IOException {
+        // Find consumer but don't load the saved providers collection
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found with id: " + consumerId));
 
-        // Delete old picture if exists
-        if (consumer.getProfileImage() != null) {
-            fileStorageService.deleteFile(consumer.getProfileImage());
+        String oldProfileImage = consumer.getProfileImage();
+        String newFileUrl = null;
+
+        try {
+            newFileUrl = fileStorageService.storeFile(file, "profile-images");
+
+            consumerRepository.updateProfileImage(consumerId, newFileUrl);
+
+            if (oldProfileImage != null && !oldProfileImage.isEmpty()) {
+                try {
+                    fileStorageService.deleteFile(oldProfileImage);
+                } catch (Exception e) {
+                    // Ignore deletion error
+                }
+            }
+
+            Consumer updatedConsumer = consumerRepository.findById(consumerId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Consumer not found with id: " + consumerId));
+
+            return consumerMapper.toConsumerResponse(updatedConsumer);
+
+        } catch (Exception e) {
+            // If upload succeeded but update failed, clean up the uploaded file
+            if (newFileUrl != null) {
+                try {
+                    fileStorageService.deleteFile(newFileUrl);
+                } catch (Exception cleanupEx) {
+                }
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProfileResponse deleteProfilePicture(Long consumerId) throws IOException {
+        Consumer consumer = consumerRepository.findById(consumerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consumer not found with id: " + consumerId));
+
+        String oldProfileImage = consumer.getProfileImage();
+
+        if (oldProfileImage == null || oldProfileImage.isEmpty()) {
+            return ProfileResponse.builder()
+                    .success(true)
+                    .message("No profile picture to delete")
+                    .build();
         }
 
-        // Upload new picture
-        String fileUrl = fileStorageService.storeFile(file, "profile-images");
-        consumer.setProfileImage(fileUrl);
+        try {
+            fileStorageService.deleteFile(oldProfileImage);
 
-        Consumer updatedConsumer = consumerRepository.save(consumer);
-        return consumerMapper.toConsumerResponse(updatedConsumer);
+            consumer.setProfileImage(null);
+            consumerRepository.save(consumer);
+
+            return ProfileResponse.builder()
+                    .success(true)
+                    .message("Profile picture deleted successfully")
+                    .build();
+
+        } catch (Exception e) {
+            throw new IOException("Failed to delete profile picture: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -88,9 +141,10 @@ public class ConsumerServiceImpl implements ConsumerService {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
 
-        if (!consumer.getSavedProviders().contains(provider)) {
-            consumer.getSavedProviders().add(provider);
-            consumerRepository.save(consumer);
+        boolean alreadySaved = consumerRepository.isProviderSavedNative(consumerId, providerId);
+
+        if (!alreadySaved) {
+            consumerRepository.insertSavedProvider(consumerId, providerId);
         }
 
         return ProfileResponse.builder()
@@ -105,12 +159,15 @@ public class ConsumerServiceImpl implements ConsumerService {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found with id: " + consumerId));
 
-        consumer.getSavedProviders().removeIf(p -> p.getId().equals(providerId));
-        consumerRepository.save(consumer);
+        int deletedCount = consumerRepository.deleteSavedProvider(consumerId, providerId);
+
+        if (deletedCount > 0) {
+            consumer.getSavedProviders().removeIf(p -> p.getId().equals(providerId));
+        }
 
         return ProfileResponse.builder()
-                .success(true)
-                .message("Provider removed successfully")
+                .success(deletedCount > 0)
+                .message(deletedCount > 0 ? "Provider removed successfully" : "Provider was not in saved list")
                 .build();
     }
 

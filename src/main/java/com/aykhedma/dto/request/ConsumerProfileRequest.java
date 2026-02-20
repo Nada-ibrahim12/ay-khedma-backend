@@ -1,5 +1,6 @@
 package com.aykhedma.dto.request;
 
+import com.aykhedma.dto.location.LocationDTO;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -25,4 +26,6 @@ public class ConsumerProfileRequest {
 
     @Size(min = 2, max = 10, message = "Language code must be between 2 and 10 characters")
     private String preferredLanguage;
+
+    private LocationDTO location;
 }

@@ -67,6 +67,7 @@ public abstract class User {
     @Column(nullable = false)
     private boolean credentialsNonExpired = true;
 
+
     public UserType getRole() {
         return role;
     }

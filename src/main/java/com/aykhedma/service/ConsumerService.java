@@ -14,6 +14,7 @@ public interface ConsumerService {
     ConsumerResponse getConsumerProfile(Long consumerId);
     ConsumerResponse updateConsumerProfile(Long consumerId, ConsumerProfileRequest request);
     ConsumerResponse updateProfilePicture(Long consumerId, MultipartFile file) throws IOException;
+    ProfileResponse deleteProfilePicture(Long consumerId) throws IOException;
     ProfileResponse saveProvider(Long consumerId, Long providerId);
     ProfileResponse removeSavedProvider(Long consumerId, Long providerId);
     List<ProviderSummaryResponse> getSavedProviders(Long consumerId);
