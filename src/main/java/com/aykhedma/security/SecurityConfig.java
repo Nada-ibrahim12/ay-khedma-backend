@@ -38,9 +38,15 @@ public class SecurityConfig {
 
                 // Authorization rules
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
+
+                        .requestMatchers( "/auth/login",
+                                "/auth/register",
+                                "/auth/send-otp",
+                                "/auth/verify-otp",
+                                "/auth/refresh").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/provider/**").hasRole("PROVIDER")
+                        .requestMatchers("/consumer/**").hasRole("CONSUMER")
                         .anyRequest().authenticated()
                 )
 
