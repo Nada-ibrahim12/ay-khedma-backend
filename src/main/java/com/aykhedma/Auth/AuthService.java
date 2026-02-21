@@ -4,9 +4,7 @@ import com.aykhedma.dto.request.LoginRequest;
 import com.aykhedma.dto.request.RegisterRequest;
 import com.aykhedma.dto.response.AuthResponse;
 import com.aykhedma.model.RefreshToken;
-import com.aykhedma.model.user.Consumer;
-import com.aykhedma.model.user.User;
-import com.aykhedma.model.user.UserType;
+import com.aykhedma.model.user.*;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +18,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final RefreshTokenService refreshTokenService; // ✅ ADD THIS
+    private final RefreshTokenService refreshTokenService;
 
     public AuthResponse login(LoginRequest request) {
 
@@ -77,8 +75,20 @@ public class AuthService {
 
             userRepository.save(consumer);
 
-        } else {
-            throw new RuntimeException("Provider registration requires extra data");
+        }else if (request.getUserType() == UserType.PROVIDER) {
+
+            Provider provider = Provider.builder()
+                    .name(request.getName())
+                    .email(request.getEmail())
+                    .phoneNumber(request.getPhoneNumber())
+                    .password(encodedPassword)
+                    .role(UserType.PROVIDER)
+                    .enabled(false) // until OTP verified
+                    .credentialsNonExpired(true)
+                    .verificationStatus(VerificationStatus.PENDING)
+                    .build();
+
+            userRepository.save(provider);
         }
     }
 
