@@ -42,4 +42,11 @@ public interface ConsumerRepository extends JpaRepository<Consumer, Long> {
             nativeQuery = true)
     int deleteSavedProvider(@Param("consumerId") Long consumerId,
                             @Param("providerId") Long providerId);
+
+    @Modifying
+    @Query("UPDATE Consumer c SET c.location.id = :locationId WHERE c.id = :consumerId")
+    void updateConsumerLocation(@Param("consumerId") Long consumerId, @Param("locationId") Long locationId);
+
+    // Check if consumer exists without loading the entity
+    boolean existsById(Long id);
 }

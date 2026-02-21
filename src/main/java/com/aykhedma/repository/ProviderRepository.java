@@ -46,4 +46,6 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
     @Modifying
     @Query("UPDATE Provider c SET c.profileImage = :profileImage WHERE c.id = :consumerId")
     void updateProfileImage(@Param("providerId") Long consumerId, @Param("profileImage") String profileImage);
+
+    List<Provider> findByServiceTypeId(Long serviceTypeId);
 }
