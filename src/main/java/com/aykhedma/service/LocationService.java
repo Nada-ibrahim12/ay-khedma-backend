@@ -324,8 +324,8 @@ public class LocationService {
         );
 
         boolean isWithinServiceArea = false;
-        if (provider.getServiceArea() != null) {
-            isWithinServiceArea = distance <= provider.getServiceArea();
+        if (provider.getServiceArea() != null && provider.getServiceAreaRadius() != null) {
+            isWithinServiceArea = distance <= provider.getServiceAreaRadius();
         }
 
         log.info("Distance calculated: {} km between consumer {} and provider {}", distance, consumerId, providerId);
@@ -337,7 +337,7 @@ public class LocationService {
                 .consumerLocation(locationMapper.toDto(consumerLocation))
                 .providerLocation(locationMapper.toDto(providerLocation))
                 .withinServiceArea(isWithinServiceArea)
-                .providerServiceArea(provider.getServiceArea())
+                .providerServiceArea(provider.getServiceAreaRadius())
                 .build();
     }
 
@@ -359,7 +359,7 @@ public class LocationService {
             throw new ResourceNotFoundException("Provider has no location saved");
         }
 
-        if (provider.getServiceArea() == null) {
+        if (provider.getServiceAreaRadius() == null) {
             return false;
         }
 
@@ -370,7 +370,7 @@ public class LocationService {
                 longitude
         );
 
-        return distance <= provider.getServiceArea();
+        return distance <= provider.getServiceAreaRadius();
     }
 
     /**

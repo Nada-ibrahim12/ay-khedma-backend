@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.aykhedma.dto.location.LocationDTO;
 
 @Data
 @Builder
@@ -30,7 +31,6 @@ public class ProviderProfileRequest {
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
     private String bio;
 
-    // ADD THIS MISSING FIELD
     @Positive(message = "Service type ID must be positive")
     private Long serviceTypeId;
 
@@ -43,7 +43,11 @@ public class ProviderProfileRequest {
 
     private Boolean emergencyEnabled;
 
-    @DecimalMin(value = "0.1", message = "Service area must be at least 0.1 km")
-    @DecimalMax(value = "100.0", message = "Service area cannot exceed 100 km")
-    private Double serviceArea;
+    @Size(max = 100, message = "Area cannot exceed 100 characters")
+    private String serviceArea;
+
+    @DecimalMin(value = "0.0", message = "Service area radius cannot be negative")
+    private Double serviceAreaRadius;
+
+    private LocationDTO location;
 }

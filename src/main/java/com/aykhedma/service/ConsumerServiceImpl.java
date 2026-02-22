@@ -12,8 +12,6 @@ import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.repository.ConsumerRepository;
 import com.aykhedma.repository.ProviderRepository;
-import com.aykhedma.service.ConsumerService;
-import com.aykhedma.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +30,7 @@ public class ConsumerServiceImpl implements ConsumerService {
     private final ConsumerMapper consumerMapper;
     private final ProviderMapper providerMapper;
     private final FileStorageService fileStorageService;
+    private final LocationService locationService;
 
     @Override
     public ConsumerResponse getConsumerProfile(Long consumerId) {
@@ -56,6 +55,11 @@ public class ConsumerServiceImpl implements ConsumerService {
         }
         if (request.getPreferredLanguage() != null) {
             consumer.setPreferredLanguage(request.getPreferredLanguage());
+        }
+
+//        also can update location here
+        if (request.getLocation() != null) {
+            locationService.updateConsumerLocation(consumerId, request.getLocation());
         }
 
         Consumer updatedConsumer = consumerRepository.save(consumer);
@@ -143,6 +147,13 @@ public class ConsumerServiceImpl implements ConsumerService {
 
         boolean alreadySaved = consumerRepository.isProviderSavedNative(consumerId, providerId);
 
+        if (alreadySaved) {
+            return ProfileResponse.builder()
+                    .success(false)
+                    .message("Provider already saved")
+                    .id(providerId)
+                    .build();
+        }
         if (!alreadySaved) {
             consumerRepository.insertSavedProvider(consumerId, providerId);
         }
@@ -177,19 +188,5 @@ public class ConsumerServiceImpl implements ConsumerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found with id: " + consumerId));
 
         return providerMapper.toProviderSummaryResponseList(consumer.getSavedProviders());
-    }
-
-    @Override
-    public ProfileResponse updateLocation(Long consumerId, LocationDTO request) {
-        Consumer consumer = consumerRepository.findById(consumerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Consumer not found with id: " + consumerId));
-
-        // For now, just acknowledge - location handling will be implemented later
-        // You can add location entity to Consumer if needed
-
-        return ProfileResponse.builder()
-                .success(true)
-                .message("Location updated successfully")
-                .build();
     }
 }

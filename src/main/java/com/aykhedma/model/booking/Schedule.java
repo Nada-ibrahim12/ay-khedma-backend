@@ -26,7 +26,7 @@ public class Schedule {
 
     @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<TimeSlot> availableSlots = new ArrayList<>();
+    private List<TimeSlot> timeSlots = new ArrayList<>();
 
 //    @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL)
 //    @Builder.Default

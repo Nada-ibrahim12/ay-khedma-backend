@@ -18,5 +18,4 @@ public interface ConsumerService {
     ProfileResponse saveProvider(Long consumerId, Long providerId);
     ProfileResponse removeSavedProvider(Long consumerId, Long providerId);
     List<ProviderSummaryResponse> getSavedProviders(Long consumerId);
-    ProfileResponse updateLocation(Long consumerId, LocationDTO request);
 }

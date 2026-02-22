@@ -83,6 +83,18 @@ public class ConsumerController {
         return ResponseEntity.ok(response);
     }
 
+    @DeleteMapping("/{consumerId}/profile-picture")
+    @Operation(summary = "Delete profile picture")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Successfully deleted profile picture"),
+            @ApiResponse(responseCode = "404", description = "Consumer not found or no profile picture exists")
+    })
+    public ResponseEntity<Void> deleteProfilePicture(
+            @Parameter(description = "ID of the consumer", required = true)
+            @PathVariable Long consumerId) throws IOException {
+        consumerService.deleteProfilePicture(consumerId);
+        return ResponseEntity.noContent().build();
+    }
     @PostMapping("/{consumerId}/saved-providers/{providerId}")
     @Operation(summary = "Save a provider to favorites")
     @ApiResponses(value = {
@@ -130,37 +142,6 @@ public class ConsumerController {
             @PathVariable Long consumerId) {
         List<ProviderSummaryResponse> responses = consumerService.getSavedProviders(consumerId);
         return ResponseEntity.ok(responses);
-    }
-
-    @PatchMapping("/{consumerId}/location")
-    @Operation(summary = "Update consumer location")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully updated location",
-                    content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Consumer not found"),
-            @ApiResponse(responseCode = "400", description = "Invalid location data")
-    })
-    public ResponseEntity<ProfileResponse> updateLocation(
-            @Parameter(description = "ID of the consumer", required = true)
-            @PathVariable Long consumerId,
-
-            @Parameter(description = "Location data (latitude, longitude, address)", required = true)
-            @Valid @RequestBody LocationDTO request) {
-        ProfileResponse response = consumerService.updateLocation(consumerId, request);
-        return ResponseEntity.ok(response);
-    }
-
-    @DeleteMapping("/{consumerId}/profile-picture")
-    @Operation(summary = "Delete profile picture")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Successfully deleted profile picture"),
-            @ApiResponse(responseCode = "404", description = "Consumer not found or no profile picture exists")
-    })
-    public ResponseEntity<Void> deleteProfilePicture(
-            @Parameter(description = "ID of the consumer", required = true)
-            @PathVariable Long consumerId) throws IOException {
-        consumerService.deleteProfilePicture(consumerId);
-        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{consumerId}/exists")

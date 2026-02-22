@@ -5,8 +5,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Data
@@ -15,8 +17,9 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class WorkingDayRequest {
 
-    @NotNull(message = "Day of week is required")
-    private DayOfWeek dayOfWeek;
+    @NotNull(message = "Date is required")
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate date;
 
     @NotNull(message = "Start time is required")
     private LocalTime startTime;

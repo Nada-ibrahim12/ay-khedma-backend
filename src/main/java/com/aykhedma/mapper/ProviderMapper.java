@@ -32,6 +32,8 @@ public interface ProviderMapper {
     @Mapping(source = "acceptanceRate", target = "acceptanceRate")
     @Mapping(source = "schedule", target = "schedule")
     @Mapping(target = "documents", ignore = true)
+    @Mapping(source = "serviceAreaRadius", target = "serviceAreaRadius")
+    @Mapping(source = "serviceArea", target = "serviceArea")
     ProviderResponse toProviderResponse(Provider provider);
 
     @Mapping(source = "id", target = "id")
@@ -45,6 +47,7 @@ public interface ProviderMapper {
     @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")
     @Mapping(target = "distance", ignore = true)
     @Mapping(target = "estimatedArrivalTime", ignore = true)
+    @Mapping(source = "serviceArea", target = "serviceArea")
     ProviderSummaryResponse toProviderSummaryResponse(Provider provider);
 
     List<ProviderResponse> toProviderResponseList(List<Provider> providers);

@@ -1,9 +1,9 @@
 package com.aykhedma.controller;
 
-import com.aykhedma.dto.location.LocationDTO;
 import com.aykhedma.dto.request.ProviderProfileRequest;
 import com.aykhedma.dto.request.WorkingDayRequest;
 import com.aykhedma.dto.response.*;
+import com.aykhedma.model.user.VerificationStatus;
 import com.aykhedma.service.ProviderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -42,7 +42,7 @@ public class ProviderController {
             @ApiResponse(responseCode = "404", description = "Provider not found")
     })
     public ResponseEntity<ProviderResponse> getProviderProfile(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId) {
         ProviderResponse response = providerService.getProviderProfile(providerId);
         return ResponseEntity.ok(response);
@@ -57,7 +57,7 @@ public class ProviderController {
             @ApiResponse(responseCode = "400", description = "Invalid input data")
     })
     public ResponseEntity<ProviderResponse> updateProviderProfile(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId,
 
             @Parameter(description = "Updated provider profile data", required = true)
@@ -75,7 +75,7 @@ public class ProviderController {
             @ApiResponse(responseCode = "400", description = "Invalid file format or size")
     })
     public ResponseEntity<ProviderResponse> updateProfilePicture(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId,
 
             @Parameter(description = "Profile picture file (max 5MB, supported formats: JPEG, PNG, GIF)", required = true)
@@ -84,106 +84,213 @@ public class ProviderController {
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{providerId}/profile-picture")
-    @Operation(summary = "Delete profile picture")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Successfully deleted profile picture"),
-            @ApiResponse(responseCode = "404", description = "Provider not found")
-    })
-    public ResponseEntity<Void> deleteProfilePicture(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
-            @PathVariable Long providerId) throws IOException {
-        providerService.updateProfilePicture(providerId, null);
-        return ResponseEntity.noContent().build();
-    }
+//    @DeleteMapping("/{providerId}/profile-picture")
+//    @Operation(summary = "Delete profile picture")
+//    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "204", description = "Successfully deleted profile picture"),
+//            @ApiResponse(responseCode = "404", description = "Provider not found")
+//    })
+//    public ResponseEntity<Void> deleteProfilePicture(
+//            @Parameter(description = "ID of the provider", required = true)
+//            @PathVariable Long providerId) throws IOException {
+//        providerService.updateProfilePicture(providerId, null);
+//        return ResponseEntity.noContent().build();
+//    }
 
-    // ===== Location Management =====
-
-    @PatchMapping("/{providerId}/location")
-    @Operation(summary = "Update provider location")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully updated location",
-                    content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Provider not found"),
-            @ApiResponse(responseCode = "400", description = "Invalid location data")
-    })
-    public ResponseEntity<ProfileResponse> updateProviderLocation(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
-            @PathVariable Long providerId,
-
-            @Parameter(description = "Location data", required = true)
-            @Valid @RequestBody LocationDTO request) {
-        ProfileResponse response = providerService.updateProviderLocation(providerId, request);
-        return ResponseEntity.ok(response);
-    }
-
-    // ===== Schedule Management =====
-
+    
+//    === SCHEDULE MANAGEMENT ===
     @GetMapping("/{providerId}/schedule")
-    @Operation(summary = "Get provider schedule")
+    @Operation(summary = "Get provider's complete schedule with working days and time slots")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved schedule",
                     content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
             @ApiResponse(responseCode = "404", description = "Provider not found")
     })
     public ResponseEntity<ScheduleResponse> getSchedule(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId) {
         ScheduleResponse response = providerService.getSchedule(providerId);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{providerId}/schedule/working-days")
-    @Operation(summary = "Add working day")
+    @Operation(summary = "Add a working day template (recurring weekly schedule)")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Successfully added working day",
+            @ApiResponse(responseCode = "201", description = "Working day added successfully",
                     content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Provider not found"),
-            @ApiResponse(responseCode = "400", description = "Invalid working day data or duplicate")
+            @ApiResponse(responseCode = "400", description = "Invalid working day data or duplicate day"),
+            @ApiResponse(responseCode = "404", description = "Provider not found")
     })
     public ResponseEntity<ScheduleResponse> addWorkingDay(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId,
-
-            @Parameter(description = "Working day data", required = true)
+            @Parameter(description = "Working day data (day of week, start time, end time)", required = true)
             @Valid @RequestBody WorkingDayRequest request) {
         ScheduleResponse response = providerService.addWorkingDay(providerId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @DeleteMapping("/{providerId}/schedule/working-days/{workingDayId}")
-    @Operation(summary = "Remove working day")
+    @PutMapping("/{providerId}/schedule/working-days/{workingDayId}")
+    @Operation(summary = "Update an existing working day template")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully removed working day",
+            @ApiResponse(responseCode = "200", description = "Working day updated successfully",
+                    content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid working day data"),
+            @ApiResponse(responseCode = "404", description = "Provider or working day not found")
+    })
+    public ResponseEntity<ScheduleResponse> updateWorkingDay(
+            @Parameter(description = "ID of the provider", required = true)
+            @PathVariable Long providerId,
+            @Parameter(description = "ID of the working day", required = true)
+            @PathVariable Long workingDayId,
+            @Parameter(description = "Updated working day data", required = true)
+            @Valid @RequestBody WorkingDayRequest request) {
+        ScheduleResponse response = providerService.updateWorkingDay(providerId, workingDayId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{providerId}/schedule/working-days/{workingDayId}")
+    @Operation(summary = "Remove a working day template and its future available slots")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Working day removed successfully",
                     content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
             @ApiResponse(responseCode = "404", description = "Provider or working day not found")
     })
     public ResponseEntity<ScheduleResponse> removeWorkingDay(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId,
-
-            @Parameter(description = "ID of the working day", required = true, example = "1")
+            @Parameter(description = "ID of the working day to remove", required = true)
             @PathVariable Long workingDayId) {
         ScheduleResponse response = providerService.removeWorkingDay(providerId, workingDayId);
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/{providerId}/available-slots")
-    @Operation(summary = "Get available time slots")
+    // ===== Time Slots Management =====
+
+    @GetMapping("/{providerId}/time-slots")
+    @Operation(summary = "Get all time slots for a specific date")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successfully retrieved time slots"),
             @ApiResponse(responseCode = "404", description = "Provider not found")
     })
-    public ResponseEntity<List<LocalTime>> getAvailableTimeSlots(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+    public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getTimeSlotsByDate(
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId,
-
-            @Parameter(description = "Date (format: yyyy-MM-dd)", required = true, example = "2026-03-01")
+            @Parameter(description = "Date (format: yyyy-MM-dd)", required = true)
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        List<LocalTime> response = providerService.getAvailableTimeSlots(providerId, date);
+        List<ScheduleResponse.TimeSlotResponse> response = providerService.getTimeSlotsByDate(providerId, date);
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{providerId}/available-slots")
+    @Operation(summary = "Get ONLY available (not booked) time slots for a specific date")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved available time slots"),
+            @ApiResponse(responseCode = "404", description = "Provider not found")
+    })
+    public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getAvailableTimeSlots(
+            @Parameter(description = "ID of the provider", required = true)
+            @PathVariable Long providerId,
+            @Parameter(description = "Date (format: yyyy-MM-dd)", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        List<ScheduleResponse.TimeSlotResponse> response = providerService.getAvailableTimeSlots(providerId, date);
+        return ResponseEntity.ok(response);
+    }
+
+//    @GetMapping("/{providerId}/time-slots/range")
+//    @Operation(summary = "Get all time slots within a date range")
+//    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "200", description = "Successfully retrieved time slots"),
+//            @ApiResponse(responseCode = "404", description = "Provider not found")
+//    })
+//    public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getTimeSlotsInRange(
+//            @Parameter(description = "ID of the provider", required = true)
+//            @PathVariable Long providerId,
+//            @Parameter(description = "Start date (format: yyyy-MM-dd)", required = true)
+//            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+//            @Parameter(description = "End date (format: yyyy-MM-dd)", required = true, example = "2026-03-07")
+//            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+//        List<ScheduleResponse.TimeSlotResponse> response = providerService.getTimeSlotsInRange(providerId, startDate, endDate);
+//        return ResponseEntity.ok(response);
+//    }
+
+    @GetMapping("/{providerId}/time-slots/{timeSlotId}")
+    @Operation(summary = "Get a specific time slot by ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved time slot"),
+            @ApiResponse(responseCode = "404", description = "Time slot not found")
+    })
+    public ResponseEntity<ScheduleResponse.TimeSlotResponse> getTimeSlotById(
+            @Parameter(description = "ID of the provider", required = true)
+            @PathVariable Long providerId,
+            @Parameter(description = "ID of the time slot", required = true)
+            @PathVariable Long timeSlotId) {
+        ScheduleResponse.TimeSlotResponse response = providerService.getTimeSlot(providerId, timeSlotId);
+        return ResponseEntity.ok(response);
+    }
+
+    // ===== Booking =====
+
+    @PostMapping("/time-slots/{timeSlotId}/book")
+    @Operation(summary = "Book a time slot (internal use - called when booking is confirmed)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Time slot booked successfully"),
+            @ApiResponse(responseCode = "400", description = "Time slot not available or duration exceeds slot"),
+            @ApiResponse(responseCode = "404", description = "Time slot not found")
+    })
+    public ResponseEntity<ScheduleResponse.TimeSlotResponse> bookTimeSlot(
+            @Parameter(description = "ID of the time slot", required = true)
+            @PathVariable Long timeSlotId,
+            @Parameter(description = "Duration in minutes", required = true)
+            @RequestParam Integer durationMinutes) {
+        ScheduleResponse.TimeSlotResponse response = providerService.bookTimeSlot(timeSlotId, durationMinutes);
+        return ResponseEntity.ok(response);
+    }
+
+//    @PostMapping("/time-slots/{timeSlotId}/cancel-booking")
+//    @Operation(summary = "Cancel a booking and make the time slot available again")
+//    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "200", description = "Booking cancelled successfully"),
+//            @ApiResponse(responseCode = "400", description = "Time slot is not booked"),
+//            @ApiResponse(responseCode = "404", description = "Time slot not found")
+//    })
+//    public ResponseEntity<ScheduleResponse.TimeSlotResponse> cancelBooking(
+//            @Parameter(description = "ID of the time slot", required = true)
+//            @PathVariable Long timeSlotId) {
+//        ScheduleResponse.TimeSlotResponse response = providerService.cancelBooking(timeSlotId);
+//        return ResponseEntity.ok(response);
+//    }
+
+    // ===== Provider Schedule Overview =====
+
+    @GetMapping("/{providerId}/schedule/upcoming")
+    @Operation(summary = "Get upcoming available slots for the next N days")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved upcoming slots"),
+            @ApiResponse(responseCode = "404", description = "Provider not found")
+    })
+    public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getUpcomingAvailableSlots(
+            @Parameter(description = "ID of the provider", required = true)
+            @PathVariable Long providerId,
+            @Parameter(description = "Number of days to look ahead", required = true)
+            @RequestParam(defaultValue = "7") Integer days) {
+        List<ScheduleResponse.TimeSlotResponse> response = providerService.getUpcomingAvailableSlots(providerId, days);
+        return ResponseEntity.ok(response);
+    }
+
+//    @GetMapping("/{providerId}/schedule/working-days")
+//    @Operation(summary = "Get all working day templates")
+//    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "200", description = "Successfully retrieved working days"),
+//            @ApiResponse(responseCode = "404", description = "Provider not found")
+//    })
+//    public ResponseEntity<List<ScheduleResponse.WorkingDayResponse>> getWorkingDays(
+//            @Parameter(description = "ID of the provider", required = true)
+//            @PathVariable Long providerId) {
+//        List<ScheduleResponse.WorkingDayResponse> response = providerService.getWorkingDays(providerId);
+//        return ResponseEntity.ok(response);
+//    }
+    
     // ===== Document Management =====
 
     @PostMapping(value = "/{providerId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -195,7 +302,7 @@ public class ProviderController {
             @ApiResponse(responseCode = "400", description = "Invalid file format or size")
     })
     public ResponseEntity<DocumentResponse> uploadDocument(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId,
 
             @Parameter(description = "Document file (max 10MB, supported formats: PDF, DOC, DOCX, XLS, XLSX, TXT)", required = true)
@@ -215,7 +322,7 @@ public class ProviderController {
             @ApiResponse(responseCode = "404", description = "Provider not found")
     })
     public ResponseEntity<List<DocumentResponse>> getProviderDocuments(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId) {
         List<DocumentResponse> response = providerService.getProviderDocuments(providerId);
         return ResponseEntity.ok(response);
@@ -229,55 +336,24 @@ public class ProviderController {
             @ApiResponse(responseCode = "404", description = "Provider or document not found")
     })
     public ResponseEntity<ProfileResponse> deleteDocument(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId,
 
-            @Parameter(description = "ID of the document", required = true, example = "1")
+            @Parameter(description = "ID of the document", required = true)
             @PathVariable Long documentId) {
         ProfileResponse response = providerService.deleteDocument(providerId, documentId);
         return ResponseEntity.ok(response);
     }
 
-    // ===== Search & Discovery =====
 
-    @GetMapping("/nearby")
-    @Operation(summary = "Find nearby providers")
+    @GetMapping("/all")
+    @Operation(summary = "all providers")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successfully found providers",
                     content = @Content(schema = @Schema(implementation = ProviderSummaryResponse.class)))
     })
-    public ResponseEntity<List<ProviderSummaryResponse>> findNearbyProviders(
-            @Parameter(description = "Latitude", required = true, example = "30.0444")
-            @RequestParam Double latitude,
-
-            @Parameter(description = "Longitude", required = true, example = "31.2357")
-            @RequestParam Double longitude,
-
-            @Parameter(description = "Service type ID", required = true, example = "1")
-            @RequestParam Long serviceTypeId,
-
-            @Parameter(description = "Search radius in km", required = true, example = "10")
-            @RequestParam Double radius) {
-        List<ProviderSummaryResponse> response = providerService.findNearbyProviders(latitude, longitude, serviceTypeId, radius);
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/search")
-    @Operation(summary = "Search providers")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully found providers",
-                    content = @Content(schema = @Schema(implementation = ProviderSummaryResponse.class)))
-    })
-    public ResponseEntity<List<ProviderSummaryResponse>> searchProviders(
-            @Parameter(description = "Search keyword", example = "plumber")
-            @RequestParam(required = false) String keyword,
-
-            @Parameter(description = "Category ID", example = "1")
-            @RequestParam(required = false) Long categoryId,
-
-            @Parameter(description = "Minimum rating", example = "4.0")
-            @RequestParam(required = false) Double minRating) {
-        List<ProviderSummaryResponse> response = providerService.searchProviders(keyword, categoryId, minRating);
+    public ResponseEntity<List<ProviderSummaryResponse>> allProviders() {
+        List<ProviderSummaryResponse> response = providerService.allProviders();
         return ResponseEntity.ok(response);
     }
 
@@ -290,10 +366,10 @@ public class ProviderController {
                     content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
             @ApiResponse(responseCode = "404", description = "Provider not found")
     })
-    public ResponseEntity<ProviderResponse> getVerificationStatus(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+    public ResponseEntity<VerificationStatus> getVerificationStatus(
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId) {
-        ProviderResponse response = providerService.getVerificationStatus(providerId);
+        VerificationStatus response = providerService.getVerificationStatus(providerId);
         return ResponseEntity.ok(response);
     }
 //
@@ -305,7 +381,7 @@ public class ProviderController {
 //            @ApiResponse(responseCode = "404", description = "Provider not found")
 //    })
 //    public ResponseEntity<ProviderResponse> updateEmergencyStatus(
-//            @Parameter(description = "ID of the provider", required = true, example = "1")
+//            @Parameter(description = "ID of the provider", required = true)
 //            @PathVariable Long providerId,
 //
 //            @Parameter(description = "Emergency status", required = true, example = "true")
@@ -322,7 +398,7 @@ public class ProviderController {
             @ApiResponse(responseCode = "404", description = "Provider does not exist")
     })
     public ResponseEntity<Void> checkProviderExists(
-            @Parameter(description = "ID of the provider", required = true, example = "1")
+            @Parameter(description = "ID of the provider", required = true)
             @PathVariable Long providerId) {
         try {
             providerService.getProviderProfile(providerId);

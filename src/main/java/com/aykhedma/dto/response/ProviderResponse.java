@@ -35,4 +35,6 @@ public class ProviderResponse {
     private Integer acceptanceRate;
     private List<DocumentResponse> documents;
     private ScheduleResponse schedule;
+    private Double serviceAreaRadius;
+    private String serviceArea;
 }

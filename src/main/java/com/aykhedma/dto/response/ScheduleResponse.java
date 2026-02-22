@@ -15,7 +15,7 @@ import java.util.List;
 public class ScheduleResponse {
     private Long id;
     private List<WorkingDayResponse> workingDays;
-    private List<TimeSlotResponse> availableSlots;
+    private List<TimeSlotResponse> timeSlots;
 
     @Data
     @Builder
@@ -23,7 +23,7 @@ public class ScheduleResponse {
     @AllArgsConstructor
     public static class WorkingDayResponse {
         private Long id;
-        private String dayOfWeek;
+        private String date;
         private LocalTime startTime;
         private LocalTime endTime;
     }
@@ -38,5 +38,6 @@ public class ScheduleResponse {
         private LocalTime startTime;
         private LocalTime endTime;
         private boolean isBooked;
+        private String status;
     }
 }
