@@ -1,15 +1,16 @@
-//package com.aykhedma;
-//
-//import org.junit.jupiter.api.Test;
-//import org.springframework.boot.test.context.SpringBootTest;
-//import org.springframework.context.annotation.Import;
-//
-//@Import(TestcontainersConfiguration.class)
-//@SpringBootTest
-//class AyKhedmaBackendApplicationTests {
-//
-//    @Test
-//    void contextLoads() {
-//    }
-//
-//}
+package com.aykhedma;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.testcontainers.utility.TestcontainersConfiguration;
+
+@Import(TestcontainersConfiguration.class)
+@SpringBootTest
+class AyKhedmaBackendApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}

@@ -22,7 +22,7 @@ public interface ConsumerRepository extends JpaRepository<Consumer, Long> {
 
     @Modifying
     @Query("UPDATE Consumer c SET c.profileImage = :profileImage WHERE c.id = :consumerId")
-    void updateProfileImage(@Param("consumerId") Long consumerId, @Param("profileImage") String profileImage);
+    int updateProfileImage(@Param("consumerId") Long consumerId, @Param("profileImage") String profileImage);
 
     @Query(value = "SELECT COUNT(*) > 0 FROM consumer_saved_providers " +
             "WHERE consumer_id = :consumerId AND provider_id = :providerId",
