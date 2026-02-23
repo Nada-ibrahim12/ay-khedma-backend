@@ -3,6 +3,7 @@ package com.aykhedma.controller;
 import com.aykhedma.dto.request.ProviderProfileRequest;
 import com.aykhedma.dto.request.WorkingDayRequest;
 import com.aykhedma.dto.response.*;
+import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.model.user.VerificationStatus;
 import com.aykhedma.service.ProviderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -406,5 +411,39 @@ public class ProviderController {
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search providers with filters and location-based sorting")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Search completed successfully"),
+            @ApiResponse(responseCode = "404", description = "Consumer not found")
+    })
+    public ResponseEntity<Page<SearchResponse>> search(
+            @Parameter(description = "Search keyword (searches in name, bio, service type)")
+            @RequestParam(required = false) String keyword,
+
+            @Parameter(description = "Filter by category ID")
+            @RequestParam(required = false) Long categoryId,
+
+            @Parameter(description = "Filter by category name")
+            @RequestParam(required = false) String categoryName,
+
+            @Parameter(description = "Consumer ID for location-based search")
+            @RequestParam(required = true) Long consumerId,
+
+            @Parameter(description = "Search radius in kilometers (requires consumerId)")
+            @RequestParam(required = false, defaultValue = "5.0") Double radius,
+
+            @Parameter(description = "Sort by field (distance, rating, price, experience)")
+            @RequestParam(required = false, defaultValue = "rating") String sortBy,
+
+            @PageableDefault(size = 20, sort = "averageRating", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+
+        Page<SearchResponse> response = providerService.search(
+                keyword, categoryId, categoryName, consumerId, radius, sortBy, pageable);
+
+        return ResponseEntity.ok(response);
     }
 }

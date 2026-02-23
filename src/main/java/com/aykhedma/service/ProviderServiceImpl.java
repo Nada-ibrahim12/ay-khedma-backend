@@ -22,6 +22,9 @@ import com.aykhedma.repository.*;
 import com.aykhedma.service.FileStorageService;
 import com.aykhedma.service.ProviderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -180,6 +183,133 @@ public class ProviderServiceImpl implements ProviderService {
     public List<ProviderSummaryResponse> allProviders() {
         List<Provider> providers = providerRepository.findAll();
         return providerMapper.toProviderSummaryResponseList(providers);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<SearchResponse> search(
+            String keyword,
+            Long categoryId,
+            String categoryName,
+            Long consumerId,
+            Double radius,
+            String sortBy,
+            Pageable pageable) {
+
+        Page<Provider> providersPage = providerRepository.searchProviders(
+                keyword, categoryId, categoryName, pageable);
+
+        if (consumerId == null || radius == null) {
+            List<SearchResponse> responses = providersPage.getContent()
+                    .stream()
+                    .map(provider -> {
+                        SearchResponse response = providerMapper.toSearchResponse(provider);
+                        response.setDistance(null);
+                        response.setEstimatedArrivalTime(null);
+                        return response;
+                    })
+                    .collect(Collectors.toList());
+
+            List<SearchResponse> sortedResponses = applySorting(responses, sortBy, null);
+
+            return new PageImpl<>(sortedResponses, pageable, providersPage.getTotalElements());
+        }
+
+        // === Location-based filtering ===
+        try {
+//            LocationDTO consumerLocation = locationService.getConsumerLocation(consumerId);
+
+            List<SearchResponse> filteredList = providersPage.getContent()
+                    .stream()
+                    .filter(provider -> provider.getLocation() != null)
+                    .map(provider -> {
+                        try {
+                            // calc distance
+                            double distance = locationService.calculateDistanceBetweenConsumerAndProvider(
+                                    consumerId, provider.getId()).getDistanceKm();
+
+                            // within radius?
+                            if (distance > radius) return null;
+
+                            SearchResponse response = providerMapper.toSearchResponse(provider);
+                            response.setDistance(Math.round(distance * 100.0) / 100.0);
+
+                            // calc estimated arrival time (average speed 30 km/h in city)
+                            int estimatedMinutes = (int) Math.round((distance / 30.0) * 60);
+                            response.setEstimatedArrivalTime(estimatedMinutes);
+
+                            // Check if within provider's service area
+                            response.setWithinServiceArea(distance <= provider.getServiceAreaRadius());
+
+                            return response;
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            List<SearchResponse> sortedList = applySorting(filteredList, sortBy, consumerId);
+
+            return new PageImpl<>(sortedList, pageable, sortedList.size());
+
+        } catch (ResourceNotFoundException e) {
+
+            // Return results without location filtering
+            List<SearchResponse> responses = providersPage.getContent()
+                    .stream()
+                    .map(provider -> {
+                        SearchResponse response = providerMapper.toSearchResponse(provider);
+                        response.setDistance(null);
+                        response.setEstimatedArrivalTime(null);
+                        return response;
+                    })
+                    .collect(Collectors.toList());
+
+            List<SearchResponse> sortedResponses = applySorting(responses, sortBy, null);
+            return new PageImpl<>(sortedResponses, pageable, providersPage.getTotalElements());
+        }
+    }
+
+    /**
+     * Helper method to apply sorting based on sortBy parameter
+     */
+    private List<SearchResponse> applySorting(List<SearchResponse> responses, String sortBy, Long consumerId) {
+        if (responses == null || responses.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        String sortField = sortBy != null ? sortBy.toLowerCase() : "rating";
+
+        switch (sortField) {
+            case "price_low":
+                return responses.stream()
+                        .sorted(Comparator.comparing(SearchResponse::getPrice))
+                        .collect(Collectors.toList());
+
+            case "price_high":
+                return responses.stream()
+                        .sorted(Comparator.comparing(SearchResponse::getPrice).reversed())
+                        .collect(Collectors.toList());
+
+            case "experience":
+                return responses.stream()
+                        .sorted(Comparator.comparing(SearchResponse::getCompletedJobs).reversed())
+                        .collect(Collectors.toList());
+
+            case "distance":
+                return responses.stream()
+                        .filter(r -> r.getDistance() != null)
+                        .sorted(Comparator.comparing(SearchResponse::getDistance))
+                        .collect(Collectors.toList());
+
+            case "rating":
+            default:
+                return responses.stream()
+                        .sorted(Comparator.comparing(SearchResponse::getAverageRating,
+                                Comparator.nullsLast(Comparator.reverseOrder())))
+                        .collect(Collectors.toList());
+        }
     }
 
     @Override

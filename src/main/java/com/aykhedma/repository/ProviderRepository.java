@@ -3,6 +3,8 @@ package com.aykhedma.repository;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.model.user.VerificationStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -48,4 +50,25 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
     void updateProfileImage(@Param("providerId") Long providerId, @Param("profileImage") String profileImage);
 
     List<Provider> findByServiceTypeId(Long serviceTypeId);
+
+    @Query("SELECT p FROM Provider p " +
+            "LEFT JOIN p.serviceType s " +
+            "LEFT JOIN s.category c " +
+            "WHERE p.enabled = true " +
+            "AND p.verificationStatus = 'VERIFIED' " +
+            "AND (:keyword IS NULL OR :keyword = '' OR " +
+            "    LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "    LOWER(COALESCE(p.bio, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "    LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "    LOWER(COALESCE(s.nameAr, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "    LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "    LOWER(COALESCE(p.serviceArea, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+            "AND (:categoryId IS NULL OR c.id = :categoryId) " +
+            "AND (:categoryName IS NULL OR :categoryName = '' OR " +
+            "    LOWER(c.name) = LOWER(:categoryName))")
+    Page<Provider> searchProviders(
+            @Param("keyword") String keyword,
+            @Param("categoryId") Long categoryId,
+            @Param("categoryName") String categoryName,
+            Pageable pageable);
 }

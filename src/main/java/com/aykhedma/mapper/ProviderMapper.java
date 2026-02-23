@@ -2,6 +2,7 @@ package com.aykhedma.mapper;
 
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.ProviderSummaryResponse;
+import com.aykhedma.dto.response.SearchResponse;
 import com.aykhedma.model.user.Provider;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -49,6 +50,18 @@ public interface ProviderMapper {
     @Mapping(target = "estimatedArrivalTime", ignore = true)
     @Mapping(source = "serviceArea", target = "serviceArea")
     ProviderSummaryResponse toProviderSummaryResponse(Provider provider);
+
+
+    @Mapping(source = "serviceType.name", target = "serviceType")
+    @Mapping(source = "serviceType.nameAr", target = "serviceTypeAr")
+    @Mapping(source = "serviceType.category.name", target = "categoryName")
+    @Mapping(source = "serviceAreaRadius", target = "serviceAreaRadius")
+    @Mapping(source = "serviceArea", target = "serviceArea")
+    @Mapping(target = "distance", ignore = true)
+    @Mapping(target = "estimatedArrivalTime", ignore = true)
+    @Mapping(target = "withinServiceArea", ignore = true)
+    @Mapping(source = "bio", target = "bio")
+    SearchResponse toSearchResponse(Provider provider);
 
     List<ProviderResponse> toProviderResponseList(List<Provider> providers);
 

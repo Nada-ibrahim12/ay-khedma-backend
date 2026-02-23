@@ -6,6 +6,8 @@ import com.aykhedma.dto.request.WorkingDayRequest;
 import com.aykhedma.dto.response.*;
 import com.aykhedma.model.booking.TimeSlot;
 import com.aykhedma.model.user.VerificationStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -24,6 +26,14 @@ public interface ProviderService {
 //    ProfileResponse updateProviderLocation(Long providerId, LocationDTO request);
 //    List<ProviderSummaryResponse> findNearbyProviders(Double latitude, Double longitude, Long serviceTypeId, Double radius);
     List<ProviderSummaryResponse> allProviders();
+    Page<SearchResponse> search(
+            String keyword,
+            Long categoryId,
+            String categoryName,
+            Long consumerId,
+            Double radius,
+            String sortBy,
+            Pageable pageable);
 
     // Schedule Management
     ScheduleResponse addWorkingDay(Long providerId, WorkingDayRequest request);
