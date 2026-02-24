@@ -44,7 +44,7 @@ public class Location {
     @Size(max = 100, message = "Country cannot exceed 100 characters")
     private String country;
 
-    @Column(columnDefinition = "geography(POINT, 4326)")
+    @Column(columnDefinition = "geometry")
     private Point coordinates;
 
     public double calculateDistance(Location other) {

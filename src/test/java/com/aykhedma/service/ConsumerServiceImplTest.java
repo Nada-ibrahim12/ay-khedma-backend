@@ -146,6 +146,22 @@ class ConsumerServiceImplTest {
             verify(locationService, never()).updateConsumerLocation(any(), any());
             verify(consumerRepository).save(consumer);
         }
+
+        @Test
+        @DisplayName("Should throw ResourceNotFoundException when consumer does not exist")
+        void updateConsumerProfile_NonExistingId_ThrowsException() {
+            ConsumerProfileRequest request = TestDataFactory.createConsumerProfileRequest();
+
+            when(consumerRepository.findById(NON_EXISTENT_ID)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> consumerService.updateConsumerProfile(NON_EXISTENT_ID, request))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Consumer not found with id: " + NON_EXISTENT_ID);
+
+            verify(consumerRepository).findById(NON_EXISTENT_ID);
+            verify(consumerRepository, never()).save(any());
+            verify(locationService, never()).updateConsumerLocation(any(), any());
+        }
     }
 
     @Nested

@@ -324,7 +324,7 @@ public class LocationService {
         );
 
         boolean isWithinServiceArea = false;
-        if (provider.getServiceArea() != null && provider.getServiceAreaRadius() != null) {
+        if (provider.getServiceAreaRadius() != null) {
             isWithinServiceArea = distance <= provider.getServiceAreaRadius();
         }
 

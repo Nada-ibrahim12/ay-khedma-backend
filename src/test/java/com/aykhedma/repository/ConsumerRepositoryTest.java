@@ -3,6 +3,10 @@ package com.aykhedma.repository;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.model.user.UserType;
+import com.aykhedma.model.service.PriceType;
+import com.aykhedma.model.service.RiskLevel;
+import com.aykhedma.model.service.ServiceCategory;
+import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.util.TestDataFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,16 +36,35 @@ class ConsumerRepositoryTest {
 
     private Consumer consumer;
     private Provider provider;
+    private ServiceType serviceType;
 
     @BeforeEach
     void setUp() {
+        String uniqueSuffix = String.valueOf(System.nanoTime());
+        ServiceCategory category = ServiceCategory.builder()
+            .name("Home Services " + uniqueSuffix)
+            .build();
+        entityManager.persist(category);
+
+        serviceType = ServiceType.builder()
+            .name("Plumbing " + uniqueSuffix)
+            .category(category)
+            .riskLevel(RiskLevel.LOW)
+            .defaultPriceType(PriceType.HOUR)
+            .basePrice(100.0)
+            .build();
+        entityManager.persist(serviceType);
+
         consumer = TestDataFactory.createConsumer(null);
         consumer.setEmail("unique" + System.currentTimeMillis() + "@test.com");
-        consumer.setPhoneNumber("011" + (System.currentTimeMillis() % 1000000000));
+        long consumerSuffix = Math.floorMod(System.nanoTime(), 1_000_000_000L);
+        consumer.setPhoneNumber("01" + String.format("%09d", consumerSuffix));
 
         provider = TestDataFactory.createProvider(null);
         provider.setEmail("provider" + System.currentTimeMillis() + "@test.com");
-        provider.setPhoneNumber("012" + (System.currentTimeMillis() % 1000000000));
+        long providerSuffix = Math.floorMod(System.nanoTime() + 1, 1_000_000_000L);
+        provider.setPhoneNumber("01" + String.format("%09d", providerSuffix));
+        provider.setServiceType(serviceType);
     }
 
     @Test
