@@ -22,7 +22,6 @@ public class ServiceCatalogController {
     private final ServiceCategoryService categoryService;
     private final ServiceManagementServiceImpl typeService;
 
-    // --- Category Endpoints ---
     @GetMapping("/categories")
     public List<ServiceCategoryDTO> getCategories() {
         return categoryService.getAllCategories();
@@ -53,7 +52,6 @@ public class ServiceCatalogController {
         return categoryService.countCategories();
     }
 
-    // --- ServiceType Endpoints ---
     @GetMapping("/types")
     public List<ServiceTypeDTO> getTypes() {
         return typeService.getAllTypes();

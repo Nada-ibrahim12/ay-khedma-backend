@@ -1,6 +1,7 @@
 package com.aykhedma.dto.response;
 
 import com.aykhedma.model.service.PriceType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,13 +30,14 @@ public class SearchResponse {
     private String serviceArea;
     private String bio;
 
+    @JsonIgnore
     public String getFormattedDistance() {
         if (distance == null) return null;
         return distance < 1 ?
                 Math.round(distance * 1000) + " m" :
                 String.format("%.1f km", distance);
     }
-
+    @JsonIgnore
     public String getFormattedArrivalTime() {
         if (estimatedArrivalTime == null) return null;
         if (estimatedArrivalTime < 60) return estimatedArrivalTime + " min";

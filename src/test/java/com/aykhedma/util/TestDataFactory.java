@@ -6,9 +6,14 @@ import com.aykhedma.dto.response.ConsumerResponse;
 import com.aykhedma.dto.response.ProviderSummaryResponse;
 import com.aykhedma.model.location.Location;
 import com.aykhedma.model.service.PriceType;
+import com.aykhedma.model.service.RiskLevel;
+import com.aykhedma.model.service.ServiceCategory;
+import com.aykhedma.model.service.ServiceType;
+import com.aykhedma.model.booking.Schedule;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.model.user.UserType;
+import com.aykhedma.model.user.VerificationStatus;
 import lombok.experimental.UtilityClass;
 
 import java.time.LocalDateTime;
@@ -106,6 +111,22 @@ public class TestDataFactory {
      * FIXED: Handle null id properly
      */
     public static Provider createProvider(Long id) {
+        ServiceCategory category = ServiceCategory.builder()
+                .name("Home Services")
+                .build();
+
+        ServiceType serviceType = ServiceType.builder()
+                .name("Plumbing")
+                .category(category)
+                .riskLevel(RiskLevel.LOW)
+                .defaultPriceType(PriceType.HOUR)
+                .basePrice(100.0)
+                .build();
+
+        Location location = createLocation(null);
+        Schedule schedule = Schedule.builder().build();
+        String nationalId = String.format("%014d", Math.floorMod(System.nanoTime(), 100_000_000_000_000L));
+
         Provider provider = Provider.builder()
                 .id(id)
                 .name("Test Provider " + (id != null ? id : ""))
@@ -114,6 +135,12 @@ public class TestDataFactory {
                 .password("$2a$10$hashedPassword12345678901234567890")
                 .role(UserType.PROVIDER)
                 .profileImage("http://test.com/provider.jpg")
+                .verificationStatus(VerificationStatus.PENDING)
+                .serviceType(serviceType)
+                .location(location)
+                .schedule(schedule)
+                .emergencyEnabled(false)
+                .nationalId(nationalId)
                 .averageRating(4.8)
                 .completedJobs(50)
                 .price(100.0)

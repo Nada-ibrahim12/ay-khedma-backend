@@ -185,7 +185,7 @@ public class ProviderServiceImpl implements ProviderService {
 //    }
 
 
-//    @Override
+    //    @Override
 //    public List<ProviderSummaryResponse> allProviders() {
 //        List<Provider> providers = providerRepository.findAll();
 //        return providerMapper.toProviderSummaryResponseList(providers);
