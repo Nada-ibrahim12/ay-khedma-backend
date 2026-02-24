@@ -1,6 +1,7 @@
 package com.aykhedma.model.service;
 
 import com.aykhedma.model.user.Provider;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;

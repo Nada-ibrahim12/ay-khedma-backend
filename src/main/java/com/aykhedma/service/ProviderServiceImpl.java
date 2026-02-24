@@ -22,6 +22,9 @@ import com.aykhedma.repository.*;
 import com.aykhedma.service.FileStorageService;
 import com.aykhedma.service.ProviderService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +40,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class ProviderServiceImpl implements ProviderService {
@@ -59,6 +63,7 @@ public class ProviderServiceImpl implements ProviderService {
     }
 
     @Override
+    @CacheEvict(value = {"searchProvidersCache", "allProvidersCache"}, allEntries = true)
     public ProviderResponse updateProviderProfile(Long providerId, ProviderProfileRequest request) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
@@ -118,6 +123,7 @@ public class ProviderServiceImpl implements ProviderService {
     }
 
     @Override
+    @CacheEvict(value = {"searchProvidersCache", "allProvidersCache"}, allEntries = true)
     public ProviderResponse updateProfilePicture(Long providerId, MultipartFile file) throws IOException {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
@@ -179,25 +185,55 @@ public class ProviderServiceImpl implements ProviderService {
 //    }
 
 
+//    @Override
+//    public List<ProviderSummaryResponse> allProviders() {
+//        List<Provider> providers = providerRepository.findAll();
+//        return providerMapper.toProviderSummaryResponseList(providers);
+//    }
     @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = "allProvidersCache", key = "'allProviders'")
     public List<ProviderSummaryResponse> allProviders() {
         List<Provider> providers = providerRepository.findAll();
-        return providerMapper.toProviderSummaryResponseList(providers);
+        return providers.stream()
+                .map(providerMapper::toProviderSummaryResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<SearchResponse> search(
-            String keyword,
-            Long categoryId,
-            String categoryName,
-            Long consumerId,
-            Double radius,
-            String sortBy,
-            Pageable pageable) {
+    public Page<SearchResponse> search(String keyword,
+                                       Long categoryId,
+                                       String categoryName,
+                                       Long consumerId,
+                                       Double radius,
+                                       String sortBy,
+                                       Pageable pageable) {
 
-        Page<Provider> providersPage = providerRepository.searchProviders(
-                keyword, categoryId, categoryName, pageable);
+        List<SearchResponse> fullList = searchList(keyword, categoryId, categoryName, consumerId, radius, sortBy);
+
+        log.info("Returning {} results (maybe from cache)", fullList.size());
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), fullList.size());
+
+        List<SearchResponse> pageContent =
+                start >= fullList.size() ? Collections.emptyList() : fullList.subList(start, end);
+
+        return new PageImpl<>(pageContent, pageable, fullList.size());
+    }
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy}")
+    public List<SearchResponse> searchList(String keyword,
+                                           Long categoryId,
+                                           String categoryName,
+                                           Long consumerId,
+                                           Double radius,
+                                           String sortBy) {
+        log.warn("CACHE MISS -> Fetching from DATABASE");
+
+        Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName, Pageable.unpaged());
 
         if (consumerId == null || radius == null) {
             List<SearchResponse> responses = providersPage.getContent()
@@ -210,35 +246,24 @@ public class ProviderServiceImpl implements ProviderService {
                     })
                     .collect(Collectors.toList());
 
-            List<SearchResponse> sortedResponses = applySorting(responses, sortBy, null);
-
-            return new PageImpl<>(sortedResponses, pageable, providersPage.getTotalElements());
+            return applySorting(responses, sortBy, null);
         }
 
-        // === Location-based filtering ===
         try {
-//            LocationDTO consumerLocation = locationService.getConsumerLocation(consumerId);
-
             List<SearchResponse> filteredList = providersPage.getContent()
                     .stream()
                     .filter(provider -> provider.getLocation() != null)
                     .map(provider -> {
                         try {
-                            // calc distance
-                            double distance = locationService.calculateDistanceBetweenConsumerAndProvider(
-                                    consumerId, provider.getId()).getDistanceKm();
+                            double distance = locationService
+                                    .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
+                                    .getDistanceKm();
 
-                            // within radius?
                             if (distance > radius) return null;
 
                             SearchResponse response = providerMapper.toSearchResponse(provider);
                             response.setDistance(Math.round(distance * 100.0) / 100.0);
-
-                            // calc estimated arrival time (average speed 30 km/h in city)
-                            int estimatedMinutes = (int) Math.round((distance / 30.0) * 60);
-                            response.setEstimatedArrivalTime(estimatedMinutes);
-
-                            // Check if within provider's service area
+                            response.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
                             response.setWithinServiceArea(distance <= provider.getServiceAreaRadius());
 
                             return response;
@@ -249,13 +274,10 @@ public class ProviderServiceImpl implements ProviderService {
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
-            List<SearchResponse> sortedList = applySorting(filteredList, sortBy, consumerId);
-
-            return new PageImpl<>(sortedList, pageable, sortedList.size());
+            return applySorting(filteredList, sortBy, consumerId);
 
         } catch (ResourceNotFoundException e) {
 
-            // Return results without location filtering
             List<SearchResponse> responses = providersPage.getContent()
                     .stream()
                     .map(provider -> {
@@ -266,14 +288,10 @@ public class ProviderServiceImpl implements ProviderService {
                     })
                     .collect(Collectors.toList());
 
-            List<SearchResponse> sortedResponses = applySorting(responses, sortBy, null);
-            return new PageImpl<>(sortedResponses, pageable, providersPage.getTotalElements());
+            return applySorting(responses, sortBy, null);
         }
     }
 
-    /**
-     * Helper method to apply sorting based on sortBy parameter
-     */
     private List<SearchResponse> applySorting(List<SearchResponse> responses, String sortBy, Long consumerId) {
         if (responses == null || responses.isEmpty()) {
             return new ArrayList<>();
