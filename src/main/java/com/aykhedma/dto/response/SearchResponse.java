@@ -30,14 +30,15 @@ public class SearchResponse {
     private String serviceArea;
     private String bio;
 
-    @JsonIgnore
+    private String formattedDistance;
+    private String formattedArrivalTime;
+
     public String getFormattedDistance() {
         if (distance == null) return null;
         return distance < 1 ?
                 Math.round(distance * 1000) + " m" :
                 String.format("%.1f km", distance);
     }
-    @JsonIgnore
     public String getFormattedArrivalTime() {
         if (estimatedArrivalTime == null) return null;
         if (estimatedArrivalTime < 60) return estimatedArrivalTime + " min";

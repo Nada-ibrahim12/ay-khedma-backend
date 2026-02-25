@@ -1,5 +1,6 @@
 package com.aykhedma.controller;
 
+import com.aykhedma.dto.response.SearchResponse;
 import com.aykhedma.dto.service.ServiceCategoryDTO;
 import com.aykhedma.dto.service.ServiceTypeDTO;
 import com.aykhedma.config.TestSecurityConfig;
@@ -17,6 +18,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -48,6 +50,20 @@ class ServiceCatalogControllerTest {
     @MockBean
     private ServiceManagementServiceImpl typeService;
 
+    private SearchResponse provider() {
+        return SearchResponse.builder()
+                .id(1L)
+                .name("Ibrahim Nasser")
+                .serviceType("Drain Cleaning")
+                .categoryName("Plumbing")
+                .averageRating(4.6)
+                .price(200.0)
+                .distance(0.39)
+                .estimatedArrivalTime(15)
+                .withinServiceArea(true)
+                .completedJobs(12)
+                .build();
+    }
 
     private ServiceCategoryDTO category1;
     private ServiceCategoryDTO category2;
@@ -221,5 +237,104 @@ class ServiceCatalogControllerTest {
         mockMvc.perform(get("/api/services/types/count"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("2"));
+    }
+    @Test
+    @DisplayName("GET search - keyword filter")
+    void search_keyword() throws Exception {
+        when(typeService.searchList("drain", null, null, 1L, 5.0, "rating"))
+                .thenReturn(List.of(provider()));
+
+        mockMvc.perform(get("/api/services/search")
+                        .param("consumerId", "1")
+                        .param("keyword", "drain")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].serviceType").value("Drain Cleaning"))
+                .andExpect(jsonPath("$.content[0].name").value("Ibrahim Nasser"));
+    }
+    @Test
+    @DisplayName("GET search - category id")
+    void search_category_id() throws Exception {
+        when(typeService.searchList(null, 3L, null, 1L, 5.0, "rating"))
+                .thenReturn(List.of(provider()));
+
+        mockMvc.perform(get("/api/services/search")
+                        .param("consumerId", "1")
+                        .param("categoryId", "3")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].categoryName").value("Plumbing"));
+    }
+
+    @Test
+    @DisplayName("GET search - category name")
+    void search_category_name() throws Exception {
+        when(typeService.searchList(null, null, "Plumbing", 1L, 5.0, "rating"))
+                .thenReturn(List.of(provider()));
+
+        mockMvc.perform(get("/api/services/search")
+                        .param("consumerId", "1")
+                        .param("categoryName", "Plumbing")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].categoryName").value("Plumbing"));
+    }
+
+    @Test
+    @DisplayName("GET search - location radius")
+    void search_location() throws Exception {
+        when(typeService.searchList(null, null, null, 1L, 10.0, "distance"))
+                .thenReturn(List.of(provider()));
+
+        mockMvc.perform(get("/api/services/search")
+                        .param("consumerId", "1")
+                        .param("radius", "10")
+                        .param("sortBy", "distance")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].distance").value(0.39))
+                .andExpect(jsonPath("$.content[0].estimatedArrivalTime").value(15));
+    }
+
+    @Test
+    @DisplayName("GET search - sort by price")
+    void search_sort_price() throws Exception {
+        when(typeService.searchList(null, null, null, 1L, 5.0, "price_low"))
+                .thenReturn(List.of(provider()));
+
+        mockMvc.perform(get("/api/services/search")
+                        .param("consumerId", "1")
+                        .param("sortBy", "price_low")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].price").value(200.0));
+    }
+
+    @Test
+    @DisplayName("GET search - all filters combined")
+    void search_all_filters() throws Exception {
+        when(typeService.searchList("drain", 3L, "Plumbing", 1L, 10.0, "distance"))
+                .thenReturn(List.of(provider()));
+
+        mockMvc.perform(get("/api/services/search")
+                        .param("consumerId", "1")
+                        .param("keyword", "drain")
+                        .param("categoryId", "3")
+                        .param("categoryName", "Plumbing")
+                        .param("radius", "10")
+                        .param("sortBy", "distance")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].categoryName").value("Plumbing"))
+                .andExpect(jsonPath("$.content[0].serviceType").value("Drain Cleaning"))
+                .andExpect(jsonPath("$.content[0].distance").value(0.39))
+                .andExpect(jsonPath("$.content[0].estimatedArrivalTime").value(15))
+                .andExpect(jsonPath("$.content[0].withinServiceArea").value(true));
     }
 }
