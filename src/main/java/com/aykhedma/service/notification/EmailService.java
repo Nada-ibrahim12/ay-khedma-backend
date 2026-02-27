@@ -26,9 +26,7 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
-    /**
-     * Send a simple text email (no HTML, no template)
-     */
+    
     @Async
     public void sendSimpleEmail(String to, String subject, String text) {
         try {
@@ -39,10 +37,10 @@ public class EmailService {
             message.setText(text);
 
             mailSender.send(message);
-            log.info("✅ Simple email sent to: {}", to);
+            log.info("Simple email sent to: {}", to);
 
         } catch (Exception e) {
-            log.error("❌ Failed to send simple email: {}", e.getMessage());
+            log.error("Failed to send simple email: {}", e.getMessage());
         }
     }
 
@@ -66,10 +64,10 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            log.info("✅ HTML email sent to: {}", to);
+            log.info("HTML email sent to: {}", to);
 
         } catch (MessagingException e) {
-            log.error("❌ Failed to send HTML email: {}", e.getMessage());
+            log.error("Failed to send HTML email: {}", e.getMessage());
         }
     }
 
@@ -88,10 +86,10 @@ public class EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            log.info("✅ Raw HTML email sent to: {}", to);
+            log.info("Raw HTML email sent to: {}", to);
 
         } catch (MessagingException e) {
-            log.error("❌ Failed to send raw HTML email: {}", e.getMessage());
+            log.error("Failed to send raw HTML email: {}", e.getMessage());
         }
     }
 }
