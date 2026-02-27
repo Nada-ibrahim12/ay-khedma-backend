@@ -52,8 +52,14 @@ public class Notification {
 
     @PastOrPresent(message = "Read date cannot be in the future")
     private LocalDateTime readAt;
+    @Column(name = "is_delivered")
+    private boolean delivered = false;
 
-    private Boolean isRead = false;
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
+
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead;
 
     @Size(max = 500, message = "Image URL cannot exceed 500 characters")
     @Pattern(regexp = "^(http|https|ftp)://.*$", message = "Invalid image URL format")
@@ -61,4 +67,19 @@ public class Notification {
 
     @Size(max = 500, message = "Deep link cannot exceed 500 characters")
     private String deepLink;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private NotificationStatus status;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        if (status == null) {
+            status = NotificationStatus.PENDING;
+        }
+    }
 }
