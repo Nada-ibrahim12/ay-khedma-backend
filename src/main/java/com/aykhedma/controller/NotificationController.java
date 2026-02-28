@@ -1,4 +1,3 @@
-// NotificationController.java
 package com.aykhedma.controller;
 
 import com.aykhedma.dto.response.NotificationDTO;
@@ -16,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,13 +27,91 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
+    @PostMapping("/send-email")
+    public ResponseEntity<Map<String, Object>> sendEmailNotification(
+            @RequestParam String email, 
+            @RequestBody NotificationRequest request) {
+        
+        log.info("Received request to send email notification to: {}", email);
+        
+        request.setSendEmail(true);
+        request.setSendInApp(false);
+        request.setSendPush(false);
+        request.setEmail(email);
+        
+        notificationService.sendNotification(request);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Email notification sent successfully");
+        response.put("email", email);
+        response.put("userId", request.getUserId());
+        response.put("type", request.getType());
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/send-push")
+    public ResponseEntity<Map<String, Object>> sendPushNotification(
+            @RequestParam Long userId,
+            @RequestBody NotificationRequest request) {
+
+        log.info("Received request to send push notification to userId: {}", userId);
+        request.setSendEmail(false);
+        request.setSendInApp(false);
+        request.setSendPush(true);
+        notificationService.sendNotification(request);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Push notification sent successfully");
+        response.put("userId", userId);
+        response.put("type", request.getType());
+        return ResponseEntity.ok(response);
+
+    }
+
+    @PostMapping("/send-inapp")
+    public ResponseEntity<Map<String, Object>> sendInAppNotification(
+            @RequestParam Long userId,
+            @RequestBody NotificationRequest request) {
+        log.info("Received request to send in-app notification to userId: {}", userId);
+        request.setSendEmail(false);    
+        request.setSendInApp(true);
+        request.setSendPush(false);
+        notificationService.sendNotification(request);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "In-app notification sent successfully");
+        response.put("userId", userId);
+        response.put("type", request.getType());
+        return ResponseEntity.ok(response);
+    }
+
+
+    
     /**
-     * Get all notifications for a user
+     * Send a test notification (for development only)
      *
-     * @param userId User ID (passed as header or parameter)
-     * @param pageable Pagination information
-     * @return Page of notifications
+     * @param request Notification request
+     * @return Success response
      */
+    @PostMapping("/test/send")
+    public ResponseEntity<Map<String, Object>> sendTestNotification(
+            @RequestBody NotificationRequest request) {
+
+        log.info("Sending test notification to user: {}", request.getUserId());
+
+        notificationService.sendNotification(request);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Test notification sent");
+        response.put("userId", request.getUserId());
+        response.put("type", request.getType());
+
+        return ResponseEntity.ok(response);
+    }
+    
     @GetMapping
     public ResponseEntity<Page<NotificationDTO>> getUserNotifications(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -52,12 +130,6 @@ public class NotificationController {
         return ResponseEntity.ok(notifications);
     }
 
-    /**
-     * Get unread notifications count for a user
-     *
-     * @param userId User ID (passed as header or parameter)
-     * @return Unread count
-     */
     @GetMapping("/unread/count")
     public ResponseEntity<Map<String, Long>> getUnreadCount(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -76,13 +148,7 @@ public class NotificationController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Get a specific notification by ID
-     *
-     * @param userId User ID (passed as header or parameter)
-     * @param notificationId Notification ID
-     * @return Notification details
-     */
+
     @GetMapping("/{notificationId}")
     public ResponseEntity<NotificationDTO> getNotification(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -95,17 +161,15 @@ public class NotificationController {
             return ResponseEntity.badRequest().build();
         }
 
-        // TODO: Implement getNotificationById in service
-        return ResponseEntity.ok().build();
+        try {
+            NotificationDTO notification = notificationService.getNotificationById(userId, notificationId);
+            return ResponseEntity.ok(notification);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
     }
 
-    /**
-     * Mark a single notification as read
-     *
-     * @param userId User ID (passed as header or parameter)
-     * @param notificationId Notification ID to mark as read
-     * @return Success response
-     */
+
     @PutMapping("/{notificationId}/read")
     public ResponseEntity<Map<String, Object>> markAsRead(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -137,13 +201,7 @@ public class NotificationController {
         }
     }
 
-    /**
-     * Mark multiple notifications as read
-     *
-     * @param userId User ID (passed as header or parameter)
-     * @param request Map containing notification IDs
-     * @return Success response
-     */
+
     @PutMapping("/read-batch")
     public ResponseEntity<Map<String, Object>> markMultipleAsRead(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -156,8 +214,7 @@ public class NotificationController {
             return ResponseEntity.badRequest().build();
         }
 
-        // Extract notification IDs from request
-        // This expects JSON like: { "notificationIds": [1, 2, 3] }
+
         @SuppressWarnings("unchecked")
         java.util.List<Integer> ids = (java.util.List<Integer>) request.get("notificationIds");
 
@@ -179,12 +236,7 @@ public class NotificationController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Mark all notifications as read for a user
-     *
-     * @param userId User ID (passed as header or parameter)
-     * @return Success response
-     */
+
     @PutMapping("/read-all")
     public ResponseEntity<Map<String, Object>> markAllAsRead(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -206,13 +258,7 @@ public class NotificationController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Delete a notification
-     *
-     * @param userId User ID (passed as header or parameter)
-     * @param notificationId Notification ID to delete
-     * @return Success response
-     */
+
     @DeleteMapping("/{notificationId}")
     public ResponseEntity<Map<String, Object>> deleteNotification(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -225,8 +271,7 @@ public class NotificationController {
             return ResponseEntity.badRequest().build();
         }
 
-        // TODO: Implement delete method in service
-        // notificationService.deleteNotification(userId, notificationId);
+        notificationService.deleteNotification(userId, notificationId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -236,45 +281,13 @@ public class NotificationController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Send a test notification (for development only)
-     *
-     * @param request Notification request
-     * @return Success response
-     */
-    @PostMapping("/test/send")
-    public ResponseEntity<Map<String, Object>> sendTestNotification(
-            @RequestBody NotificationRequest request) {
 
-        log.info("Sending test notification to user: {}", request.getUserId());
-
-        notificationService.sendNotification(request);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Test notification sent");
-        response.put("userId", request.getUserId());
-        response.put("type", request.getType());
-
-        return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Get notifications filtered by date range
-     *
-     * @param userId User ID (passed as header or parameter)
-     * @param startDate Start date (optional)
-     * @param endDate End date (optional)
-     * @param pageable Pagination information
-     * @return Filtered notifications
-     */
     @GetMapping("/filter")
     public ResponseEntity<Page<NotificationDTO>> filterNotifications(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
             @RequestParam(value = "userId", required = false) Long paramUserId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
-            @RequestParam(required = false) String type,
             @PageableDefault(size = 20) Pageable pageable) {
 
         Long userId = headerUserId != null ? headerUserId : paramUserId;
@@ -283,36 +296,7 @@ public class NotificationController {
             return ResponseEntity.badRequest().build();
         }
 
-        // TODO: Implement filter method in service
-        return ResponseEntity.ok(Page.empty());
-    }
-
-    /**
-     * Get notification statistics for a user
-     *
-     * @param userId User ID (passed as header or parameter)
-     * @return Statistics
-     */
-    @GetMapping("/stats")
-    public ResponseEntity<Map<String, Object>> getNotificationStats(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId) {
-
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
-
-        if (userId == null) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        long unreadCount = notificationService.getUnreadCount(userId);
-        // TODO: Get total count, today's count, etc.
-
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("userId", userId);
-        stats.put("unreadCount", unreadCount);
-        stats.put("totalCount", 0); // Implement this
-        stats.put("todayCount", 0);  // Implement this
-
-        return ResponseEntity.ok(stats);
+        Page<NotificationDTO> filteredNotifications = notificationService.getUserNotificationsByDateRange(userId, startDate, endDate, pageable);
+        return ResponseEntity.ok(filteredNotifications);
     }
 }

@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
@@ -20,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,8 +36,29 @@ public class NotificationService {
     private final EmailService emailService;
 //    private final SmsService smsService;
     private final SimpMessagingTemplate messagingTemplate;
-    private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
+
+    public NotificationDTO getNotificationById(Long userID, Long notificationId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+
+        if (!notification.getUserId().equals(userID)) {
+            throw new RuntimeException("Unauthorized");
+        }
+
+        return NotificationDTO.fromEntity(notification);
+    }
+
+    public void deleteNotification(Long userId, Long notificationId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+
+        if (!notification.getUserId().equals(userId)) {
+            throw new RuntimeException("Unauthorized");
+        }
+
+        notificationRepository.deleteById(notificationId);
+    }
 
     @Async
     @Transactional
@@ -118,7 +142,6 @@ public class NotificationService {
                     Map.of("count", unreadCount)
             );
 
-            // Mark as delivered
             notification.setDelivered(true);
             notification.setDeliveredAt(LocalDateTime.now());
             notificationRepository.save(notification);
@@ -150,6 +173,19 @@ public class NotificationService {
                 return "email/booking-reminder";
             default:
                 return "email/general-notification";
+        }
+    }
+//  send app notification (websocket + push) 
+    private void sendAppNotification(NotificationRequest request) {
+        Notification notification = saveNotification(request);
+        sendWebSocketNotification(notification);
+        if (request.isSendPush() && firebaseService.isFirebaseEnabled()) {
+            firebaseService.sendPushNotification(
+                    request.getUserId(),
+                    request.getTitle(),
+                    request.getContent(),
+                    request.getData()
+            );
         }
     }
 
@@ -213,4 +249,25 @@ public class NotificationService {
         int deleted = notificationRepository.deleteOldNotifications(expiryDate);
         log.info("Deleted {} old notifications", deleted);
     }
+
+    // filter
+        /**
+     * Get notifications filtered by date range
+     *
+     * @param userId User ID (passed as header or parameter)
+     * @param startDate Start date (optional)
+     * @param endDate End date (optional)
+     * @param pageable Pagination information
+     * @return Filtered notifications
+     */
+    public Page<NotificationDTO> getUserNotificationsByDateRange(Long userId, LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
+        List<Notification> notifications = notificationRepository.findByUserIdAndCreatedAtBetween(userId, startDate, endDate, pageable);
+        
+        List<NotificationDTO> notificationDTOs = notifications.stream()
+                .map(NotificationDTO::fromEntity)
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(notificationDTOs, pageable, notifications.size());
+    }
+
 }

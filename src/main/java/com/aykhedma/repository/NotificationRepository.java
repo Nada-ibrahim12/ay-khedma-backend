@@ -34,17 +34,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     List<Notification> findByUserIdAndTypeOrderBySentAtDesc(Long userId, NotificationType type);
 
-    // FIXED: Removed unused readAt parameter
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP WHERE n.userId = :userId AND n.isRead = false")
     int markAllAsRead(@Param("userId") Long userId);
 
-    // Alternative if you need custom timestamp:
-    /*
-    @Modifying
-    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = :readAt WHERE n.userId = :userId AND n.isRead = false")
-    int markAllAsRead(@Param("userId") Long userId, @Param("readAt") LocalDateTime readAt);
-    */
 
     @Query("SELECT n FROM Notification n WHERE n.userId = :userId ORDER BY n.sentAt DESC")
     List<Notification> findRecentNotifications(@Param("userId") Long userId, Pageable pageable);
@@ -54,10 +47,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("DELETE FROM Notification n WHERE n.createdAt < :expiryDate")
     int deleteOldNotifications(@Param("expiryDate") LocalDateTime expiryDate);
 
-    // Optional: Add method to find by status
     List<Notification> findByStatus(String status);
 
-    // Optional: Find unread count only
     @Query("SELECT COUNT(n) FROM Notification n WHERE n.userId = :userId AND n.isRead = false")
     long getUnreadCount(@Param("userId") Long userId);
+
+        @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND n.createdAt BETWEEN :start AND :end ORDER BY n.createdAt DESC")
+    List<Notification> findByUserIdAndCreatedAtBetween(Long userId, LocalDateTime start, LocalDateTime end, Pageable pageable);
 }
