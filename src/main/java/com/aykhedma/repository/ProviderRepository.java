@@ -71,4 +71,12 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
             @Param("categoryId") Long categoryId,
             @Param("categoryName") String categoryName,
             Pageable pageable);
+
+    @Modifying
+    @Query("UPDATE Provider p SET p.totalBookings = p.totalBookings + 1 WHERE p.id = :providerId")
+    void incrementTotalBookings(@Param("providerId") Long providerId);
+
+    @Modifying
+    @Query("UPDATE Provider p SET p.cancelledBookings = p.cancelledBookings + 1 WHERE p.id = :providerId")
+    void incrementCancelledBookings(@Param("providerId") Long providerId);
 }

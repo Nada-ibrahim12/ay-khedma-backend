@@ -24,6 +24,8 @@ public class ProviderResponse {
     private String bio;
     private VerificationStatus verificationStatus;
     private Integer completedJobs;
+    private Integer totalBookings;
+    private Integer cancelledBookings;
     private String serviceType;
     private Long serviceTypeId;
     private LocationDTO location;

@@ -25,6 +25,7 @@ public interface ConsumerMapper {
     @Mapping(source = "preferredLanguage", target = "preferredLanguage")
     @Mapping(source = "averageRating", target = "averageRating")
     @Mapping(source = "totalBookings", target = "totalBookings")
+    @Mapping(source = "cancelledBookings", target = "cancelledBookings")
     @Mapping(target = "savedProviders", expression = "java(mapSavedProviders(consumer.getSavedProviders()))")
     @Mapping(source = "location", target = "location", qualifiedByName = "mapLocationToDTO")
     ConsumerResponse toConsumerResponse(Consumer consumer);
@@ -42,6 +43,7 @@ public interface ConsumerMapper {
     @Mapping(target = "profileImage", ignore = true)
     @Mapping(target = "averageRating", ignore = true)
     @Mapping(target = "totalBookings", ignore = true)
+    @Mapping(target = "cancelledBookings", ignore = true)
     Consumer toEntity(ConsumerProfileRequest request);
 
     @Named("mapLocationToDTO")
@@ -80,6 +82,8 @@ public interface ConsumerMapper {
     @Mapping(source = "serviceType.name", target = "serviceType")
     @Mapping(source = "averageRating", target = "averageRating")
     @Mapping(source = "completedJobs", target = "completedJobs")
+    @Mapping(source = "totalBookings", target = "totalBookings")
+    @Mapping(source = "cancelledBookings", target = "cancelledBookings")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "priceType", target = "priceType")
     ProviderSummaryResponse toProviderSummary(Provider provider);

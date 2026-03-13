@@ -104,7 +104,8 @@ public class ProviderController {
 //    }
 
 
-    //    === SCHEDULE MANAGEMENT ===
+//    === SCHEDULE MANAGEMENT ===
+
     @GetMapping("/{providerId}/schedule")
     @Operation(summary = "Get provider's complete schedule with working days and time slots")
     @ApiResponses(value = {
@@ -296,7 +297,6 @@ public class ProviderController {
 //        List<ScheduleResponse.WorkingDayResponse> response = providerService.getWorkingDays(providerId);
 //        return ResponseEntity.ok(response);
 //    }
-
     // ===== Document Management =====
 
     @PostMapping(value = "/{providerId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -451,12 +451,8 @@ public class ProviderController {
 
             @PageableDefault(size = 20, sort = "averageRating", direction = Sort.Direction.DESC)
             Pageable pageable) {
-
-
-        List<SearchResponse> list = providerService.searchList(
-                keyword, categoryId, categoryName, consumerId, radius, sortBy);
-
-        Page<SearchResponse> page = new PageImpl<>(list, pageable, list.size());
+        Page<SearchResponse> page = providerService.search(
+                keyword, categoryId, categoryName, consumerId, radius, sortBy, pageable);
 
         return ResponseEntity.ok(page);
     }

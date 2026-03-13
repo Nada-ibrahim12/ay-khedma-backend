@@ -14,22 +14,22 @@ import java.time.LocalTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookingResponse {
-
+public class BookingResponse
+{
     private Long id;
     private ConsumerSummaryResponse consumer;
     private ProviderSummaryResponse provider;
-    private String serviceType;
     private LocalDate requestedDate;
     private LocalTime requestedStartTime;
-    private LocalTime requestedEndTime;
+    private Long estimatedDuration; // In minutes
     private String problemDescription;
-    private Double initialPrice;
-    private Double finalPrice;
     private BookingStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime acceptedAt;
+    private LocalDateTime declinedAt;
+    private LocalDateTime expiredAt;
     private LocalDateTime completedAt;
-    private Double consumerRating;
-    private String consumerReview;
+    private LocalDateTime cancelledAt;
+    private String cancellationReason;
+    private String cancelledBy;
 }

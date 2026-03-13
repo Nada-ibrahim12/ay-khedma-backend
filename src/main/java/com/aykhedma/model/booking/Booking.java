@@ -9,6 +9,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -49,29 +50,25 @@ public class Booking {
     @Column(nullable = false)
     private LocalTime requestedStartTime;
 
-    private LocalTime requestedEndTime;
+    private Long estimatedDuration; // In minutes
 
     @Size(max = 1000, message = "Problem description cannot exceed 1000 characters")
     @Column(length = 1000)
     private String problemDescription;
-
-    @DecimalMin(value = "0.0", inclusive = false, message = "Initial price must be greater than 0")
-    @DecimalMax(value = "100000.0", message = "Initial price cannot exceed 100,000")
-    private Double initialPrice;
-
-    @DecimalMin(value = "0.0", inclusive = false, message = "Final price must be greater than 0")
-    @DecimalMax(value = "100000.0", message = "Final price cannot exceed 100,000")
-    private Double finalPrice;
 
     @NotNull(message = "Booking status is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private BookingStatus status = BookingStatus.PENDING;
 
-    private LocalTime estimatedTime;
-
     @PastOrPresent(message = "Accepted date cannot be in the future")
     private LocalDateTime acceptedAt;
+
+    @PastOrPresent(message = "Declined date cannot be in the future")
+    private LocalDateTime declinedAt;
+
+    @PastOrPresent(message = "Expired date cannot be in the future")
+    private LocalDateTime expiredAt;
 
     @PastOrPresent(message = "Started date cannot be in the future")
     private LocalDateTime startedAt;
@@ -84,6 +81,10 @@ public class Booking {
 
     @Size(max = 200, message = "Cancellation reason cannot exceed 200 characters")
     private String cancellationReason;
+
+    @Pattern(regexp = "[PC]", message = "Cancelled by value must be 'P' (provider) or 'C' (consumer)")
+    @Column(length = 1)
+    private String cancelledBy;
 
     @PastOrPresent(message = "Created date cannot be in the future")
     @CreationTimestamp

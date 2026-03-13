@@ -33,7 +33,7 @@ build/
 .vscode/
 
 # Environment variables
-.env
+app.env
 *.env
 
 # Firebase

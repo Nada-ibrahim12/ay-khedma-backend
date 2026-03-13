@@ -54,4 +54,15 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
         return existsByScheduleIdAndDateAndStartTimeAndStatus(scheduleId, date, startTime, TimeSlotStatus.AVAILABLE);
     }
 
+    @Query("SELECT CASE WHEN EXISTS (" +
+       "SELECT 1 FROM TimeSlot t " +
+       "WHERE t.schedule.id = :scheduleId " +
+       "AND t.date = :date " +
+       "AND t.status = 'AVAILABLE' " +
+       "AND t.startTime <= :time " +
+       "AND t.endTime >= :time" +
+       ") THEN TRUE ELSE FALSE END")
+    boolean isTimeWithinAvailableSlot(@Param("scheduleId") Long scheduleId,
+                                      @Param("date") LocalDate date,
+                                      @Param("time") LocalTime time);
 }

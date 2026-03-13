@@ -26,19 +26,14 @@ public interface ProviderService {
 //    ProfileResponse updateProviderLocation(Long providerId, LocationDTO request);
 //    List<ProviderSummaryResponse> findNearbyProviders(Double latitude, Double longitude, Long serviceTypeId, Double radius);
     List<ProviderSummaryResponse> allProviders();
-    Page<SearchResponse> search(String keyword,
-                                Long categoryId,
-                                String categoryName,
-                                Long consumerId,
-                                Double radius,
-                                String sortBy,
-                                Pageable pageable);
-    List<SearchResponse> searchList(String keyword,
-                                    Long categoryId,
-                                    String categoryName,
-                                    Long consumerId,
-                                    Double radius,
-                                    String sortBy);
+    Page<SearchResponse> search(
+            String keyword,
+            Long categoryId,
+            String categoryName,
+            Long consumerId,
+            Double radius,
+            String sortBy,
+            Pageable pageable);
 
     // Schedule Management
     ScheduleResponse addWorkingDay(Long providerId, WorkingDayRequest request);

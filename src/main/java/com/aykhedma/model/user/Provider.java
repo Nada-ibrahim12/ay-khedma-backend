@@ -21,6 +21,7 @@ import java.util.List;
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
+@PrimaryKeyJoinColumn(name = "id")
 public class Provider extends User {
 
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
@@ -39,6 +40,14 @@ public class Provider extends User {
     @Min(value = 0, message = "Completed jobs cannot be negative")
     @Column(nullable = false)
     private Integer completedJobs = 0;
+
+    @Min(value = 0, message = "Total bookings cannot be negative")
+    @Column(nullable = false)
+    private Integer totalBookings = 0;
+
+    @Min(value = 0, message = "Total bookings cannot be negative")
+    @Column(nullable = false)
+    private Integer cancelledBookings = 0;
 
     @NotNull(message = "Service type is required")
     @ManyToOne

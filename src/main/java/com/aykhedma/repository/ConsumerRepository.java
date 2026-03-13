@@ -49,4 +49,12 @@ public interface ConsumerRepository extends JpaRepository<Consumer, Long> {
 
     // Check if consumer exists without loading the entity
     boolean existsById(Long id);
+
+    @Modifying
+    @Query("UPDATE Consumer c SET c.totalBookings = c.totalBookings + 1 WHERE c.id = :consumerId")
+    void incrementTotalBookings(@Param("consumerId") Long consumerId);
+
+    @Modifying
+    @Query("UPDATE Consumer c SET c.cancelledBookings = c.cancelledBookings + 1 WHERE c.id = :consumerId")
+    void incrementCancelledBookings(@Param("consumerId") Long consumerId);
 }

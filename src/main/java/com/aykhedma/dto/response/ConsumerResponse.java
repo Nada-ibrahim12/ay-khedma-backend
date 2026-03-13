@@ -25,5 +25,6 @@ public class ConsumerResponse {
     private LocationDTO location;
     private Double averageRating;
     private Integer totalBookings;
+    private Integer cancelledBookings;
     private List<ProviderSummaryResponse> savedProviders;
 }

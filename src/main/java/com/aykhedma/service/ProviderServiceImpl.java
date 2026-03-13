@@ -200,8 +200,32 @@ public class ProviderServiceImpl implements ProviderService {
                 .collect(Collectors.toList());
     }
 
+    // @Override
+    // @Transactional(readOnly = true)
+    // public Page<SearchResponse> search(String keyword,
+    //                                    Long categoryId,
+    //                                    String categoryName,
+    //                                    Long consumerId,
+    //                                    Double radius,
+    //                                    String sortBy,
+    //                                    Pageable pageable) {
+
+    //     List<SearchResponse> fullList = searchList(keyword, categoryId, categoryName, consumerId, radius, sortBy);
+
+    //     log.info("Returning {} results (maybe from cache)", fullList.size());
+
+    //     int start = (int) pageable.getOffset();
+    //     int end = Math.min((start + pageable.getPageSize()), fullList.size());
+
+    //     List<SearchResponse> pageContent =
+    //             start >= fullList.size() ? Collections.emptyList() : fullList.subList(start, end);
+
+    //     return new PageImpl<>(pageContent, pageable, fullList.size());
+    // }
+
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy,#pageable.pageNumber,#pageable.pageSize,#pageable.sort}")
     public Page<SearchResponse> search(String keyword,
                                        Long categoryId,
                                        String categoryName,
@@ -209,28 +233,6 @@ public class ProviderServiceImpl implements ProviderService {
                                        Double radius,
                                        String sortBy,
                                        Pageable pageable) {
-
-        List<SearchResponse> fullList = searchList(keyword, categoryId, categoryName, consumerId, radius, sortBy);
-
-        log.info("Returning {} results (maybe from cache)", fullList.size());
-
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), fullList.size());
-
-        List<SearchResponse> pageContent =
-                start >= fullList.size() ? Collections.emptyList() : fullList.subList(start, end);
-
-        return new PageImpl<>(pageContent, pageable, fullList.size());
-    }
-    @Override
-    @Transactional(readOnly = true)
-    @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy}")
-    public List<SearchResponse> searchList(String keyword,
-                                           Long categoryId,
-                                           String categoryName,
-                                           Long consumerId,
-                                           Double radius,
-                                           String sortBy) {
         log.warn("CACHE MISS -> Fetching from DATABASE");
 
         Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName, Pageable.unpaged());
@@ -246,10 +248,15 @@ public class ProviderServiceImpl implements ProviderService {
                     })
                     .collect(Collectors.toList());
 
-            return applySorting(responses, sortBy, null);
+            List<SearchResponse> sortedResponses = applySorting(responses, sortBy, null);
+
+            return toPage(sortedResponses, pageable);
         }
 
+        // === Location-based filtering ===
         try {
+//            LocationDTO consumerLocation = locationService.getConsumerLocation(consumerId);
+
             List<SearchResponse> filteredList = providersPage.getContent()
                     .stream()
                     .filter(provider -> provider.getLocation() != null)
@@ -259,12 +266,20 @@ public class ProviderServiceImpl implements ProviderService {
                                     .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
                                     .getDistanceKm();
 
-                            if (distance > radius) return null;
+                            if (radius != null && distance > radius) {
+                                return null;
+                            }
 
                             SearchResponse response = providerMapper.toSearchResponse(provider);
-                            response.setDistance(Math.round(distance * 100.0) / 100.0);
-                            response.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
-                            response.setWithinServiceArea(distance <= provider.getServiceAreaRadius());
+                            response.setDistance(distance);
+
+                            // calc estimated arrival time (average speed 30 km/h in city)
+                            int estimatedMinutes = (int) Math.round((distance / 30.0) * 60);
+                            response.setEstimatedArrivalTime(estimatedMinutes);
+
+                            // Check if within provider's service area
+                            response.setWithinServiceArea(provider.getServiceAreaRadius() != null
+                                    && distance <= provider.getServiceAreaRadius());
 
                             return response;
                         } catch (Exception e) {
@@ -274,10 +289,13 @@ public class ProviderServiceImpl implements ProviderService {
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
-            return applySorting(filteredList, sortBy, consumerId);
+            List<SearchResponse> sortedList = applySorting(filteredList, sortBy, consumerId);
+
+            return toPage(sortedList, pageable);
 
         } catch (ResourceNotFoundException e) {
 
+            // Return results without location filtering
             List<SearchResponse> responses = providersPage.getContent()
                     .stream()
                     .map(provider -> {
@@ -288,8 +306,24 @@ public class ProviderServiceImpl implements ProviderService {
                     })
                     .collect(Collectors.toList());
 
-            return applySorting(responses, sortBy, null);
+            List<SearchResponse> sortedResponses = applySorting(responses, sortBy, null);
+            return toPage(sortedResponses, pageable);
         }
+    }
+
+    private Page<SearchResponse> toPage(List<SearchResponse> responses, Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged()) {
+            return new PageImpl<>(responses);
+        }
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), responses.size());
+
+        List<SearchResponse> pageContent = start >= responses.size()
+                ? Collections.emptyList()
+                : responses.subList(start, end);
+
+        return new PageImpl<>(pageContent, pageable, responses.size());
     }
 
     private List<SearchResponse> applySorting(List<SearchResponse> responses, String sortBy, Long consumerId) {
@@ -298,7 +332,6 @@ public class ProviderServiceImpl implements ProviderService {
         }
 
         String sortField = sortBy != null ? sortBy.toLowerCase() : "rating";
-
         switch (sortField) {
             case "price_low":
                 return responses.stream()

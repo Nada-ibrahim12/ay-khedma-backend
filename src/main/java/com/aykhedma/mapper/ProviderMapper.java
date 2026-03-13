@@ -4,9 +4,7 @@ import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.ProviderSummaryResponse;
 import com.aykhedma.dto.response.SearchResponse;
 import com.aykhedma.model.user.Provider;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.ReportingPolicy;
+import org.mapstruct.*;
 
 import java.util.List;
 
@@ -22,6 +20,8 @@ public interface ProviderMapper {
     @Mapping(source = "bio", target = "bio")
     @Mapping(source = "verificationStatus", target = "verificationStatus")
     @Mapping(source = "completedJobs", target = "completedJobs")
+    @Mapping(source = "totalBookings", target = "totalBookings")
+    @Mapping(source = "cancelledBookings", target = "cancelledBookings")
     @Mapping(source = "serviceType.name", target = "serviceType")
     @Mapping(source = "serviceType.id", target = "serviceTypeId")
     @Mapping(source = "location", target = "location")
@@ -37,12 +37,14 @@ public interface ProviderMapper {
     @Mapping(source = "serviceArea", target = "serviceArea")
     ProviderResponse toProviderResponse(Provider provider);
 
-    @Mapping(source = "id", target = "id")
+    @Named("providerSummary")
     @Mapping(source = "name", target = "name")
-    @Mapping(source = "profileImage", target = "profileImage")
     @Mapping(source = "serviceType.name", target = "serviceType")
     @Mapping(source = "averageRating", target = "averageRating")
     @Mapping(source = "completedJobs", target = "completedJobs")
+
+    @Mapping(source = "totalBookings", target = "totalBookings")
+    @Mapping(source = "cancelledBookings", target = "cancelledBookings")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "priceType", target = "priceType")
     @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")
@@ -65,5 +67,6 @@ public interface ProviderMapper {
 
     List<ProviderResponse> toProviderResponseList(List<Provider> providers);
 
+    @IterableMapping(qualifiedByName = "providerSummary")
     List<ProviderSummaryResponse> toProviderSummaryResponseList(List<Provider> providers);
 }
