@@ -17,7 +17,6 @@ public class AcceptBookingRequest
     private Long bookingId;
 
     @NotNull(message = "Estimated duration is required")
-    @Positive(message = "Estimated duration must be positive")
     @Min(value = 30, message = "Estimated duration cannot be less than 30 minutes")
     private Long estimatedDuration; // In minutes
 
