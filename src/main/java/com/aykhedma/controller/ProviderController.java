@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -102,8 +103,8 @@ public class ProviderController {
 //        return ResponseEntity.noContent().build();
 //    }
 
-    
-//    === SCHEDULE MANAGEMENT ===
+
+    //    === SCHEDULE MANAGEMENT ===
     @GetMapping("/{providerId}/schedule")
     @Operation(summary = "Get provider's complete schedule with working days and time slots")
     @ApiResponses(value = {
@@ -295,7 +296,7 @@ public class ProviderController {
 //        List<ScheduleResponse.WorkingDayResponse> response = providerService.getWorkingDays(providerId);
 //        return ResponseEntity.ok(response);
 //    }
-    
+
     // ===== Document Management =====
 
     @PostMapping(value = "/{providerId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -351,6 +352,16 @@ public class ProviderController {
     }
 
 
+    //    @GetMapping("/all")
+//    @Operation(summary = "all providers")
+//    @ApiResponses(value = {
+//            @ApiResponse(responseCode = "200", description = "Successfully found providers",
+//                    content = @Content(schema = @Schema(implementation = ProviderSummaryResponse.class)))
+//    })
+//    public ResponseEntity<List<ProviderSummaryResponse>> allProviders() {
+//        List<ProviderSummaryResponse> response = providerService.allProviders();
+//        return ResponseEntity.ok(response);
+//    }
     @GetMapping("/all")
     @Operation(summary = "all providers")
     @ApiResponses(value = {
@@ -441,9 +452,12 @@ public class ProviderController {
             @PageableDefault(size = 20, sort = "averageRating", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
-        Page<SearchResponse> response = providerService.search(
-                keyword, categoryId, categoryName, consumerId, radius, sortBy, pageable);
 
-        return ResponseEntity.ok(response);
+        List<SearchResponse> list = providerService.searchList(
+                keyword, categoryId, categoryName, consumerId, radius, sortBy);
+
+        Page<SearchResponse> page = new PageImpl<>(list, pageable, list.size());
+
+        return ResponseEntity.ok(page);
     }
 }
