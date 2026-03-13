@@ -38,7 +38,7 @@ public abstract class User {
     private String phoneNumber;
 
     @NotBlank(message = "Password is required")
-    @Size(min = 60, max = 60, message = "Invalid password hash")
+    @Size(min = 8, max = 60, message = "Invalid password hash")
     @Column(nullable = false, length = 60)
     private String password;
 
@@ -66,6 +66,7 @@ public abstract class User {
     @NotNull(message = "Credentials non-expired status is required")
     @Column(nullable = false)
     private boolean credentialsNonExpired = true;
+
 
     public UserType getRole() {
         return role;

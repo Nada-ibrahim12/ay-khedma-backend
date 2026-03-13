@@ -23,4 +23,5 @@ public class ProviderSummaryResponse {
     private Double distance; // in km
     private Integer estimatedArrivalTime; // in minutes
     private boolean emergencyEnabled;
+    private String serviceArea;
 }
