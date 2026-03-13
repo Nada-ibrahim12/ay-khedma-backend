@@ -50,21 +50,11 @@ public class Booking {
     @Column(nullable = false)
     private LocalTime requestedStartTime;
 
-    private LocalTime requestedEndTime;
-
     private Long estimatedDuration; // In minutes
 
     @Size(max = 1000, message = "Problem description cannot exceed 1000 characters")
     @Column(length = 1000)
     private String problemDescription;
-
-    @DecimalMin(value = "0.0", inclusive = false, message = "Initial price must be greater than 0")
-    @DecimalMax(value = "100000.0", message = "Initial price cannot exceed 100,000")
-    private Double initialPrice;
-
-    @DecimalMin(value = "0.0", inclusive = false, message = "Final price must be greater than 0")
-    @DecimalMax(value = "100000.0", message = "Final price cannot exceed 100,000")
-    private Double finalPrice;
 
     @NotNull(message = "Booking status is required")
     @Enumerated(EnumType.STRING)
