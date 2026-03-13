@@ -21,6 +21,7 @@ import java.util.List;
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
+@PrimaryKeyJoinColumn(name = "id")
 public class Provider extends User {
 
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
@@ -39,6 +40,14 @@ public class Provider extends User {
     @Min(value = 0, message = "Completed jobs cannot be negative")
     @Column(nullable = false)
     private Integer completedJobs = 0;
+
+    @Min(value = 0, message = "Total bookings cannot be negative")
+    @Column(nullable = false)
+    private Integer totalBookings = 0;
+
+    @Min(value = 0, message = "Total bookings cannot be negative")
+    @Column(nullable = false)
+    private Integer cancelledBookings = 0;
 
     @NotNull(message = "Service type is required")
     @ManyToOne
@@ -89,9 +98,11 @@ public class Provider extends User {
     @Column(nullable = false, length = 20)
     private PriceType priceType;
 
-    @DecimalMin(value = "0.1", message = "Service area must be at least 0.1 km")
-    @DecimalMax(value = "100.0", message = "Service area cannot exceed 100 km")
-    private Double serviceArea;
+    @Size(max = 100, message = "Area cannot exceed 100 characters")
+    private String serviceArea;
+
+    @DecimalMin(value = "0.0", message = "Service area radius cannot be negative")
+    private Double serviceAreaRadius = 7.0;
 
     @OneToMany(mappedBy = "provider")
     @Builder.Default

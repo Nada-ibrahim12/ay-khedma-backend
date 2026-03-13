@@ -24,6 +24,8 @@ public class ProviderResponse {
     private String bio;
     private VerificationStatus verificationStatus;
     private Integer completedJobs;
+    private Integer totalBookings;
+    private Integer cancelledBookings;
     private String serviceType;
     private Long serviceTypeId;
     private LocationDTO location;
@@ -35,4 +37,6 @@ public class ProviderResponse {
     private Integer acceptanceRate;
     private List<DocumentResponse> documents;
     private ScheduleResponse schedule;
+    private Double serviceAreaRadius;
+    private String serviceArea;
 }

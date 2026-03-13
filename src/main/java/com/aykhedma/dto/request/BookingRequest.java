@@ -14,15 +14,11 @@ import java.time.LocalTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookingRequest {
-
+public class BookingRequest
+{
     @NotNull(message = "Provider ID is required")
     @Positive(message = "Provider ID must be positive")
     private Long providerId;
-
-    @NotNull(message = "Service type ID is required")
-    @Positive(message = "Service type ID must be positive")
-    private Long serviceTypeId;
 
     @NotNull(message = "Requested date is required")
     @FutureOrPresent(message = "Requested date must be today or in the future")
@@ -33,10 +29,7 @@ public class BookingRequest {
     @JsonFormat(pattern = "HH:mm")
     private LocalTime requestedTime;
 
-    @Size(max = 500, message = "Problem description cannot exceed 500 characters")
+    @NotNull(message = "Problem description is required")
+    @Size(max = 1000, message = "Problem description cannot exceed 1000 characters")
     private String problemDescription;
-
-    @DecimalMin(value = "0.0", inclusive = false, message = "Proposed price must be greater than 0")
-    @DecimalMax(value = "100000.0", message = "Proposed price cannot exceed 100,000")
-    private Double proposedPrice;
 }

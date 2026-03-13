@@ -18,9 +18,12 @@ public class ProviderSummaryResponse {
     private String serviceType;
     private Double averageRating;
     private Integer completedJobs;
+    private Integer totalBookings;
+    private Integer cancelledBookings;
     private Double price;
     private PriceType priceType;
     private Double distance; // in km
     private Integer estimatedArrivalTime; // in minutes
     private boolean emergencyEnabled;
+    private String serviceArea;
 }

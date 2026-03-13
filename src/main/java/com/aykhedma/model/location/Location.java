@@ -3,7 +3,10 @@ package com.aykhedma.model.location;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.PrecisionModel;
 
 @Entity
 @Table(name = "locations")
@@ -41,7 +44,7 @@ public class Location {
     @Size(max = 100, message = "Country cannot exceed 100 characters")
     private String country;
 
-    @Column(columnDefinition = "geography(POINT, 4326)")
+    @Column(columnDefinition = "geometry")
     private Point coordinates;
 
     public double calculateDistance(Location other) {
@@ -71,5 +74,15 @@ public class Location {
             sb.append(city);
         }
         return sb.toString();
+    }
+
+    private static final GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
+
+    @PrePersist
+    @PreUpdate
+    private void calculateCoordinates() {
+        if (latitude != null && longitude != null) {
+            this.coordinates = geometryFactory.createPoint(new Coordinate(longitude, latitude));
+        }
     }
 }
