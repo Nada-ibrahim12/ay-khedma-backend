@@ -68,7 +68,7 @@ public class BookingController
             })
     public ResponseEntity<AcceptBookingResponse> acceptBooking(
             @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
-            @Parameter(description = "Accept booking request data (booking ID and estimated duration)", required = true)
+            @Parameter(description = "Accept booking request data (booking ID and estimated duration in minutes)", required = true)
             @Valid @RequestBody AcceptBookingRequest request)
     {
         AcceptBookingResponse response = bookingService.acceptBooking(providerId, request);
