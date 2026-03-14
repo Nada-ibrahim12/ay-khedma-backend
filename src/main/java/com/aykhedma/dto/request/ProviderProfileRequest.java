@@ -5,12 +5,13 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.aykhedma.dto.location.LocationDTO;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UpdateProfileRequest {
+public class ProviderProfileRequest {
 
     @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
     @Pattern(regexp = "^[\\p{L} .'-]+$", message = "Name can only contain letters, spaces, dots, apostrophes, and hyphens")
@@ -30,6 +31,9 @@ public class UpdateProfileRequest {
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
     private String bio;
 
+    @Positive(message = "Service type ID must be positive")
+    private Long serviceTypeId;
+
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Price cannot exceed 100,000")
     private Double price;
@@ -39,7 +43,11 @@ public class UpdateProfileRequest {
 
     private Boolean emergencyEnabled;
 
-    @DecimalMin(value = "0.1", message = "Service area must be at least 0.1 km")
-    @DecimalMax(value = "100.0", message = "Service area cannot exceed 100 km")
-    private Double serviceArea;
+    @Size(max = 100, message = "Area cannot exceed 100 characters")
+    private String serviceArea;
+
+    @DecimalMin(value = "0.0", message = "Service area radius cannot be negative")
+    private Double serviceAreaRadius;
+
+    private LocationDTO location;
 }

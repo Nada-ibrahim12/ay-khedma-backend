@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${subject}">Email</title>
+</head>
+<body>
+<h2>Ay Khedma Test Email</h2>
+<p><strong>Message:</strong> <span th:text="${message}">message</span></p>
+<p><strong>Sent at:</strong> <span th:text="${timestamp}">timestamp</span></p>
+<hr>
+<p style="color: gray;">This is an automated test message from your notification system.</p>
+</body>
+</html>

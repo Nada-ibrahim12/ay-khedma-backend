@@ -3,6 +3,7 @@ package com.aykhedma.model.booking;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Entity
@@ -17,8 +18,7 @@ public class WorkingDay {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Enumerated(EnumType.STRING)
-    private DayOfWeek dayOfWeek;
+    private LocalDate date;
 
     private LocalTime startTime;
 

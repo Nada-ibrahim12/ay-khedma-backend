@@ -15,5 +15,6 @@ public class ServiceCategoryDTO {
     private Long id;
     private String name;
     private String nameAr;
+    private String description;
     private List<ServiceTypeDTO> serviceTypes;
 }

@@ -17,6 +17,7 @@ import java.util.List;
 @AllArgsConstructor
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
+@PrimaryKeyJoinColumn(name = "id")
 public class Consumer extends User {
 
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
@@ -41,6 +42,10 @@ public class Consumer extends User {
     @Min(value = 0, message = "Total bookings cannot be negative")
     @Column(nullable = false)
     private Integer totalBookings = 0;
+
+    @Min(value = 0, message = "Total bookings cannot be negative")
+    @Column(nullable = false)
+    private Integer cancelledBookings = 0;
 
     @ManyToOne
     @JoinColumn(name = "location_id")

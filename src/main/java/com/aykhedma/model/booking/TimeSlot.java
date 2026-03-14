@@ -23,7 +23,8 @@ public class TimeSlot {
 
     private LocalTime endTime;
 
-    private boolean isBooked = false;
+    @Enumerated(EnumType.STRING)
+    private TimeSlotStatus status = TimeSlotStatus.AVAILABLE;
 
     @ManyToOne
     @JoinColumn(name = "schedule_id")
@@ -31,4 +32,8 @@ public class TimeSlot {
 
     @OneToOne(mappedBy = "timeSlot")
     private Booking booking;
+
+    public boolean canBeSplit() {
+        return status == TimeSlotStatus.AVAILABLE;
+    }
 }
