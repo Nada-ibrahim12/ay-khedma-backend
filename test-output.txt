@@ -905,9 +905,9 @@ Hibernate: insert into users (created_at,credentials_non_expired,email,enabled,n
 Hibernate: insert into consumers (average_rating,location_id,total_bookings,id) values (?,?,?,?)
 Hibernate: select u1_0.id,case when u1_1.id is not null then 1 when u1_2.id is not null then 2 when u1_3.id is not null then 3 end,u1_0.created_at,u1_0.credentials_non_expired,u1_0.email,u1_0.enabled,u1_0.name,u1_0.password,u1_0.phone_number,u1_0.preferred_language,u1_0.profile_image,u1_0.role,u1_1.department,u1_1.permissions,u1_2.average_rating,u1_2.id,u1_2.location_id,u1_2.total_bookings,u1_3.acceptance_rate,u1_3.average_rating,u1_3.average_time,u1_3.bio,u1_3.booking_rate,u1_3.id,u1_3.completed_jobs,u1_3.emergency_enabled,u1_3.location_id,u1_3.national_id,u1_3.price,u1_3.price_type,u1_3.response_time,u1_3.schedule_id,u1_3.service_area,u1_3.service_type_id,u1_3.verification_status from users u1_0 left join admins u1_1 on u1_0.id=u1_1.id left join consumers u1_2 on u1_0.id=u1_2.id left join providers u1_3 on u1_0.id=u1_3.id where u1_0.email=?
 [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.587 s -- in com.aykhedma.controller.SecurityIntegrationTest
-[INFO] Running com.aykhedma.repository.ConsumerRepositoryTest
-2026-02-25T01:58:51.376+02:00  INFO 25792 --- [ay-khedma-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.aykhedma.repository.ConsumerRepositoryTest]: ConsumerRepositoryTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
-2026-02-25T01:58:51.404+02:00  INFO 25792 --- [ay-khedma-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.aykhedma.AyKhedmaBackendApplication for test class com.aykhedma.repository.ConsumerRepositoryTest
+[INFO] Running com.aykhedma.repository.com.aykhedma.repository.ConsumerRepositoryTest
+2026-02-25T01:58:51.376+02:00  INFO 25792 --- [ay-khedma-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.aykhedma.repository.com.aykhedma.repository.ConsumerRepositoryTest]: com.aykhedma.repository.ConsumerRepositoryTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+2026-02-25T01:58:51.404+02:00  INFO 25792 --- [ay-khedma-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.aykhedma.AyKhedmaBackendApplication for test class com.aykhedma.repository.com.aykhedma.repository.ConsumerRepositoryTest
 2026-02-25T01:58:51.414+02:00  INFO 25792 --- [ay-khedma-backend] [           main] o.s.b.d.r.RestartApplicationListener     : Restart disabled due to context in which it is running
 2026-02-25T01:58:51.424+02:00  INFO 25792 --- [ay-khedma-backend] [           main] m.p.springdotenv.DotenvPropertySource    : Initialized Dotenv with DotenvConfig{directory=null, filename=null, ignoreIfMalformed=false, ignoreIfMissing=true, systemProperties=false, prefix=null}
 
@@ -919,8 +919,8 @@ Hibernate: select u1_0.id,case when u1_1.id is not null then 1 when u1_2.id is n
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::                (v3.2.4)
 
-2026-02-25T01:58:51.541+02:00  INFO 25792 --- [ay-khedma-backend] [           main] c.a.repository.ConsumerRepositoryTest    : Starting ConsumerRepositoryTest using Java 17.0.18 with PID 25792 (started by ahmed in C:\Users\ahmed\OneDrive\Documents\GitHub\ay-khedma-backend)
-2026-02-25T01:58:51.541+02:00  INFO 25792 --- [ay-khedma-backend] [           main] c.a.repository.ConsumerRepositoryTest    : The following 1 profile is active: "test"
+2026-02-25T01:58:51.541+02:00  INFO 25792 --- [ay-khedma-backend] [           main] c.a.repository.com.aykhedma.repository.ConsumerRepositoryTest    : Starting com.aykhedma.repository.ConsumerRepositoryTest using Java 17.0.18 with PID 25792 (started by ahmed in C:\Users\ahmed\OneDrive\Documents\GitHub\ay-khedma-backend)
+2026-02-25T01:58:51.541+02:00  INFO 25792 --- [ay-khedma-backend] [           main] c.a.repository.com.aykhedma.repository.ConsumerRepositoryTest    : The following 1 profile is active: "test"
 2026-02-25T01:58:51.784+02:00  INFO 25792 --- [ay-khedma-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
 2026-02-25T01:58:51.784+02:00  INFO 25792 --- [ay-khedma-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
 2026-02-25T01:58:51.835+02:00  INFO 25792 --- [ay-khedma-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 51 ms. Found 14 JPA repository interfaces.
@@ -1597,7 +1597,7 @@ Hibernate: alter table if exists service_types add constraint FKgkmclnbnae59q72h
 Hibernate: alter table if exists time_slots add constraint FK4le5ii2mi0tnij3a1sxbn73p3 foreign key (schedule_id) references schedules
 Hibernate: alter table if exists working_days add constraint FKmxvcxf2mug7lx5seiy1va02v8 foreign key (schedule_id) references schedules
 2026-02-25T01:58:52.790+02:00  INFO 25792 --- [ay-khedma-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-2026-02-25T01:58:53.165+02:00  INFO 25792 --- [ay-khedma-backend] [           main] c.a.repository.ConsumerRepositoryTest    : Started ConsumerRepositoryTest in 1.752 seconds (process running for 25.834)
+2026-02-25T01:58:53.165+02:00  INFO 25792 --- [ay-khedma-backend] [           main] c.a.repository.com.aykhedma.repository.ConsumerRepositoryTest    : Started com.aykhedma.repository.ConsumerRepositoryTest in 1.752 seconds (process running for 25.834)
 Hibernate: insert into users (created_at,credentials_non_expired,email,enabled,name,password,phone_number,preferred_language,profile_image,role) values (?,?,?,?,?,?,?,?,?,?)
 Hibernate: insert into consumers (average_rating,location_id,total_bookings,id) values (?,?,?,?)
 Hibernate: select c1_0.id,c1_1.created_at,c1_1.credentials_non_expired,c1_1.email,c1_1.enabled,c1_1.name,c1_1.password,c1_1.phone_number,c1_1.preferred_language,c1_1.profile_image,c1_1.role,c1_0.average_rating,c1_0.location_id,c1_0.total_bookings from consumers c1_0 join users c1_1 on c1_0.id=c1_1.id where c1_1.phone_number=?
@@ -1612,7 +1612,7 @@ Hibernate: select c1_0.id,c1_1.created_at,c1_1.credentials_non_expired,c1_1.emai
 Hibernate: insert into users (created_at,credentials_non_expired,email,enabled,name,password,phone_number,preferred_language,profile_image,role) values (?,?,?,?,?,?,?,?,?,?)
 Hibernate: insert into consumers (average_rating,location_id,total_bookings,id) values (?,?,?,?)
 Hibernate: select c1_0.id,c1_1.created_at,c1_1.credentials_non_expired,c1_1.email,c1_1.enabled,c1_1.name,c1_1.password,c1_1.phone_number,c1_1.preferred_language,c1_1.profile_image,c1_1.role,c1_0.average_rating,c1_0.location_id,c1_0.total_bookings from consumers c1_0 join users c1_1 on c1_0.id=c1_1.id where c1_1.email=?
-[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.028 s -- in com.aykhedma.repository.ConsumerRepositoryTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.028 s -- in com.aykhedma.repository.com.aykhedma.repository.ConsumerRepositoryTest
 [INFO] Running com.aykhedma.repository.RefreshTokenRepositoryTest
 2026-02-25T01:58:53.403+02:00  INFO 25792 --- [ay-khedma-backend] [           main] t.c.s.AnnotationConfigContextLoaderUtils : Could not detect default configuration classes for test class [com.aykhedma.repository.RefreshTokenRepositoryTest]: RefreshTokenRepositoryTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
 2026-02-25T01:58:53.433+02:00  INFO 25792 --- [ay-khedma-backend] [           main] .b.t.c.SpringBootTestContextBootstrapper : Found @SpringBootConfiguration com.aykhedma.AyKhedmaBackendApplication for test class com.aykhedma.repository.RefreshTokenRepositoryTest
