@@ -7,11 +7,13 @@ import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.repository.ServiceCategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ServiceCategoryService {
 
     private final ServiceCategoryRepository categoryRepository;
@@ -47,7 +49,7 @@ public class ServiceCategoryService {
                         .basePrice(stDto.getBasePrice())
                         .defaultPriceType(stDto.getDefaultPriceType())
                         .estimatedDuration(stDto.getEstimatedDuration())
-                        .category(category) // VERY IMPORTANT
+                        .category(category)
                         .build();
 
                 category.getServiceTypes().add(serviceType);
@@ -97,6 +99,7 @@ public class ServiceCategoryService {
                 .id(category.getId())
                 .name(category.getName())
                 .nameAr(category.getNameAr())
+                .description(category.getDescription())
                 .serviceTypes(types)
                 .build();
     }

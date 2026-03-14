@@ -34,7 +34,7 @@ public class NotificationService {
     private final NotificationPreferenceRepository preferenceRepository;
     private final FirebaseService firebaseService;
     private final EmailService emailService;
-//    private final SmsService smsService;
+    //    private final SmsService smsService;
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
 
@@ -175,7 +175,7 @@ public class NotificationService {
                 return "email/general-notification";
         }
     }
-//  send app notification (websocket + push) 
+    //  send app notification (websocket + push)
     private void sendAppNotification(NotificationRequest request) {
         Notification notification = saveNotification(request);
         sendWebSocketNotification(notification);
@@ -251,7 +251,7 @@ public class NotificationService {
     }
 
     // filter
-        /**
+    /**
      * Get notifications filtered by date range
      *
      * @param userId User ID (passed as header or parameter)
@@ -262,11 +262,9 @@ public class NotificationService {
      */
     public Page<NotificationDTO> getUserNotificationsByDateRange(Long userId, LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
         List<Notification> notifications = notificationRepository.findByUserIdAndCreatedAtBetween(userId, startDate, endDate, pageable);
-        
         List<NotificationDTO> notificationDTOs = notifications.stream()
                 .map(NotificationDTO::fromEntity)
                 .collect(Collectors.toList());
-        
         return new PageImpl<>(notificationDTOs, pageable, notifications.size());
     }
 
