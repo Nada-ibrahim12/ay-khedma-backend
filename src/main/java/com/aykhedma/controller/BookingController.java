@@ -90,7 +90,7 @@ public class BookingController
                            content = @Content(schema = @Schema(implementation = BookingResponse.class))),
                    @ApiResponse(responseCode = "400", description = "Invalid booking to be declined"),
                    @ApiResponse(responseCode = "403", description = "Provider does not own this booking"),
-                   @ApiResponse(responseCode = "404", description = "Provider or booking not found"),
+                   @ApiResponse(responseCode = "404", description = "Provider or booking not found")
             })
     public ResponseEntity<BookingResponse> declineBooking(
             @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
@@ -112,7 +112,7 @@ public class BookingController
                    @ApiResponse(responseCode = "400", description = "Invalid booking to be cancelled"),
                    @ApiResponse(responseCode = "403", description = "User does not own this booking"),
                    @ApiResponse(responseCode = "403", description = "User is not a provider or a consumer"),
-                   @ApiResponse(responseCode = "404", description = "User or booking not found"),
+                   @ApiResponse(responseCode = "404", description = "User or booking not found")
             })
     public ResponseEntity<BookingResponse> cancelBooking(
             @Parameter(description = "ID of the user", required = true) @PathVariable Long userId,
@@ -130,9 +130,9 @@ public class BookingController
             {
                    @ApiResponse(responseCode = "200", description = "Bookings retrieved successfully",
                            content = @Content(schema = @Schema(implementation = BookingResponse.class))),
-                   @ApiResponse(responseCode = "400", description = "Invalid booking status"),
                    @ApiResponse(responseCode = "403", description = "User is not a provider or a consumer"),
                    @ApiResponse(responseCode = "404", description = "User not found"),
+                   @ApiResponse(responseCode = "500", description = "Invalid booking status")
             })
     public ResponseEntity<Page<BookingResponse>> getBookingsByStatus(
             @Parameter(description = "ID of the user", required = true) @PathVariable Long userId,
@@ -151,7 +151,7 @@ public class BookingController
                    @ApiResponse(responseCode = "200", description = "Bookings retrieved successfully",
                            content = @Content(schema = @Schema(implementation = BookingResponse.class))),
                    @ApiResponse(responseCode = "403", description = "User is not a provider or a consumer"),
-                   @ApiResponse(responseCode = "404", description = "User not found"),
+                   @ApiResponse(responseCode = "404", description = "User not found")
             })
     public ResponseEntity<List<BookingResponse>> getUpcomingBookings(
             @Parameter(description = "ID of the user", required = true) @PathVariable Long userId)
