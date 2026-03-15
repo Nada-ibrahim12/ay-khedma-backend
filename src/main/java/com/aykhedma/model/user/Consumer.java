@@ -39,10 +39,12 @@ public class Consumer extends User {
     @Builder.Default
     private List<Provider> savedProviders = new ArrayList<>();
 
+    @Builder.Default
     @Min(value = 0, message = "Total bookings cannot be negative")
     @Column(nullable = false)
     private Integer totalBookings = 0;
 
+    @Builder.Default
     @Min(value = 0, message = "Total bookings cannot be negative")
     @Column(nullable = false)
     private Integer cancelledBookings = 0;
