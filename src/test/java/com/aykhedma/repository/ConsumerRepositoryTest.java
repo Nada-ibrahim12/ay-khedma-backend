@@ -127,4 +127,44 @@ class ConsumerRepositoryTest {
 
         assertThat(topRated).isEmpty();
     }
+
+    @Test
+    @DisplayName("incrementTotalBookings() should update the total bookings by 1")
+    void incrementTotalBookingsTest()
+    {
+        Consumer consumer = Consumer.builder()
+                .name("ConsumerForBookings")
+                .email("consumerforbookings@test.com")
+                .phoneNumber("01099999999")
+                .password("encodedPassword")
+                .role(UserType.CONSUMER)
+                .build();
+        entityManager.persistAndFlush(consumer);
+
+        consumerRepository.incrementTotalBookings(consumer.getId());
+        entityManager.clear();
+
+        Consumer updated = consumerRepository.findById(consumer.getId()).orElseThrow();
+        assertThat(updated.getTotalBookings()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("incrementCancelledBookings() should update the cancelled bookings by 1")
+    void incrementCancelledBookingsTest()
+    {
+        Consumer consumer = Consumer.builder()
+                .name("ConsumerForBookings2")
+                .email("consumerforbookings2@test.com")
+                .phoneNumber("01099995555")
+                .password("encodedPassword")
+                .role(UserType.CONSUMER)
+                .build();
+        entityManager.persistAndFlush(consumer);
+
+        consumerRepository.incrementCancelledBookings(consumer.getId());
+        entityManager.clear();
+
+        Consumer updated = consumerRepository.findById(consumer.getId()).orElseThrow();
+        assertThat(updated.getCancelledBookings()).isEqualTo(1L);
+    }
 }

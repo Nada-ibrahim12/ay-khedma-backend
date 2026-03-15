@@ -1,6 +1,5 @@
 package com.aykhedma.repository;
 
-import com.aykhedma.model.location.Location;
 import com.aykhedma.model.service.PriceType;
 import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.service.ServiceCategory;
@@ -103,5 +102,37 @@ class ProviderRepositoryTest {
 
         assertThat(found).isPresent();
         assertThat(found.get().getId()).isEqualTo(savedProvider.getId());
+    }
+
+    @Test
+    @DisplayName("Should update the total bookings by 1")
+    void incrementTotalBookingsTest()
+    {
+        Provider savedProvider = providerRepository.save(provider);
+        entityManager.flush();
+        entityManager.clear();
+
+        providerRepository.incrementTotalBookings(savedProvider.getId());
+        entityManager.flush();
+        entityManager.clear();
+
+        Provider updated = providerRepository.findById(savedProvider.getId()).orElseThrow();
+        assertThat(updated.getTotalBookings()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("Should update the cancelled bookings by 1")
+    void incrementCancelledBookingsTest()
+    {
+        Provider savedProvider = providerRepository.save(provider);
+        entityManager.flush();
+        entityManager.clear();
+
+        providerRepository.incrementCancelledBookings(savedProvider.getId());
+        entityManager.flush();
+        entityManager.clear();
+
+        Provider updated = providerRepository.findById(savedProvider.getId()).orElseThrow();
+        assertThat(updated.getCancelledBookings()).isEqualTo(1L);
     }
 }
