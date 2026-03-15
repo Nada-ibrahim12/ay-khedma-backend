@@ -1,6 +1,6 @@
 package com.aykhedma.repository;
 
-import com.aykhedma.model.RefreshToken;
+import com.aykhedma.model.user.RefreshToken;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.UserType;
 import org.junit.jupiter.api.BeforeEach;

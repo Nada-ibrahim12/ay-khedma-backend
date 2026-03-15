@@ -1,6 +1,5 @@
-package com.aykhedma.model;
+package com.aykhedma.model.user;
 
-import com.aykhedma.model.user.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

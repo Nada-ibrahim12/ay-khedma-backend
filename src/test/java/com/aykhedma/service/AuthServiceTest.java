@@ -1,11 +1,11 @@
 package com.aykhedma.service;
 
-import com.aykhedma.Auth.AuthService;
-import com.aykhedma.Auth.RefreshTokenService;
+import com.aykhedma.auth.AuthService;
+import com.aykhedma.auth.RefreshTokenService;
 import com.aykhedma.dto.request.LoginRequest;
 import com.aykhedma.dto.request.RegisterRequest;
 import com.aykhedma.dto.response.AuthResponse;
-import com.aykhedma.model.RefreshToken;
+import com.aykhedma.model.user.RefreshToken;
 import com.aykhedma.model.user.*;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.security.JwtService;

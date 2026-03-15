@@ -1,6 +1,6 @@
 package com.aykhedma.repository;
 
-import com.aykhedma.model.RefreshToken;
+import com.aykhedma.model.user.RefreshToken;
 import com.aykhedma.model.user.User;
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;

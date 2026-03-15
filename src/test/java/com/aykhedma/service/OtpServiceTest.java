@@ -1,6 +1,6 @@
 package com.aykhedma.service;
 
-import com.aykhedma.Auth.OtpService;
+import com.aykhedma.auth.OtpService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
