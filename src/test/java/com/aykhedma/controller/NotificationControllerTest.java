@@ -6,6 +6,8 @@ import com.aykhedma.dto.request.NotificationRequest;
 import com.aykhedma.exception.GlobalExceptionHandler;
 import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.notification.NotificationStatus;
+import com.aykhedma.security.CustomUserDetailsService;
+import com.aykhedma.security.JwtService;
 import com.aykhedma.service.NotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +47,12 @@ class NotificationControllerTest {
 
     @MockBean
     private NotificationService notificationService;
+
+    @MockBean
+    private JwtService jwtService;
+
+    @MockBean
+    private CustomUserDetailsService customUserDetailsService;
 
     private final Long USER_ID = 1L;
     private final Long NOTIFICATION_ID = 100L;
