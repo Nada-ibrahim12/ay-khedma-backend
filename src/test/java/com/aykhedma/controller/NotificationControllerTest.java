@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(NotificationController.class)
-@Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
+@Import({ TestSecurityConfig.class, GlobalExceptionHandler.class })
 @DisplayName("Notification Controller Unit Tests")
 class NotificationControllerTest {
 
