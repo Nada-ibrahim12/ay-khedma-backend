@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,6 +33,7 @@ public class BookingController
 
     // =================================== Consumer Side ===================================
 
+    @PreAuthorize("hasRole('CONSUMER')")
     @PostMapping("/{consumerId}/request-booking")
     @Operation(summary = "Request a booking from a provider")
     @ApiResponses(value =
@@ -52,6 +54,7 @@ public class BookingController
 
     // =================================== Provider Side ===================================
 
+    @PreAuthorize("hasRole('PROVIDER')")
     @PostMapping("/{providerId}/accept-booking")
     @Operation(summary = "Accept a consumer's booking")
     @ApiResponses(value =
@@ -78,6 +81,7 @@ public class BookingController
             return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
+    @PreAuthorize("hasRole('PROVIDER')")
     @PostMapping("/{providerId}/decline-booking/{bookingId}")
     @Operation(summary = "Decline a consumer's booking")
     @ApiResponses(value =
@@ -86,7 +90,7 @@ public class BookingController
                            content = @Content(schema = @Schema(implementation = BookingResponse.class))),
                    @ApiResponse(responseCode = "400", description = "Invalid booking to be declined"),
                    @ApiResponse(responseCode = "403", description = "Provider does not own this booking"),
-                   @ApiResponse(responseCode = "404", description = "Provider or booking not found"),
+                   @ApiResponse(responseCode = "404", description = "Provider or booking not found")
             })
     public ResponseEntity<BookingResponse> declineBooking(
             @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
@@ -98,6 +102,7 @@ public class BookingController
 
     // =================================== User Side ===================================
 
+    @PreAuthorize("hasAnyRole('PROVIDER','CONSUMER')")
     @PostMapping("/{userId}/cancel-booking")
     @Operation(summary = "Cancel user's booking")
     @ApiResponses(value =
@@ -107,7 +112,7 @@ public class BookingController
                    @ApiResponse(responseCode = "400", description = "Invalid booking to be cancelled"),
                    @ApiResponse(responseCode = "403", description = "User does not own this booking"),
                    @ApiResponse(responseCode = "403", description = "User is not a provider or a consumer"),
-                   @ApiResponse(responseCode = "404", description = "User or booking not found"),
+                   @ApiResponse(responseCode = "404", description = "User or booking not found")
             })
     public ResponseEntity<BookingResponse> cancelBooking(
             @Parameter(description = "ID of the user", required = true) @PathVariable Long userId,
@@ -118,15 +123,16 @@ public class BookingController
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
+    @PreAuthorize("hasAnyRole('PROVIDER','CONSUMER')")
     @GetMapping("/{userId}")
     @Operation(summary = "Get user's bookings by booking status")
         @ApiResponses(value =
             {
                    @ApiResponse(responseCode = "200", description = "Bookings retrieved successfully",
                            content = @Content(schema = @Schema(implementation = BookingResponse.class))),
-                   @ApiResponse(responseCode = "400", description = "Invalid booking status"),
                    @ApiResponse(responseCode = "403", description = "User is not a provider or a consumer"),
                    @ApiResponse(responseCode = "404", description = "User not found"),
+                   @ApiResponse(responseCode = "500", description = "Invalid booking status")
             })
     public ResponseEntity<Page<BookingResponse>> getBookingsByStatus(
             @Parameter(description = "ID of the user", required = true) @PathVariable Long userId,
@@ -137,6 +143,7 @@ public class BookingController
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
+    @PreAuthorize("hasAnyRole('PROVIDER','CONSUMER')")
     @GetMapping("/{userId}/upcoming-bookings")
     @Operation(summary = "Get user's upcoming bookings for the day")
         @ApiResponses(value =
@@ -144,7 +151,7 @@ public class BookingController
                    @ApiResponse(responseCode = "200", description = "Bookings retrieved successfully",
                            content = @Content(schema = @Schema(implementation = BookingResponse.class))),
                    @ApiResponse(responseCode = "403", description = "User is not a provider or a consumer"),
-                   @ApiResponse(responseCode = "404", description = "User not found"),
+                   @ApiResponse(responseCode = "404", description = "User not found")
             })
     public ResponseEntity<List<BookingResponse>> getUpcomingBookings(
             @Parameter(description = "ID of the user", required = true) @PathVariable Long userId)

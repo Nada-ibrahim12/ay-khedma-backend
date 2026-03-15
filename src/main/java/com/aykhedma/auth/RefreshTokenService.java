@@ -1,6 +1,6 @@
-package com.aykhedma.Auth;
+package com.aykhedma.auth;
 
-import com.aykhedma.model.RefreshToken;
+import com.aykhedma.model.user.RefreshToken;
 import com.aykhedma.model.user.User;
 import com.aykhedma.repository.RefreshTokenRepository;
 import org.springframework.stereotype.Service;

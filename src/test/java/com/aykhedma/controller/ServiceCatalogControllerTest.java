@@ -6,6 +6,8 @@ import com.aykhedma.dto.service.ServiceTypeDTO;
 import com.aykhedma.config.TestSecurityConfig;
 import com.aykhedma.exception.GlobalExceptionHandler;
 import com.aykhedma.exception.ResourceNotFoundException;
+import com.aykhedma.security.JwtAuthenticationFilter;
+import com.aykhedma.security.JwtService;
 import com.aykhedma.service.ServiceCategoryService;
 import com.aykhedma.service.ServiceManagementServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,6 +51,12 @@ class ServiceCatalogControllerTest {
 
     @MockBean
     private ServiceManagementServiceImpl typeService;
+
+    @MockBean
+    private JwtService jwtService;
+
+    @MockBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     private SearchResponse provider() {
         return SearchResponse.builder()

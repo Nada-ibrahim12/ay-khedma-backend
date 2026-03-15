@@ -59,10 +59,12 @@ public abstract class User {
     @Pattern(regexp = "^[a-z]{2}(-[A-Z]{2})?$", message = "Invalid language format (e.g., 'en', 'ar-EG')")
     private String preferredLanguage;
 
+    @Builder.Default
     @NotNull(message = "Account enabled status is required")
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Builder.Default
     @NotNull(message = "Credentials non-expired status is required")
     @Column(nullable = false)
     private boolean credentialsNonExpired = true;

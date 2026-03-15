@@ -28,6 +28,7 @@ public class Provider extends User {
     @Column(length = 500)
     private String bio;
 
+    @Builder.Default
     @NotNull(message = "Verification status is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -37,14 +38,17 @@ public class Provider extends User {
     @Max(value = 480, message = "Average time cannot exceed 8 hours (480 minutes)")
     private Integer averageTime;
 
+    @Builder.Default
     @Min(value = 0, message = "Completed jobs cannot be negative")
     @Column(nullable = false)
     private Integer completedJobs = 0;
 
+    @Builder.Default
     @Min(value = 0, message = "Total bookings cannot be negative")
     @Column(nullable = false)
     private Integer totalBookings = 0;
 
+    @Builder.Default
     @Min(value = 0, message = "Total bookings cannot be negative")
     @Column(nullable = false)
     private Integer cancelledBookings = 0;
@@ -64,6 +68,7 @@ public class Provider extends User {
     @JoinColumn(name = "location_id", nullable = false)
     private Location location;
 
+    @Builder.Default
     @NotNull(message = "Emergency enabled status is required")
     @Column(nullable = false)
     private Boolean emergencyEnabled = false;
@@ -78,11 +83,13 @@ public class Provider extends User {
     @JoinColumn(name = "schedule_id", nullable = false)
     private Schedule schedule;
 
+    @Builder.Default
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average rating cannot exceed 5.0")
     //@Column(precision = 3, scale = 2)
     private Double averageRating = 0.0;
 
+    @Builder.Default
     @Min(value = 0, message = "Booking rate cannot be negative")
     @Max(value = 100, message = "Booking rate cannot exceed 100")
     private Integer bookingRate = 0;
@@ -101,6 +108,7 @@ public class Provider extends User {
     @Size(max = 100, message = "Area cannot exceed 100 characters")
     private String serviceArea;
 
+    @Builder.Default
     @DecimalMin(value = "0.0", message = "Service area radius cannot be negative")
     private Double serviceAreaRadius = 7.0;
 
@@ -108,6 +116,7 @@ public class Provider extends User {
     @Builder.Default
     private List<Booking> bookings = new ArrayList<>();
 
+    @Builder.Default
     @Min(value = 0, message = "Acceptance rate cannot be negative")
     @Max(value = 100, message = "Acceptance rate cannot exceed 100")
     private Integer acceptanceRate = 100;

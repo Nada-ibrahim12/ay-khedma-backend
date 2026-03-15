@@ -1,7 +1,7 @@
 package com.aykhedma.service;
 
-import com.aykhedma.Auth.RefreshTokenService;
-import com.aykhedma.model.RefreshToken;
+import com.aykhedma.auth.RefreshTokenService;
+import com.aykhedma.model.user.RefreshToken;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.User;
 import com.aykhedma.model.user.UserType;

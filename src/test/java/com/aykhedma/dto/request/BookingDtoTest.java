@@ -39,8 +39,8 @@ class BookingDtoTest
         {
             BookingRequest request = BookingRequest.builder()
                     .providerId(15L)
-                    .requestedDate(LocalDate.parse("2027-02-27"))
-                    .requestedTime(LocalTime.parse("10:00"))
+                    .requestedDate(LocalDate.now().plusDays(1))
+                    .requestedTime(LocalTime.now())
                     .problemDescription("Need help ASAP")
                     .build();
 
@@ -59,8 +59,8 @@ class BookingDtoTest
         void noProviderIdFieldViolationTest()
         {
             BookingRequest request = BookingRequest.builder()
-                    .requestedDate(LocalDate.parse("2027-02-27"))
-                    .requestedTime(LocalTime.parse("10:00"))
+                    .requestedDate(LocalDate.now().plusDays(1))
+                    .requestedTime(LocalTime.now())
                     .problemDescription("Need help ASAP")
                     .build();
 
@@ -77,8 +77,8 @@ class BookingDtoTest
         {
             BookingRequest request = BookingRequest.builder()
                     .providerId(-15L)
-                    .requestedDate(LocalDate.parse("2027-02-27"))
-                    .requestedTime(LocalTime.parse("10:00"))
+                    .requestedDate(LocalDate.now().plusDays(1))
+                    .requestedTime(LocalTime.now())
                     .problemDescription("Need help ASAP")
                     .build();
 
@@ -100,7 +100,7 @@ class BookingDtoTest
         {
             BookingRequest request = BookingRequest.builder()
                     .providerId(15L)
-                    .requestedTime(LocalTime.parse("10:00"))
+                    .requestedTime(LocalTime.now())
                     .problemDescription("Need help ASAP")
                     .build();
 
@@ -117,8 +117,8 @@ class BookingDtoTest
         {
             BookingRequest request = BookingRequest.builder()
                     .providerId(10L)
-                    .requestedDate(LocalDate.parse("2026-02-26"))
-                    .requestedTime(LocalTime.parse("10:00"))
+                    .requestedDate(LocalDate.now().minusDays(1))
+                    .requestedTime(LocalTime.now())
                     .problemDescription("Need help ASAP")
                     .build();
 
@@ -140,7 +140,7 @@ class BookingDtoTest
         {
             BookingRequest request = BookingRequest.builder()
                     .providerId(15L)
-                    .requestedDate(LocalDate.parse("2027-02-27"))
+                    .requestedDate(LocalDate.now().plusDays(1))
                     .problemDescription("Need help ASAP")
                     .build();
 
@@ -162,8 +162,8 @@ class BookingDtoTest
         {
             BookingRequest request = BookingRequest.builder()
                     .providerId(15L)
-                    .requestedDate(LocalDate.parse("2027-02-27"))
-                    .requestedTime(LocalTime.parse("10:00"))
+                    .requestedDate(LocalDate.now().plusDays(1))
+                    .requestedTime(LocalTime.now())
                     .build();
 
             Set<ConstraintViolation<BookingRequest>> violations = validator.validate(request);
@@ -181,8 +181,8 @@ class BookingDtoTest
 
             BookingRequest request = BookingRequest.builder()
                     .providerId(10L)
-                    .requestedDate(LocalDate.parse("2027-02-27"))
-                    .requestedTime(LocalTime.parse("10:00"))
+                    .requestedDate(LocalDate.now().plusDays(1))
+                    .requestedTime(LocalTime.now())
                     .problemDescription(longDescription)
                     .build();
 

@@ -56,6 +56,7 @@ public class Booking {
     @Column(length = 1000)
     private String problemDescription;
 
+    @Builder.Default
     @NotNull(message = "Booking status is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

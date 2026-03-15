@@ -81,10 +81,17 @@ public class ServiceCatalogController {
     }
 
     @PutMapping("/types/{id}")
-    public ServiceTypeDTO updateType(@PathVariable Long id, @RequestBody ServiceTypeDTO dto) {
-        return typeService.updateType(id, dto);
+    public ResponseEntity<?> updateType(@PathVariable Long id, @RequestBody ServiceTypeDTO dto) {
+        try {
+            ServiceTypeDTO updated = typeService.updateType(id, dto);
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(e.getMessage());
+        }
     }
-
     @DeleteMapping("/types/{id}")
     public void deleteType(@PathVariable Long id) {
 

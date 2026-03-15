@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ServiceManagementServiceImpl {
 
     private final ServiceTypeRepository typeRepository;
@@ -72,13 +73,13 @@ public class ServiceManagementServiceImpl {
         ServiceType type = typeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service type not found"));
 
-        type.setName(dto.getName());
-        type.setNameAr(dto.getNameAr());
-        type.setDescription(dto.getDescription());
-        type.setRiskLevel(dto.getRiskLevel());
-        type.setBasePrice(dto.getBasePrice());
-        type.setDefaultPriceType(dto.getDefaultPriceType());
-        type.setEstimatedDuration(dto.getEstimatedDuration());
+        if (dto.getName() != null) type.setName(dto.getName());
+        if (dto.getNameAr() != null) type.setNameAr(dto.getNameAr());
+        if (dto.getDescription() != null) type.setDescription(dto.getDescription());
+        if (dto.getRiskLevel() != null) type.setRiskLevel(dto.getRiskLevel());
+        if (dto.getBasePrice() != null) type.setBasePrice(dto.getBasePrice());
+        if (dto.getDefaultPriceType() != null) type.setDefaultPriceType(dto.getDefaultPriceType());
+        if (dto.getEstimatedDuration() != null) type.setEstimatedDuration(dto.getEstimatedDuration());
 
         if (dto.getCategoryId() != null) {
             ServiceCategory category = categoryRepository.findById(dto.getCategoryId())
