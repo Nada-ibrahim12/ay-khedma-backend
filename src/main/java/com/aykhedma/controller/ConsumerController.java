@@ -1,6 +1,5 @@
 package com.aykhedma.controller;
 
-import com.aykhedma.dto.location.LocationDTO;
 import com.aykhedma.dto.request.ConsumerProfileRequest;
 import com.aykhedma.dto.response.ConsumerResponse;
 import com.aykhedma.dto.response.ProfileResponse;
@@ -17,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,136 +29,141 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ConsumerController {
 
-    private final ConsumerService consumerService;
+        private final ConsumerService consumerService;
 
-    @GetMapping("/{consumerId}")
-    @Operation(summary = "Get consumer profile")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved consumer profile",
-                    content = @Content(schema = @Schema(implementation = ConsumerResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Consumer not found"),
-            @ApiResponse(responseCode = "400", description = "Invalid consumer ID supplied")
-    })
-    public ResponseEntity<ConsumerResponse> getConsumerProfile(
-            @Parameter(description = "ID of the consumer to retrieve", required = true)
-            @PathVariable Long consumerId) {
-        ConsumerResponse response = consumerService.getConsumerProfile(consumerId);
-        return ResponseEntity.ok(response);
-    }
+        @PreAuthorize("hasAnyRole('ADMIN', 'PROVIDER')")
+        @GetMapping("/{consumerId}")
+        @Operation(summary = "Get consumer profile")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Successfully retrieved consumer profile", content = @Content(schema = @Schema(implementation = ConsumerResponse.class))),
+                        @ApiResponse(responseCode = "404", description = "Consumer not found"),
+                        @ApiResponse(responseCode = "400", description = "Invalid consumer ID supplied")
+        })
+        public ResponseEntity<ConsumerResponse> getConsumerProfile(
+                        @Parameter(description = "ID of the consumer to retrieve", required = true) @PathVariable Long consumerId) {
 
-    @PutMapping("/{consumerId}")
-    @Operation(summary = "Update consumer profile")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully updated consumer profile",
-                    content = @Content(schema = @Schema(implementation = ConsumerResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Consumer not found"),
-            @ApiResponse(responseCode = "400", description = "Invalid input data")
-    })
-    public ResponseEntity<ConsumerResponse> updateConsumerProfile(
-            @Parameter(description = "ID of the consumer to update", required = true)
-            @PathVariable Long consumerId,
-
-            @Parameter(description = "Updated consumer profile data", required = true)
-            @Valid @RequestBody ConsumerProfileRequest request) {
-        ConsumerResponse response = consumerService.updateConsumerProfile(consumerId, request);
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping(value = "/{consumerId}/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Update profile picture")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully updated profile picture",
-                    content = @Content(schema = @Schema(implementation = ConsumerResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Consumer not found"),
-            @ApiResponse(responseCode = "400", description = "Invalid file format or size"),
-            @ApiResponse(responseCode = "413", description = "File too large"),
-            @ApiResponse(responseCode = "415", description = "Unsupported media type")
-    })
-    public ResponseEntity<ConsumerResponse> updateProfilePicture(
-            @Parameter(description = "ID of the consumer", required = true)
-            @PathVariable Long consumerId,
-
-            @Parameter(description = "Profile picture file (max 5MB, supported formats: JPEG, PNG, GIF)", required = true)
-            @RequestParam("file") MultipartFile file) throws IOException {
-        ConsumerResponse response = consumerService.updateProfilePicture(consumerId, file);
-        return ResponseEntity.ok(response);
-    }
-
-    @DeleteMapping("/{consumerId}/profile-picture")
-    @Operation(summary = "Delete profile picture")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Successfully deleted profile picture"),
-            @ApiResponse(responseCode = "404", description = "Consumer not found or no profile picture exists")
-    })
-    public ResponseEntity<Void> deleteProfilePicture(
-            @Parameter(description = "ID of the consumer", required = true)
-            @PathVariable Long consumerId) throws IOException {
-        consumerService.deleteProfilePicture(consumerId);
-        return ResponseEntity.noContent().build();
-    }
-    @PostMapping("/{consumerId}/saved-providers/{providerId}")
-    @Operation(summary = "Save a provider to favorites")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully saved provider",
-                    content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Consumer or provider not found"),
-            @ApiResponse(responseCode = "409", description = "Provider already saved")
-    })
-    public ResponseEntity<ProfileResponse> saveProvider(
-            @Parameter(description = "ID of the consumer", required = true)
-            @PathVariable Long consumerId,
-
-            @Parameter(description = "ID of the provider to save", required = true)
-            @PathVariable Long providerId) {
-        ProfileResponse response = consumerService.saveProvider(consumerId, providerId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
-    @DeleteMapping("/{consumerId}/saved-providers/{providerId}")
-    @Operation(summary = "Remove saved provider from favorites")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully removed provider",
-                    content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Consumer not found")
-    })
-    public ResponseEntity<ProfileResponse> removeSavedProvider(
-            @Parameter(description = "ID of the consumer", required = true)
-            @PathVariable Long consumerId,
-
-            @Parameter(description = "ID of the provider to remove", required = true)
-            @PathVariable Long providerId) {
-        ProfileResponse response = consumerService.removeSavedProvider(consumerId, providerId);
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/{consumerId}/saved-providers")
-    @Operation(summary = "Get saved/favorites providers")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved saved providers",
-                    content = @Content(schema = @Schema(implementation = ProviderSummaryResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Consumer not found")
-    })
-    public ResponseEntity<List<ProviderSummaryResponse>> getSavedProviders(
-            @Parameter(description = "ID of the consumer", required = true)
-            @PathVariable Long consumerId) {
-        List<ProviderSummaryResponse> responses = consumerService.getSavedProviders(consumerId);
-        return ResponseEntity.ok(responses);
-    }
-
-    @GetMapping("/{consumerId}/exists")
-    @Operation(summary = "Check if consumer exists")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Consumer exists"),
-            @ApiResponse(responseCode = "404", description = "Consumer does not exist")
-    })
-    public ResponseEntity<Void> checkConsumerExists(
-            @Parameter(description = "ID of the consumer to check", required = true)
-            @PathVariable Long consumerId) {
-        try {
-            consumerService.getConsumerProfile(consumerId);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
+                ConsumerResponse response = consumerService.getConsumerProfile(consumerId);
+                return ResponseEntity.ok(response);
         }
-    }
+
+        @PreAuthorize("hasRole('CONSUMER')")
+        @GetMapping("/me")
+        @Operation(summary = "Get my consumer profile")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Successfully retrieved consumer profile", content = @Content(schema = @Schema(implementation = ConsumerResponse.class))),
+                        @ApiResponse(responseCode = "404", description = "Consumer not found")
+        })
+        public ResponseEntity<ConsumerResponse> getMyConsumerProfile(
+                        @AuthenticationPrincipal(expression = "user.id") Long consumerId) {
+                ConsumerResponse response = consumerService.getConsumerProfile(consumerId);
+                return ResponseEntity.ok(response);
+        }
+
+        @PreAuthorize("hasRole('CONSUMER')")
+        @PutMapping("/me")
+        @Operation(summary = "Update my profile")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Successfully updated consumer profile", content = @Content(schema = @Schema(implementation = ConsumerResponse.class))),
+                        @ApiResponse(responseCode = "404", description = "Consumer not found"),
+                        @ApiResponse(responseCode = "400", description = "Invalid input data")
+        })
+        public ResponseEntity<ConsumerResponse> updateMyConsumerProfile(
+                        @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+                        @Parameter(description = "Updated consumer profile data", required = true) @Valid @RequestBody ConsumerProfileRequest request) {
+                ConsumerResponse response = consumerService.updateConsumerProfile(consumerId, request);
+                return ResponseEntity.ok(response);
+        }
+
+        @PreAuthorize("hasRole('CONSUMER')")
+        @PostMapping(value = "/me/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        @Operation(summary = "Update my profile picture")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Successfully updated profile picture", content = @Content(schema = @Schema(implementation = ConsumerResponse.class))),
+                        @ApiResponse(responseCode = "404", description = "Consumer not found"),
+                        @ApiResponse(responseCode = "400", description = "Invalid file format or size"),
+                        @ApiResponse(responseCode = "413", description = "File too large"),
+                        @ApiResponse(responseCode = "415", description = "Unsupported media type")
+        })
+        public ResponseEntity<ConsumerResponse> updateMyProfilePicture(
+                        @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+
+                        @Parameter(description = "Profile picture file (max 50MB, supported formats: JPEG, PNG, GIF)", required = true) @RequestParam("file") MultipartFile file)
+                        throws IOException {
+                ConsumerResponse response = consumerService.updateProfilePicture(consumerId, file);
+                return ResponseEntity.ok(response);
+        }
+
+        @PreAuthorize("hasRole('CONSUMER')")
+        @DeleteMapping("/me/profile-picture")
+        @Operation(summary = "Delete my profile picture")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "204", description = "Successfully deleted profile picture"),
+                        @ApiResponse(responseCode = "404", description = "Consumer not found or no profile picture exists")
+        })
+        public ResponseEntity<Void> deleteMyProfilePicture(
+                        @AuthenticationPrincipal(expression = "user.id") Long consumerId) throws IOException {
+                consumerService.deleteProfilePicture(consumerId);
+                return ResponseEntity.noContent().build();
+        }
+
+        @PreAuthorize("hasRole('CONSUMER')")
+        @PostMapping("/me/saved-providers/{providerId}")
+        @Operation(summary = "Save a provider to my favorites")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Successfully saved provider", content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
+                        @ApiResponse(responseCode = "404", description = "Consumer or provider not found"),
+                        @ApiResponse(responseCode = "409", description = "Provider already saved")
+        })
+        public ResponseEntity<ProfileResponse> saveProviderForMe(
+                        @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+
+                        @Parameter(description = "ID of the provider to save", required = true) @PathVariable Long providerId) {
+                ProfileResponse response = consumerService.saveProvider(consumerId, providerId);
+                return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        }
+
+        @PreAuthorize("hasRole('CONSUMER')")
+        @DeleteMapping("/me/saved-providers/{providerId}")
+        @Operation(summary = "Remove saved provider from my favorites")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Successfully removed provider", content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
+                        @ApiResponse(responseCode = "404", description = "Consumer not found")
+        })
+        public ResponseEntity<ProfileResponse> removeMySavedProvider(
+                        @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+
+                        @Parameter(description = "ID of the provider to remove", required = true) @PathVariable Long providerId) {
+                ProfileResponse response = consumerService.removeSavedProvider(consumerId, providerId);
+                return ResponseEntity.ok(response);
+        }
+
+        @PreAuthorize("hasRole('CONSUMER')")
+        @GetMapping("/me/saved-providers")
+        @Operation(summary = "Get my saved/favorites providers")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Successfully retrieved saved providers", content = @Content(schema = @Schema(implementation = ProviderSummaryResponse.class))),
+                        @ApiResponse(responseCode = "404", description = "Consumer not found")
+        })
+        public ResponseEntity<List<ProviderSummaryResponse>> getMySavedProviders(
+                        @AuthenticationPrincipal(expression = "user.id") Long consumerId) {
+                List<ProviderSummaryResponse> responses = consumerService.getSavedProviders(consumerId);
+                return ResponseEntity.ok(responses);
+        }
+
+        @PreAuthorize("hasRole('ADMIN')")
+        @GetMapping("/{consumerId}/exists")
+        @Operation(summary = "Check if consumer exists")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Consumer exists"),
+                        @ApiResponse(responseCode = "404", description = "Consumer does not exist")
+        })
+        public ResponseEntity<Void> checkConsumerExists(
+                        @Parameter(description = "ID of the consumer to check", required = true) @PathVariable Long consumerId) {
+                try {
+                        consumerService.getConsumerProfile(consumerId);
+                        return ResponseEntity.ok().build();
+                } catch (Exception e) {
+                        return ResponseEntity.notFound().build();
+                }
+        }
 }
