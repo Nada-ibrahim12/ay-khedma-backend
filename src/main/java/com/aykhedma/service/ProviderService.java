@@ -4,6 +4,7 @@ import com.aykhedma.dto.location.LocationDTO;
 import com.aykhedma.dto.request.ProviderProfileRequest;
 import com.aykhedma.dto.request.WorkingDayRequest;
 import com.aykhedma.dto.response.*;
+import com.aykhedma.model.booking.Booking;
 import com.aykhedma.model.booking.TimeSlot;
 import com.aykhedma.model.user.VerificationStatus;
 import org.springframework.data.domain.Page;
@@ -19,13 +20,17 @@ import java.util.Map;
 public interface ProviderService {
     // Profile Management
     ProviderResponse getProviderProfile(Long providerId);
+
     ProviderResponse updateProviderProfile(Long providerId, ProviderProfileRequest request);
+
     ProviderResponse updateProfilePicture(Long providerId, MultipartFile file) throws IOException;
 
     // Location & Search
-//    ProfileResponse updateProviderLocation(Long providerId, LocationDTO request);
-//    List<ProviderSummaryResponse> findNearbyProviders(Double latitude, Double longitude, Long serviceTypeId, Double radius);
+    // ProfileResponse updateProviderLocation(Long providerId, LocationDTO request);
+    // List<ProviderSummaryResponse> findNearbyProviders(Double latitude, Double
+    // longitude, Long serviceTypeId, Double radius);
     List<ProviderSummaryResponse> allProviders();
+
     Page<SearchResponse> search(
             String keyword,
             Long categoryId,
@@ -37,21 +42,46 @@ public interface ProviderService {
 
     // Schedule Management
     ScheduleResponse addWorkingDay(Long providerId, WorkingDayRequest request);
+
     ScheduleResponse removeWorkingDay(Long providerId, Long workingDayId);
+
     ScheduleResponse updateWorkingDay(Long providerId, Long workingDayId, WorkingDayRequest request);
+
     ScheduleResponse getSchedule(Long providerId);
+
     List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlots(Long providerId, LocalDate date);
+
     List<ScheduleResponse.TimeSlotResponse> getTimeSlotsByDate(Long providerId, LocalDate date);
+
     ScheduleResponse.TimeSlotResponse getTimeSlot(Long providerId, Long timeSlotId);
-    ScheduleResponse.TimeSlotResponse bookTimeSlot(Long timeSlotId, Integer durationMinutes);
+
+    ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId, LocalDate date, LocalTime startTime,
+            Integer durationMinutes);
+
+    ScheduleResponse.TimeSlotResponse cancelBooking(Long timeSlotId);
+
+    void validateHalfHourBoundary(LocalTime time);
+
+    TimeSlot reserveTimeSlotWithBuffer(Long scheduleId, LocalDate date, LocalTime bookingStart, LocalTime bookingEnd);
+
+    void restoreAvailabilityForCancelledBooking(Booking booking);
+
+    void mergeContiguousAvailableSlots(Long scheduleId, LocalDate date);
+
+    LocalTime maxTime(LocalTime a, LocalTime b);
+
+    LocalTime minTime(LocalTime a, LocalTime b);
+
     List<ScheduleResponse.TimeSlotResponse> getUpcomingAvailableSlots(Long providerId, Integer days);
 
     // Documents
     DocumentResponse uploadDocument(Long providerId, MultipartFile file, String documentType) throws IOException;
+
     List<DocumentResponse> getProviderDocuments(Long providerId);
+
     ProfileResponse deleteDocument(Long providerId, Long documentId);
 
     // Status & Verification
-//    ProviderResponse updateEmergencyStatus(Long providerId, boolean enabled);
+    // ProviderResponse updateEmergencyStatus(Long providerId, boolean enabled);
     VerificationStatus getVerificationStatus(Long providerId);
 }

@@ -8,6 +8,8 @@ import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
 import com.aykhedma.mapper.ScheduleMapper;
+import com.aykhedma.model.booking.Booking;
+import com.aykhedma.model.booking.BookingStatus;
 import com.aykhedma.model.booking.Schedule;
 import com.aykhedma.model.booking.TimeSlot;
 import com.aykhedma.model.booking.TimeSlotStatus;
@@ -35,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -45,8 +48,12 @@ import java.util.stream.Collectors;
 @Transactional
 public class ProviderServiceImpl implements ProviderService {
 
+    private static final int SLOT_STEP_MINUTES = 30;
+    private static final long BUFFER_MINUTES = 30L;
+
     private final ProviderRepository providerRepository;
     private final ServiceTypeRepository serviceTypeRepository;
+    private final BookingRepository bookingRepository;
     private final WorkingDayRepository workingDayRepository;
     private final TimeSlotRepository timeSlotRepository;
     private final DocumentRepository documentRepository;
@@ -63,7 +70,7 @@ public class ProviderServiceImpl implements ProviderService {
     }
 
     @Override
-    @CacheEvict(value = {"searchProvidersCache", "allProvidersCache"}, allEntries = true)
+    @CacheEvict(value = { "searchProvidersCache", "allProvidersCache" }, allEntries = true)
     public ProviderResponse updateProviderProfile(Long providerId, ProviderProfileRequest request) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
@@ -112,18 +119,17 @@ public class ProviderServiceImpl implements ProviderService {
             provider.setEmergencyEnabled(request.getEmergencyEnabled());
         }
 
-        //update location info
+        // update location info
         if (request.getLocation() != null) {
             locationService.updateProviderLocation(providerId, request.getLocation());
         }
-
 
         Provider updatedProvider = providerRepository.save(provider);
         return providerMapper.toProviderResponse(updatedProvider);
     }
 
     @Override
-    @CacheEvict(value = {"searchProvidersCache", "allProvidersCache"}, allEntries = true)
+    @CacheEvict(value = { "searchProvidersCache", "allProvidersCache" }, allEntries = true)
     public ProviderResponse updateProfilePicture(Long providerId, MultipartFile file) throws IOException {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
@@ -161,35 +167,35 @@ public class ProviderServiceImpl implements ProviderService {
         }
     }
 
-//    @Override
-//    public ProfileResponse updateProviderLocation(Long providerId, LocationDTO request) {
-//        Provider provider = providerRepository.findById(providerId)
-//                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
-//
-//        if (provider.getLocation() == null) {
-//            provider.setLocation(new Location());
-//        }
-//
-//        provider.getLocation().setLatitude(request.getLatitude());
-//        provider.getLocation().setLongitude(request.getLongitude());
-//        provider.getLocation().setAddress(request.getAddress());
-//        provider.getLocation().setArea(request.getArea());
-//        provider.getLocation().setCity(request.getCity());
-//
-//        providerRepository.save(provider);
-//
-//        return ProfileResponse.builder()
-//                .success(true)
-//                .message("Location updated successfully")
-//                .build();
-//    }
+    // @Override
+    // public ProfileResponse updateProviderLocation(Long providerId, LocationDTO
+    // request) {
+    // Provider provider = providerRepository.findById(providerId)
+    // .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+    //
+    // if (provider.getLocation() == null) {
+    // provider.setLocation(new Location());
+    // }
+    //
+    // provider.getLocation().setLatitude(request.getLatitude());
+    // provider.getLocation().setLongitude(request.getLongitude());
+    // provider.getLocation().setAddress(request.getAddress());
+    // provider.getLocation().setArea(request.getArea());
+    // provider.getLocation().setCity(request.getCity());
+    //
+    // providerRepository.save(provider);
+    //
+    // return ProfileResponse.builder()
+    // .success(true)
+    // .message("Location updated successfully")
+    // .build();
+    // }
 
-
-    //    @Override
-//    public List<ProviderSummaryResponse> allProviders() {
-//        List<Provider> providers = providerRepository.findAll();
-//        return providerMapper.toProviderSummaryResponseList(providers);
-//    }
+    // @Override
+    // public List<ProviderSummaryResponse> allProviders() {
+    // List<Provider> providers = providerRepository.findAll();
+    // return providerMapper.toProviderSummaryResponseList(providers);
+    // }
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "allProvidersCache", key = "'allProviders'")
@@ -203,39 +209,42 @@ public class ProviderServiceImpl implements ProviderService {
     // @Override
     // @Transactional(readOnly = true)
     // public Page<SearchResponse> search(String keyword,
-    //                                    Long categoryId,
-    //                                    String categoryName,
-    //                                    Long consumerId,
-    //                                    Double radius,
-    //                                    String sortBy,
-    //                                    Pageable pageable) {
+    // Long categoryId,
+    // String categoryName,
+    // Long consumerId,
+    // Double radius,
+    // String sortBy,
+    // Pageable pageable) {
 
-    //     List<SearchResponse> fullList = searchList(keyword, categoryId, categoryName, consumerId, radius, sortBy);
+    // List<SearchResponse> fullList = searchList(keyword, categoryId, categoryName,
+    // consumerId, radius, sortBy);
 
-    //     log.info("Returning {} results (maybe from cache)", fullList.size());
+    // log.info("Returning {} results (maybe from cache)", fullList.size());
 
-    //     int start = (int) pageable.getOffset();
-    //     int end = Math.min((start + pageable.getPageSize()), fullList.size());
+    // int start = (int) pageable.getOffset();
+    // int end = Math.min((start + pageable.getPageSize()), fullList.size());
 
-    //     List<SearchResponse> pageContent =
-    //             start >= fullList.size() ? Collections.emptyList() : fullList.subList(start, end);
+    // List<SearchResponse> pageContent =
+    // start >= fullList.size() ? Collections.emptyList() : fullList.subList(start,
+    // end);
 
-    //     return new PageImpl<>(pageContent, pageable, fullList.size());
+    // return new PageImpl<>(pageContent, pageable, fullList.size());
     // }
 
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy,#pageable.pageNumber,#pageable.pageSize,#pageable.sort}")
     public Page<SearchResponse> search(String keyword,
-                                       Long categoryId,
-                                       String categoryName,
-                                       Long consumerId,
-                                       Double radius,
-                                       String sortBy,
-                                       Pageable pageable) {
+            Long categoryId,
+            String categoryName,
+            Long consumerId,
+            Double radius,
+            String sortBy,
+            Pageable pageable) {
         log.warn("CACHE MISS -> Fetching from DATABASE");
 
-        Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName, Pageable.unpaged());
+        Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName,
+                Pageable.unpaged());
 
         if (consumerId == null || radius == null) {
             List<SearchResponse> responses = providersPage.getContent()
@@ -255,7 +264,8 @@ public class ProviderServiceImpl implements ProviderService {
 
         // === Location-based filtering ===
         try {
-//            LocationDTO consumerLocation = locationService.getConsumerLocation(consumerId);
+            // LocationDTO consumerLocation =
+            // locationService.getConsumerLocation(consumerId);
 
             List<SearchResponse> filteredList = providersPage.getContent()
                     .stream()
@@ -436,7 +446,6 @@ public class ProviderServiceImpl implements ProviderService {
         }
     }
 
-
     @Override
     @Transactional
     public ScheduleResponse removeWorkingDay(Long providerId, Long workingDayId) {
@@ -465,7 +474,6 @@ public class ProviderServiceImpl implements ProviderService {
 
         return scheduleMapper.toScheduleResponse(provider.getSchedule());
     }
-
 
     @Override
     @Transactional
@@ -577,10 +585,7 @@ public class ProviderServiceImpl implements ProviderService {
         List<TimeSlot> slots = timeSlotRepository.findByScheduleIdAndDateAndStatus(
                 provider.getSchedule().getId(), date, TimeSlotStatus.AVAILABLE);
 
-        return slots.stream()
-                .map(this::mapToTimeSlotResponse)
-                .sorted(Comparator.comparing(ScheduleResponse.TimeSlotResponse::getStartTime))
-                .collect(Collectors.toList());
+        return toDiscreteStartTimeResponses(slots, date);
     }
 
     @Override
@@ -622,32 +627,218 @@ public class ProviderServiceImpl implements ProviderService {
         return mapToTimeSlotResponse(timeSlot);
     }
 
-
     @Override
     @Transactional
-    public ScheduleResponse.TimeSlotResponse bookTimeSlot(Long timeSlotId, Integer durationMinutes) {
-        TimeSlot timeSlot = timeSlotRepository.findById(timeSlotId)
-                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found"));
+    public ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId, LocalDate date, LocalTime startTime,
+            Integer durationMinutes) {
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
+
+        if (provider.getSchedule() == null) {
+            throw new ResourceNotFoundException("Provider has no schedule");
+        }
 
         if (durationMinutes == null || durationMinutes <= 0) {
             throw new BadRequestException("Duration must be positive");
         }
 
-        if (timeSlot.getStatus() != TimeSlotStatus.AVAILABLE) {
-            throw new BadRequestException("Time slot is not available");
+        validateHalfHourBoundary(startTime);
+
+        LocalTime bookingEndTime = startTime.plusMinutes(durationMinutes);
+
+        TimeSlot bookedSlot = reserveTimeSlotWithBuffer(provider.getSchedule().getId(), date, startTime,
+                bookingEndTime);
+
+        return mapToTimeSlotResponse(bookedSlot);
+    }
+
+    @Override
+    @Transactional
+    public ScheduleResponse.TimeSlotResponse cancelBooking(Long timeSlotId) {
+        TimeSlot timeSlot = timeSlotRepository.findById(timeSlotId)
+                .orElseThrow(() -> new ResourceNotFoundException("Time slot not found with id: " + timeSlotId));
+
+        if (timeSlot.getStatus() != TimeSlotStatus.BOOKED) {
+            throw new BadRequestException("Time slot is not booked");
         }
-        // Calculate booking end time
-        LocalTime bookingEndTime = timeSlot.getStartTime().plusMinutes(durationMinutes);
 
-        // Validate that booking fits within the slot
-        if (bookingEndTime.isAfter(timeSlot.getEndTime())) {
-            throw new BadRequestException("Booking duration exceeds available time slot");
+        LocalDate slotDate = timeSlot.getDate();
+        LocalTime slotStartTime = timeSlot.getStartTime();
+        Long scheduleId = timeSlot.getSchedule().getId();
+
+        Booking booking = timeSlot.getBooking();
+        if (booking != null) {
+            restoreAvailabilityForCancelledBooking(booking);
+
+            booking.setStatus(BookingStatus.CANCELLED);
+            booking.setCancelledAt(LocalDateTime.now());
+            booking.setCancelledBy("P");
+
+            if (booking.getCancellationReason() == null || booking.getCancellationReason().isBlank()) {
+                booking.setCancellationReason("Cancelled by provider");
+            }
+
+            bookingRepository.save(booking);
+        } else {
+            timeSlot.setStatus(TimeSlotStatus.AVAILABLE);
+            timeSlotRepository.save(timeSlot);
+            mergeContiguousAvailableSlots(scheduleId, slotDate);
         }
 
-        // Split the time slot if needed
-        splitTimeSlot(timeSlot, timeSlot.getStartTime(), bookingEndTime, durationMinutes);
+        return timeSlotRepository.findByScheduleIdAndDateAndStatus(scheduleId, slotDate, TimeSlotStatus.AVAILABLE)
+                .stream()
+                .filter(slot -> !slotStartTime.isBefore(slot.getStartTime())
+                        && slotStartTime.isBefore(slot.getEndTime()))
+                .findFirst()
+                .map(this::mapToTimeSlotResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Available time slot not found after cancellation"));
+    }
 
-        return mapToTimeSlotResponse(timeSlot);
+    @Override
+    public TimeSlot reserveTimeSlotWithBuffer(Long scheduleId,
+            LocalDate date,
+            LocalTime bookingStart,
+            LocalTime bookingEnd) {
+        List<TimeSlot> availableSlots = timeSlotRepository
+                .findByScheduleIdAndDateAndStatus(scheduleId, date, TimeSlotStatus.AVAILABLE)
+                .stream()
+                .sorted(Comparator.comparing(TimeSlot::getStartTime))
+                .toList();
+
+        TimeSlot containingSlot = availableSlots.stream()
+                .filter(slot -> !bookingStart.isBefore(slot.getStartTime())
+                        && !bookingEnd.isAfter(slot.getEndTime()))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Selected start time with duration is not available"));
+
+        LocalTime blockedStart = maxTime(containingSlot.getStartTime(), bookingStart.minusMinutes(BUFFER_MINUTES));
+        LocalTime blockedEnd = minTime(containingSlot.getEndTime(), bookingEnd.plusMinutes(BUFFER_MINUTES));
+
+        timeSlotRepository.delete(containingSlot);
+
+        List<TimeSlot> slotsToSave = new ArrayList<>();
+
+        if (containingSlot.getStartTime().isBefore(blockedStart)) {
+            slotsToSave.add(TimeSlot.builder()
+                    .date(date)
+                    .startTime(containingSlot.getStartTime())
+                    .endTime(blockedStart)
+                    .status(TimeSlotStatus.AVAILABLE)
+                    .schedule(containingSlot.getSchedule())
+                    .build());
+        }
+
+        if (blockedStart.isBefore(bookingStart)) {
+            slotsToSave.add(TimeSlot.builder()
+                    .date(date)
+                    .startTime(blockedStart)
+                    .endTime(bookingStart)
+                    .status(TimeSlotStatus.UNAVAILABLE)
+                    .schedule(containingSlot.getSchedule())
+                    .build());
+        }
+
+        TimeSlot bookedSlot = TimeSlot.builder()
+                .date(date)
+                .startTime(bookingStart)
+                .endTime(bookingEnd)
+                .status(TimeSlotStatus.BOOKED)
+                .schedule(containingSlot.getSchedule())
+                .build();
+        slotsToSave.add(bookedSlot);
+
+        if (bookingEnd.isBefore(blockedEnd)) {
+            slotsToSave.add(TimeSlot.builder()
+                    .date(date)
+                    .startTime(bookingEnd)
+                    .endTime(blockedEnd)
+                    .status(TimeSlotStatus.UNAVAILABLE)
+                    .schedule(containingSlot.getSchedule())
+                    .build());
+        }
+
+        if (blockedEnd.isBefore(containingSlot.getEndTime())) {
+            slotsToSave.add(TimeSlot.builder()
+                    .date(date)
+                    .startTime(blockedEnd)
+                    .endTime(containingSlot.getEndTime())
+                    .status(TimeSlotStatus.AVAILABLE)
+                    .schedule(containingSlot.getSchedule())
+                    .build());
+        }
+
+        List<TimeSlot> savedSlots = timeSlotRepository.saveAll(slotsToSave);
+
+        return savedSlots.stream()
+                .filter(slot -> slot.getStatus() == TimeSlotStatus.BOOKED)
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Failed to reserve booked time slot"));
+    }
+
+    @Override
+    public void restoreAvailabilityForCancelledBooking(Booking booking) {
+        if (booking.getTimeSlot() == null) {
+            return;
+        }
+
+        TimeSlot bookedSlot = timeSlotRepository.findById(booking.getTimeSlot().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booked time slot not found"));
+
+        List<TimeSlot> daySlots = timeSlotRepository.findByScheduleIdAndDate(
+                bookedSlot.getSchedule().getId(),
+                bookedSlot.getDate());
+
+        LocalTime bookingStart = bookedSlot.getStartTime();
+        LocalTime bookingEnd = bookedSlot.getEndTime();
+
+        daySlots.stream()
+                .filter(slot -> slot.getStatus() == TimeSlotStatus.UNAVAILABLE)
+                .filter(slot -> slot.getEndTime().equals(bookingStart) || slot.getStartTime().equals(bookingEnd))
+                .forEach(slot -> slot.setStatus(TimeSlotStatus.AVAILABLE));
+
+        bookedSlot.setStatus(TimeSlotStatus.AVAILABLE);
+        booking.setTimeSlot(null);
+
+        timeSlotRepository.saveAll(daySlots);
+        mergeContiguousAvailableSlots(bookedSlot.getSchedule().getId(), bookedSlot.getDate());
+    }
+
+    @Override
+    public void mergeContiguousAvailableSlots(Long scheduleId, LocalDate date) {
+        List<TimeSlot> allDaySlots = timeSlotRepository.findByScheduleIdAndDate(scheduleId, date)
+                .stream()
+                .sorted(Comparator.comparing(TimeSlot::getStartTime))
+                .toList();
+
+        List<TimeSlot> availableSlots = allDaySlots.stream()
+                .filter(slot -> slot.getStatus() == TimeSlotStatus.AVAILABLE)
+                .sorted(Comparator.comparing(TimeSlot::getStartTime))
+                .toList();
+
+        if (availableSlots.size() < 2) {
+            return;
+        }
+
+        List<TimeSlot> slotsToDelete = new ArrayList<>();
+        TimeSlot current = availableSlots.get(0);
+
+        for (int i = 1; i < availableSlots.size(); i++) {
+            TimeSlot next = availableSlots.get(i);
+
+            if (!next.getStartTime().isAfter(current.getEndTime())) {
+                if (next.getEndTime().isAfter(current.getEndTime())) {
+                    current.setEndTime(next.getEndTime());
+                }
+                slotsToDelete.add(next);
+            } else {
+                current = next;
+            }
+        }
+
+        if (!slotsToDelete.isEmpty()) {
+            timeSlotRepository.saveAll(availableSlots);
+            timeSlotRepository.deleteAll(slotsToDelete);
+        }
     }
 
     @Override
@@ -671,97 +862,130 @@ public class ProviderServiceImpl implements ProviderService {
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.plusDays(days);
 
-
         List<TimeSlot> availableSlots = timeSlotRepository.findByScheduleIdAndDateBetweenAndStatus(
                 provider.getSchedule().getId(),
                 today,
                 endDate,
-                TimeSlotStatus.AVAILABLE
-        );
+                TimeSlotStatus.AVAILABLE);
 
-        return availableSlots.stream()
-                .map(this::mapToTimeSlotResponse)
+        return toDiscreteStartTimeResponses(availableSlots, null).stream()
                 .sorted(Comparator
                         .comparing(ScheduleResponse.TimeSlotResponse::getDate)
                         .thenComparing(ScheduleResponse.TimeSlotResponse::getStartTime))
                 .collect(Collectors.toList());
     }
 
+    // /**
+    // * Helper method to generate time slots for a working day
+    // */
+    // private void generateTimeSlotsForWorkingDay(Schedule schedule, WorkingDay
+    // workingDay) {
+    // LocalDate startDate = LocalDate.now();
+    // LocalDate endDate = startDate.plusDays(30); // Generate slots for next 30
+    // days
+    //
+    // List<TimeSlot> newSlots = new ArrayList<>();
+    //
+    // for (LocalDate date = startDate; !date.isAfter(endDate); date =
+    // date.plusDays(1)) {
+    // if (date == workingDay.getDate()) {
+    // // Check if slot already exists for this date
+    // LocalDate finalDate = date;
+    // boolean exists = schedule.getTimeSlots().stream()
+    // .anyMatch(slot -> slot.getDate().equals(finalDate));
+    //
+    // if (!exists) {
+    // TimeSlot timeSlot = TimeSlot.builder()
+    // .date(date)
+    // .startTime(workingDay.getStartTime())
+    // .endTime(workingDay.getEndTime())
+    // .status(TimeSlotStatus.AVAILABLE)
+    // .schedule(schedule)
+    // .build();
+    // newSlots.add(timeSlot);
+    // }
+    // }
+    // }
+    //
+    // if (!newSlots.isEmpty()) {
+    // timeSlotRepository.saveAll(newSlots);
+    // schedule.getTimeSlots().addAll(newSlots);
+    // }
+    // }
 
-//    /**
-//     * Helper method to generate time slots for a working day
-//     */
-//    private void generateTimeSlotsForWorkingDay(Schedule schedule, WorkingDay workingDay) {
-//        LocalDate startDate = LocalDate.now();
-//        LocalDate endDate = startDate.plusDays(30); // Generate slots for next 30 days
-//
-//        List<TimeSlot> newSlots = new ArrayList<>();
-//
-//        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-//            if (date == workingDay.getDate()) {
-//                // Check if slot already exists for this date
-//                LocalDate finalDate = date;
-//                boolean exists = schedule.getTimeSlots().stream()
-//                        .anyMatch(slot -> slot.getDate().equals(finalDate));
-//
-//                if (!exists) {
-//                    TimeSlot timeSlot = TimeSlot.builder()
-//                            .date(date)
-//                            .startTime(workingDay.getStartTime())
-//                            .endTime(workingDay.getEndTime())
-//                            .status(TimeSlotStatus.AVAILABLE)
-//                            .schedule(schedule)
-//                            .build();
-//                    newSlots.add(timeSlot);
-//                }
-//            }
-//        }
-//
-//        if (!newSlots.isEmpty()) {
-//            timeSlotRepository.saveAll(newSlots);
-//            schedule.getTimeSlots().addAll(newSlots);
-//        }
-//    }
-
-
-    private void splitTimeSlot(TimeSlot originalSlot, LocalTime bookingStart,
-                               LocalTime bookingEnd, int durationMinutes) {
-
-
-        Schedule schedule = originalSlot.getSchedule();
-        LocalDate date = originalSlot.getDate();
-
-        LocalTime originalEndTime = originalSlot.getEndTime();
-
-        originalSlot.setStatus(TimeSlotStatus.BOOKED);
-        originalSlot.setEndTime(bookingEnd);
-        timeSlotRepository.save(originalSlot);
-
-        // Create slot for the remaining time BEFORE the booking (if any)
-        if (originalSlot.getStartTime().isBefore(bookingStart)) {
-            TimeSlot beforeSlot = TimeSlot.builder()
-                    .date(date)
-                    .startTime(originalSlot.getStartTime())
-                    .endTime(bookingStart)
-                    .status(TimeSlotStatus.AVAILABLE)
-                    .schedule(schedule)
-                    .build();
-            timeSlotRepository.save(beforeSlot);
-            schedule.getTimeSlots().add(beforeSlot);
+    private List<ScheduleResponse.TimeSlotResponse> toDiscreteStartTimeResponses(List<TimeSlot> availableSlots,
+            LocalDate fallbackDate) {
+        if (availableSlots == null || availableSlots.isEmpty()) {
+            return List.of();
         }
 
-        // Create slot for the remaining time AFTER the booking (if any)
-        if (bookingEnd.isBefore(originalEndTime)) {
-            TimeSlot afterSlot = TimeSlot.builder()
-                    .date(date)
-                    .startTime(bookingEnd)
-                    .endTime(originalEndTime)
-                    .status(TimeSlotStatus.AVAILABLE)
-                    .schedule(schedule)
-                    .build();
-            timeSlotRepository.save(afterSlot);
-            schedule.getTimeSlots().add(afterSlot);
+        Map<String, ScheduleResponse.TimeSlotResponse> uniqueTimes = new LinkedHashMap<>();
+
+        for (TimeSlot slot : availableSlots) {
+            LocalDate date = slot.getDate() != null ? slot.getDate() : fallbackDate;
+            if (date == null) {
+                continue;
+            }
+
+            LocalTime cursor = roundUpToHalfHour(slot.getStartTime());
+            while (cursor.isBefore(slot.getEndTime())) {
+                String key = date + "_" + cursor;
+
+                uniqueTimes.putIfAbsent(key, ScheduleResponse.TimeSlotResponse.builder()
+                        .id(null)
+                        .date(date.toString())
+                        .startTime(cursor)
+                        .endTime(cursor.plusMinutes(SLOT_STEP_MINUTES))
+                        .isBooked(false)
+                        .status(TimeSlotStatus.AVAILABLE.name())
+                        .build());
+
+                cursor = cursor.plusMinutes(SLOT_STEP_MINUTES);
+            }
         }
+
+        return uniqueTimes.values().stream()
+                .sorted(Comparator
+                        .comparing(ScheduleResponse.TimeSlotResponse::getDate)
+                        .thenComparing(ScheduleResponse.TimeSlotResponse::getStartTime))
+                .collect(Collectors.toList());
+    }
+
+    private LocalTime roundUpToHalfHour(LocalTime time) {
+        int minute = time.getMinute();
+        int remainder = minute % SLOT_STEP_MINUTES;
+        if (remainder == 0 && time.getSecond() == 0 && time.getNano() == 0) {
+            return time;
+        }
+
+        LocalTime rounded = time.plusMinutes(SLOT_STEP_MINUTES - remainder);
+        return rounded.withSecond(0).withNano(0);
+    }
+
+    @Override
+    public void validateHalfHourBoundary(LocalTime time) {
+        if (time == null) {
+            throw new BadRequestException("Start time is required");
+        }
+
+        if (time.getSecond() != 0 || time.getNano() != 0) {
+            throw new BadRequestException("Start time must be in HH:mm format");
+        }
+
+        int minute = time.getMinute();
+        if (minute != 0 && minute != 30) {
+            throw new BadRequestException("Start time must be on a 30-minute boundary");
+        }
+    }
+
+    @Override
+    public LocalTime maxTime(LocalTime a, LocalTime b) {
+        return a.isAfter(b) ? a : b;
+    }
+
+    @Override
+    public LocalTime minTime(LocalTime a, LocalTime b) {
+        return a.isBefore(b) ? a : b;
     }
 
     /**
@@ -777,8 +1001,10 @@ public class ProviderServiceImpl implements ProviderService {
                 .status(timeSlot.getStatus().name())
                 .build();
     }
+
     @Override
-    public DocumentResponse uploadDocument(Long providerId, MultipartFile file, String documentType) throws IOException {
+    public DocumentResponse uploadDocument(Long providerId, MultipartFile file, String documentType)
+            throws IOException {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -827,16 +1053,17 @@ public class ProviderServiceImpl implements ProviderService {
                 .build();
     }
 
-//    @Override
-//    public ProviderResponse updateEmergencyStatus(Long providerId, boolean enabled) {
-//        Provider provider = providerRepository.findById(providerId)
-//                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
-//
-//        provider.setEmergencyEnabled(enabled);
-//        Provider updatedProvider = providerRepository.save(provider);
-//
-//        return providerMapper.toProviderResponse(updatedProvider);
-//    }
+    // @Override
+    // public ProviderResponse updateEmergencyStatus(Long providerId, boolean
+    // enabled) {
+    // Provider provider = providerRepository.findById(providerId)
+    // .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+    //
+    // provider.setEmergencyEnabled(enabled);
+    // Provider updatedProvider = providerRepository.save(provider);
+    //
+    // return providerMapper.toProviderResponse(updatedProvider);
+    // }
 
     @Override
     public VerificationStatus getVerificationStatus(Long providerId) {

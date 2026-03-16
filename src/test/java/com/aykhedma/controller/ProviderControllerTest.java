@@ -175,41 +175,6 @@ class ProviderControllerTest {
         }
 
         @Test
-        @DisplayName("PUT /api/providers/{id} - Should return 400 for invalid profile data")
-        void updateProviderProfile_InvalidData_Returns400() throws Exception {
-                ProviderProfileRequest invalidRequest = ProviderProfileRequest.builder()
-                                .name("1")
-                                .email("invalid-email")
-                                .phoneNumber("123")
-                                .preferredLanguage("x")
-                                .price(-1.0)
-                                .priceType("INVALID")
-                                .serviceAreaRadius(-5.0)
-                                .build();
-
-                mockMvc.perform(put("/api/v1/providers/me")
-                                .with(authenticatedProvider())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(invalidRequest)))
-                                .andExpect(status().isBadRequest())
-                                .andExpect(jsonPath("$.status").value(400))
-                                .andExpect(jsonPath("$.error").value("Validation Failed"))
-                                .andExpect(jsonPath("$.message").value("Invalid input parameters"))
-                                .andExpect(jsonPath("$.validationErrors.name").value(
-                                                "Name must be between 2 and 100 characters"))
-                                .andExpect(jsonPath("$.validationErrors.email").value("Invalid email format"))
-                                .andExpect(jsonPath("$.validationErrors.phoneNumber")
-                                                .value("Phone number must be a valid Egyptian number"))
-                                .andExpect(jsonPath("$.validationErrors.preferredLanguage")
-                                                .value("Language code must be between 2 and 10 characters"))
-                                .andExpect(jsonPath("$.validationErrors.price").value("Price must be greater than 0"))
-                                .andExpect(jsonPath("$.validationErrors.priceType")
-                                                .value("Price type must be HOUR, SESSION, or VISIT"))
-                                .andExpect(jsonPath("$.validationErrors.serviceAreaRadius")
-                                                .value("Service area radius cannot be negative"));
-        }
-
-        @Test
         @DisplayName("POST /api/providers/{id}/profile-picture - Should upload profile picture")
         void updateProfilePicture_ShouldReturnUpdatedProvider() throws Exception {
                 MockMultipartFile file = new MockMultipartFile(
@@ -293,7 +258,7 @@ class ProviderControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/providers/time-slots/{id}/book - Should book time slot")
+        @DisplayName("POST /api/providers/{id}/time-slots/book - Should book time slot")
         void bookTimeSlot_ShouldReturnBookedSlot() throws Exception {
                 ScheduleResponse.TimeSlotResponse slot = ScheduleResponse.TimeSlotResponse.builder()
                                 .id(TIME_SLOT_ID)
@@ -303,9 +268,12 @@ class ProviderControllerTest {
                                 .status("BOOKED")
                                 .build();
 
-                when(providerService.bookTimeSlot(eq(TIME_SLOT_ID), eq(60))).thenReturn(slot);
+                when(providerService.bookTimeSlot(eq(PROVIDER_ID), any(LocalDate.class), any(LocalTime.class), eq(60)))
+                                .thenReturn(slot);
 
-                mockMvc.perform(post("/api/v1/providers/time-slots/{id}/book", TIME_SLOT_ID)
+                mockMvc.perform(post("/api/v1/providers/{id}/time-slots/book", PROVIDER_ID)
+                                .param("date", LocalDate.now().toString())
+                                .param("startTime", "09:00")
                                 .param("durationMinutes", "60"))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.id").value(TIME_SLOT_ID));

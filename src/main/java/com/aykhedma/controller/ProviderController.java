@@ -259,36 +259,36 @@ public class ProviderController {
 
         // ===== Booking =====
 
-        @PostMapping("/time-slots/{timeSlotId}/book")
-        @Operation(summary = "Book a time slot (internal use - called when booking is confirmed)")
+        @PostMapping("/{providerId}/time-slots/book")
+        @Operation(summary = "Book a time slot by date/start time and duration")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Time slot booked successfully"),
                         @ApiResponse(responseCode = "400", description = "Time slot not available or duration exceeds slot"),
-                        @ApiResponse(responseCode = "404", description = "Time slot not found")
+                        @ApiResponse(responseCode = "404", description = "Provider or time slot not found")
         })
         public ResponseEntity<ScheduleResponse.TimeSlotResponse> bookTimeSlot(
-                        @Parameter(description = "ID of the time slot", required = true) @PathVariable Long timeSlotId,
+                        @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
+                        @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                        @Parameter(description = "Start time (format: HH:mm)", required = true) @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime startTime,
                         @Parameter(description = "Duration in minutes", required = true) @RequestParam Integer durationMinutes) {
-                ScheduleResponse.TimeSlotResponse response = providerService.bookTimeSlot(timeSlotId, durationMinutes);
+                ScheduleResponse.TimeSlotResponse response = providerService.bookTimeSlot(providerId, date, startTime,
+                                durationMinutes);
                 return ResponseEntity.ok(response);
         }
 
-        // @PostMapping("/time-slots/{timeSlotId}/cancel-booking")
-        // @Operation(summary = "Cancel a booking and make the time slot available
-        // again")
-        // @ApiResponses(value = {
-        // @ApiResponse(responseCode = "200", description = "Booking cancelled
-        // successfully"),
-        // @ApiResponse(responseCode = "400", description = "Time slot is not booked"),
-        // @ApiResponse(responseCode = "404", description = "Time slot not found")
-        // })
-        // public ResponseEntity<ScheduleResponse.TimeSlotResponse> cancelBooking(
-        // @Parameter(description = "ID of the time slot", required = true)
-        // @PathVariable Long timeSlotId) {
-        // ScheduleResponse.TimeSlotResponse response =
-        // providerService.cancelBooking(timeSlotId);
-        // return ResponseEntity.ok(response);
-        // }
+        @PostMapping("/time-slots/{timeSlotId}/cancel-booking")
+        @PreAuthorize("hasRole('PROVIDER')")
+        @Operation(summary = "Cancel a booking and make the time slot available again")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Booking cancelled successfully"),
+                        @ApiResponse(responseCode = "400", description = "Time slot is not booked"),
+                        @ApiResponse(responseCode = "404", description = "Time slot not found")
+        })
+        public ResponseEntity<ScheduleResponse.TimeSlotResponse> cancelBooking(
+                        @Parameter(description = "ID of the time slot", required = true) @PathVariable Long timeSlotId) {
+                ScheduleResponse.TimeSlotResponse response = providerService.cancelBooking(timeSlotId);
+                return ResponseEntity.ok(response);
+        }
 
         // ===== Provider Schedule Overview =====
 

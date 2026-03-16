@@ -1,6 +1,7 @@
 package com.aykhedma.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,8 +15,7 @@ import java.time.LocalTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookingRequest
-{
+public class BookingRequest {
     @NotNull(message = "Provider ID is required")
     @Positive(message = "Provider ID must be positive")
     private Long providerId;
@@ -27,6 +27,7 @@ public class BookingRequest
 
     @NotNull(message = "Requested time is required")
     @JsonFormat(pattern = "HH:mm")
+    @JsonAlias({ "requestedStartTime", "startTime" })
     private LocalTime requestedTime;
 
     @NotNull(message = "Problem description is required")
