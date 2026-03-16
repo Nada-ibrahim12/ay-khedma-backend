@@ -308,20 +308,6 @@ public class ProviderController {
                 return ResponseEntity.ok(response);
         }
 
-        // @GetMapping("/{providerId}/schedule/working-days")
-        // @Operation(summary = "Get all working day templates")
-        // @ApiResponses(value = {
-        // @ApiResponse(responseCode = "200", description = "Successfully retrieved
-        // working days"),
-        // @ApiResponse(responseCode = "404", description = "Provider not found")
-        // })
-        // public ResponseEntity<List<ScheduleResponse.WorkingDayResponse>>
-        // getWorkingDays(
-        // @Parameter(description = "ID of the provider", required = true)
-        // @PathVariable Long providerId) {
-        // List<ScheduleResponse.WorkingDayResponse> response =
-        // providerService.getWorkingDays(providerId);
-        // return ResponseEntity.ok(response);
         // }
         // ===== Document Management =====
 
@@ -371,18 +357,6 @@ public class ProviderController {
                 return ResponseEntity.ok(response);
         }
 
-        // @GetMapping("/all")
-        // @Operation(summary = "all providers")
-        // @ApiResponses(value = {
-        // @ApiResponse(responseCode = "200", description = "Successfully found
-        // providers",
-        // content = @Content(schema = @Schema(implementation =
-        // ProviderSummaryResponse.class)))
-        // })
-        // public ResponseEntity<List<ProviderSummaryResponse>> allProviders() {
-        // List<ProviderSummaryResponse> response = providerService.allProviders();
-        // return ResponseEntity.ok(response);
-        // }
         @GetMapping("/all")
         @Operation(summary = "all providers")
         @ApiResponses(value = {
@@ -406,29 +380,6 @@ public class ProviderController {
                 VerificationStatus response = providerService.getVerificationStatus(providerId);
                 return ResponseEntity.ok(response);
         }
-        //
-        // @PatchMapping("/{providerId}/emergency-status")
-        // @Operation(summary = "Update emergency status", description = "Enables or
-        // disables emergency mode for a provider")
-        // @ApiResponses(value = {
-        // @ApiResponse(responseCode = "200", description = "Successfully updated
-        // emergency status",
-        // content = @Content(schema = @Schema(implementation =
-        // ProviderResponse.class))),
-        // @ApiResponse(responseCode = "404", description = "Provider not found")
-        // })
-        // public ResponseEntity<ProviderResponse> updateEmergencyStatus(
-        // @Parameter(description = "ID of the provider", required = true)
-        // @PathVariable Long providerId,
-        //
-        // @Parameter(description = "Emergency status", required = true, example =
-        // "true")
-        // @RequestParam boolean enabled) {
-        // // Uncomment this method in your service first
-        // ProviderResponse response = providerService.updateEmergencyStatus(providerId,
-        // enabled);
-        // return ResponseEntity.ok(response);
-        // }
 
         @PreAuthorize("hasRole('ADMIN')")
         @GetMapping("/{providerId}/exists")
