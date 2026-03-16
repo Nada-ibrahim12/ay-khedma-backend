@@ -636,30 +636,30 @@ public class ProviderServiceImpl implements ProviderService {
         return mapToTimeSlotResponse(timeSlot);
     }
 
-    @Override
-    @Transactional
-    public ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId, LocalDate date, LocalTime startTime,
-            Integer durationMinutes) {
-        Provider provider = providerRepository.findById(providerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
+    // @Override
+    // @Transactional
+    // public ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId, LocalDate date, LocalTime startTime,
+    //         Integer durationMinutes) {
+    //     Provider provider = providerRepository.findById(providerId)
+    //             .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
 
-        if (provider.getSchedule() == null) {
-            throw new ResourceNotFoundException("Provider has no schedule");
-        }
+    //     if (provider.getSchedule() == null) {
+    //         throw new ResourceNotFoundException("Provider has no schedule");
+    //     }
 
-        if (durationMinutes == null || durationMinutes <= 0) {
-            throw new BadRequestException("Duration must be positive");
-        }
+    //     if (durationMinutes == null || durationMinutes <= 0) {
+    //         throw new BadRequestException("Duration must be positive");
+    //     }
 
-        validateHalfHourBoundary(startTime);
+    //     validateHalfHourBoundary(startTime);
 
-        LocalTime bookingEndTime = startTime.plusMinutes(durationMinutes);
+    //     LocalTime bookingEndTime = startTime.plusMinutes(durationMinutes);
 
-        TimeSlot bookedSlot = reserveTimeSlotWithBuffer(provider.getSchedule().getId(), date, startTime,
-                bookingEndTime);
+    //     TimeSlot bookedSlot = reserveTimeSlotWithBuffer(provider.getSchedule().getId(), date, startTime,
+    //             bookingEndTime);
 
-        return mapToTimeSlotResponse(bookedSlot);
-    }
+    //     return mapToTimeSlotResponse(bookedSlot);
+    // }
 
     @Override
     @Transactional

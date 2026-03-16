@@ -367,35 +367,42 @@ class ProviderServiceImplTest {
                 }
         }
 
-        @Nested
-        @DisplayName("Book Time Slot Tests")
-        class BookTimeSlotTests {
-
-                @Test
-                @DisplayName("Should throw BadRequestException when start time and duration are not available")
-                void bookTimeSlot_ExceedsDuration_ThrowsException() {
-                        LocalDate bookingDate = LocalDate.now().plusDays(1);
-                        Schedule schedule = Schedule.builder().id(7L).build();
-                        provider.setSchedule(schedule);
-
-                        TimeSlot timeSlot = TimeSlot.builder()
-                                        .id(1L)
-                                        .date(bookingDate)
-                                        .startTime(LocalTime.of(10, 0))
-                                        .endTime(LocalTime.of(11, 0))
-                                        .status(TimeSlotStatus.AVAILABLE)
-                                        .schedule(schedule)
-                                        .build();
-
-                        when(providerRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(provider));
-                        when(timeSlotRepository.findByScheduleIdAndDateAndStatus(schedule.getId(), bookingDate,
-                                        TimeSlotStatus.AVAILABLE))
-                                        .thenReturn(List.of(timeSlot));
-
-                        assertThatThrownBy(() -> providerService.bookTimeSlot(PROVIDER_ID, bookingDate,
-                                        LocalTime.of(10, 0), 90))
-                                        .isInstanceOf(BadRequestException.class)
-                                        .hasMessageContaining("Selected start time with duration is not available");
-                }
-        }
+        /*
+         * BookTimeSlotTests is commented out because bookTimeSlot(...) has been removed
+         * from ProviderService/ProviderServiceImpl.
+         */
+        // @Nested
+        // @DisplayName("Book Time Slot Tests")
+        // class BookTimeSlotTests {
+        //
+        // @Test
+        // @DisplayName("Should throw BadRequestException when start time and duration
+        // are not available")
+        // void bookTimeSlot_ExceedsDuration_ThrowsException() {
+        // LocalDate bookingDate = LocalDate.now().plusDays(1);
+        // Schedule schedule = Schedule.builder().id(7L).build();
+        // provider.setSchedule(schedule);
+        //
+        // TimeSlot timeSlot = TimeSlot.builder()
+        // .id(1L)
+        // .date(bookingDate)
+        // .startTime(LocalTime.of(10, 0))
+        // .endTime(LocalTime.of(11, 0))
+        // .status(TimeSlotStatus.AVAILABLE)
+        // .schedule(schedule)
+        // .build();
+        //
+        // when(providerRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(provider));
+        // when(timeSlotRepository.findByScheduleIdAndDateAndStatus(schedule.getId(),
+        // bookingDate,
+        // TimeSlotStatus.AVAILABLE))
+        // .thenReturn(List.of(timeSlot));
+        //
+        // assertThatThrownBy(() -> providerService.bookTimeSlot(PROVIDER_ID,
+        // bookingDate,
+        // LocalTime.of(10, 0), 90))
+        // .isInstanceOf(BadRequestException.class)
+        // .hasMessageContaining("Selected start time with duration is not available");
+        // }
+        // }
 }

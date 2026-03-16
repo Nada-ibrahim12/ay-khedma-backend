@@ -257,27 +257,35 @@ class ProviderControllerTest {
                                 .andExpect(jsonPath("$[0].id").value(TIME_SLOT_ID));
         }
 
-        @Test
-        @DisplayName("POST /api/providers/{id}/time-slots/book - Should book time slot")
-        void bookTimeSlot_ShouldReturnBookedSlot() throws Exception {
-                ScheduleResponse.TimeSlotResponse slot = ScheduleResponse.TimeSlotResponse.builder()
-                                .id(TIME_SLOT_ID)
-                                .date(LocalDate.now().toString())
-                                .startTime(LocalTime.of(9, 0))
-                                .endTime(LocalTime.of(10, 0))
-                                .status("BOOKED")
-                                .build();
-
-                when(providerService.bookTimeSlot(eq(PROVIDER_ID), any(LocalDate.class), any(LocalTime.class), eq(60)))
-                                .thenReturn(slot);
-
-                mockMvc.perform(post("/api/v1/providers/{id}/time-slots/book", PROVIDER_ID)
-                                .param("date", LocalDate.now().toString())
-                                .param("startTime", "09:00")
-                                .param("durationMinutes", "60"))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.id").value(TIME_SLOT_ID));
-        }
+        /*
+         * bookTimeSlot_ShouldReturnBookedSlot is commented out because
+         * bookTimeSlot(...)
+         * endpoint/service method has been removed from current API.
+         */
+        // @Test
+        // @DisplayName("POST /api/providers/{id}/time-slots/book - Should book time
+        // slot")
+        // void bookTimeSlot_ShouldReturnBookedSlot() throws Exception {
+        // ScheduleResponse.TimeSlotResponse slot =
+        // ScheduleResponse.TimeSlotResponse.builder()
+        // .id(TIME_SLOT_ID)
+        // .date(LocalDate.now().toString())
+        // .startTime(LocalTime.of(9, 0))
+        // .endTime(LocalTime.of(10, 0))
+        // .status("BOOKED")
+        // .build();
+        //
+        // when(providerService.bookTimeSlot(eq(PROVIDER_ID), any(LocalDate.class),
+        // any(LocalTime.class), eq(60)))
+        // .thenReturn(slot);
+        //
+        // mockMvc.perform(post("/api/v1/providers/{id}/time-slots/book", PROVIDER_ID)
+        // .param("date", LocalDate.now().toString())
+        // .param("startTime", "09:00")
+        // .param("durationMinutes", "60"))
+        // .andExpect(status().isOk())
+        // .andExpect(jsonPath("$.id").value(TIME_SLOT_ID));
+        // }
 
         @Test
         @DisplayName("POST /api/providers/{id}/documents - Should upload document")

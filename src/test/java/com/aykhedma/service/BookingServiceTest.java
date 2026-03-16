@@ -236,7 +236,7 @@ class BookingServiceTest {
                                         .overrideWorkingHours(false)
                                         .build();
                         LocalTime endTime = booking.getRequestedStartTime().plusMinutes(request.getEstimatedDuration());
-                        Booking conflicting = Booking.builder().id(99L).build();
+                        Booking conflicting = Booking.builder().id(99L).status(BookingStatus.ACCEPTED).build();
                         BookingResponse conflictingResponse = BookingResponse.builder().id(99L).build();
 
                         when(providerRepository.findById(provider.getId())).thenReturn(Optional.of(provider));
@@ -255,6 +255,57 @@ class BookingServiceTest {
                         assertThat(response.getConflictingBookings()).hasSize(1);
                         assertThat(response.getConflictingBookings().get(0).getId()).isEqualTo(99L);
                         verify(bookingRepository, never()).save(any());
+                        verify(bookingRepository, never()).saveAll(anyList());
+                }
+
+                @Test
+                @DisplayName("Accept Booking And Auto Decline Overlapping Pending Requests")
+                void acceptBookingDeclinesPendingConflictsTest() {
+                        AcceptBookingRequest request = AcceptBookingRequest.builder()
+                                        .bookingId(booking.getId())
+                                        .estimatedDuration(60L)
+                                        .overrideWorkingHours(false)
+                                        .build();
+                        LocalTime endTime = booking.getRequestedStartTime().plusMinutes(request.getEstimatedDuration());
+
+                        Booking pendingConflict = Booking.builder()
+                                        .id(99L)
+                                        .status(BookingStatus.PENDING)
+                                        .build();
+
+                        TimeSlot bookedSlot = TimeSlot.builder()
+                                        .id(101L)
+                                        .date(booking.getRequestedDate())
+                                        .startTime(booking.getRequestedStartTime())
+                                        .endTime(endTime)
+                                        .status(TimeSlotStatus.BOOKED)
+                                        .schedule(schedule)
+                                        .build();
+
+                        when(providerRepository.findById(provider.getId())).thenReturn(Optional.of(provider));
+                        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+                        when(workingDayRepository.findByScheduleIdAndDate(schedule.getId(), booking.getRequestedDate()))
+                                        .thenReturn(Optional
+                                                        .of(WorkingDay.builder().endTime(LocalTime.of(18, 0)).build()));
+                        when(bookingRepository.findConflictingBookings(provider.getId(), booking.getId(),
+                                        booking.getRequestedDate(),
+                                        booking.getRequestedStartTime(), endTime)).thenReturn(List.of(pendingConflict));
+                        when(providerService.reserveTimeSlotWithBuffer(schedule.getId(), booking.getRequestedDate(),
+                                        booking.getRequestedStartTime(), endTime))
+                                        .thenReturn(bookedSlot);
+                        when(bookingMapper.toBookingResponse(any(Booking.class)))
+                                        .thenReturn(BookingResponse.builder().id(booking.getId()).build());
+
+                        AcceptBookingResponse response = bookingService.acceptBooking(provider.getId(), request);
+
+                        assertThat(response.getStatus()).isEqualTo("ACCEPTED");
+                        verify(bookingRepository).saveAll(argThat(bookings -> {
+                                List<Booking> list = (List<Booking>) bookings;
+                                return list.size() == 1
+                                                && list.get(0).getId().equals(99L)
+                                                && list.get(0).getStatus().equals(BookingStatus.DECLINED)
+                                                && list.get(0).getDeclinedAt() != null;
+                        }));
                 }
 
                 @Test

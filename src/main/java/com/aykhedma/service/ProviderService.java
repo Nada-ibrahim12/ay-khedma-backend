@@ -55,8 +55,8 @@ public interface ProviderService {
 
     ScheduleResponse.TimeSlotResponse getTimeSlot(Long providerId, Long timeSlotId);
 
-    ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId, LocalDate date, LocalTime startTime,
-            Integer durationMinutes);
+//     ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId, LocalDate date, LocalTime startTime,
+//             Integer durationMinutes);
 
     ScheduleResponse.TimeSlotResponse cancelBooking(Long timeSlotId);
 

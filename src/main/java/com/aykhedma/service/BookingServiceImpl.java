@@ -129,10 +129,13 @@ public class BookingServiceImpl implements BookingService {
 
         List<Booking> conflictingBookings = bookingRepository.findConflictingBookings(providerId, bookingId, date,
                 startTime, endTime);
-        if (!conflictingBookings.isEmpty()) {
+        List<Booking> acceptedConflictingBookings = conflictingBookings.stream()
+                .filter(conflictingBooking -> BookingStatus.ACCEPTED.equals(conflictingBooking.getStatus()))
+                .toList();
+        if (!acceptedConflictingBookings.isEmpty()) {
             return AcceptBookingResponse.builder()
                     .status("CONFLICT")
-                    .conflictingBookings(conflictingBookings.stream()
+                    .conflictingBookings(acceptedConflictingBookings.stream()
                             .map(bookingMapper::toBookingResponse)
                             .toList())
                     .build();
@@ -145,6 +148,18 @@ public class BookingServiceImpl implements BookingService {
         booking.setAcceptedAt(LocalDateTime.now());
         booking.setTimeSlot(reservedBookedSlot);
         bookingRepository.save(booking);
+
+        List<Booking> pendingConflictingBookings = conflictingBookings.stream()
+                .filter(conflictingBooking -> BookingStatus.PENDING.equals(conflictingBooking.getStatus()))
+                .toList();
+        if (!pendingConflictingBookings.isEmpty()) {
+            LocalDateTime declinedAt = LocalDateTime.now();
+            pendingConflictingBookings.forEach(conflictingBooking -> {
+                conflictingBooking.setStatus(BookingStatus.DECLINED);
+                conflictingBooking.setDeclinedAt(declinedAt);
+            });
+            bookingRepository.saveAll(pendingConflictingBookings);
+        }
 
         providerRepository.incrementTotalBookings(booking.getProvider().getId());
         consumerRepository.incrementTotalBookings(booking.getConsumer().getId());
