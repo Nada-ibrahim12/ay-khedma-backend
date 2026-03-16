@@ -29,8 +29,10 @@ public class RegisterRequest {
 
     @NotBlank(message = "Password is required")
     @Size(min = 8, max = 32, message = "Password must be between 8 and 32 characters")
-//    @Pattern(regexp = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!])(?=\\S+$).{8,}$",
-//            message = "Password must contain at least one digit, one lowercase, one uppercase, and one special character")
+    // @Pattern(regexp =
+    // "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!])(?=\\S+$).{8,}$",
+    // message = "Password must contain at least one digit, one lowercase, one
+    // uppercase, and one special character")
     private String password;
 
     @NotNull(message = "User type is required")
@@ -52,6 +54,12 @@ public class RegisterRequest {
 
     @Pattern(regexp = "^[0-9]{14}$", message = "National ID must be exactly 14 digits")
     private String nationalId;
+
+    @Size(max = 100, message = "Service area cannot exceed 100 characters")
+    private String serviceArea;
+
+    @DecimalMin(value = "0.0", message = "Service area radius cannot be negative")
+    private Double serviceAreaRadius;
 
     // Consumer specific fields
     @Size(min = 2, max = 10, message = "Language code must be between 2 and 10 characters")
@@ -76,6 +84,53 @@ public class RegisterRequest {
     @Size(max = 100, message = "City cannot exceed 100 characters")
     private String city;
 
+    @AssertTrue(message = "Bio is required for providers")
+    public boolean isProviderBioValid() {
+        return userType != UserType.PROVIDER || hasText(bio);
+    }
 
+    @AssertTrue(message = "Service type is required for providers")
+    public boolean isProviderServiceTypeValid() {
+        return userType != UserType.PROVIDER || serviceTypeId != null;
+    }
+
+    @AssertTrue(message = "Price is required for providers")
+    public boolean isProviderPriceValid() {
+        return userType != UserType.PROVIDER || price != null;
+    }
+
+    @AssertTrue(message = "Price type is required for providers")
+    public boolean isProviderPriceTypeValid() {
+        return userType != UserType.PROVIDER || hasText(priceType);
+    }
+
+    @AssertTrue(message = "National ID is required for providers")
+    public boolean isProviderNationalIdValid() {
+        return userType != UserType.PROVIDER || hasText(nationalId);
+    }
+
+    @AssertTrue(message = "Service area is required for providers")
+    public boolean isProviderServiceAreaValid() {
+        return userType != UserType.PROVIDER || hasText(serviceArea);
+    }
+
+    @AssertTrue(message = "Service area radius is required for providers")
+    public boolean isProviderServiceAreaRadiusValid() {
+        return userType != UserType.PROVIDER || serviceAreaRadius != null;
+    }
+
+    @AssertTrue(message = "Provider location latitude is required")
+    public boolean isProviderLatitudeValid() {
+        return userType != UserType.PROVIDER || latitude != null;
+    }
+
+    @AssertTrue(message = "Provider location longitude is required")
+    public boolean isProviderLongitudeValid() {
+        return userType != UserType.PROVIDER || longitude != null;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
 
 }

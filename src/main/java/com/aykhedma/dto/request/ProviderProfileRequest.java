@@ -41,6 +41,9 @@ public class ProviderProfileRequest {
     @Pattern(regexp = "^(HOUR|SESSION|VISIT)$", message = "Price type must be HOUR, SESSION, or VISIT")
     private String priceType;
 
+    @Pattern(regexp = "^[0-9]{14}$", message = "National ID must be exactly 14 digits")
+    private String nationalId;
+
     private Boolean emergencyEnabled;
 
     @Size(max = 100, message = "Area cannot exceed 100 characters")

@@ -14,6 +14,8 @@ spring:
       enabled: true
   flyway:
     enabled: false
+  mail:
+    username: test@aykhedma.local
   session:
     store-type: none
   data:

@@ -101,10 +101,19 @@ public class ProviderServiceImpl implements ProviderService {
 
         if (request.getPriceType() != null) {
             try {
-                provider.setPriceType(com.aykhedma.model.service.PriceType.valueOf(request.getPriceType()));
+                provider.setPriceType(
+                        com.aykhedma.model.service.PriceType
+                                .valueOf(request.getPriceType().trim().toUpperCase(Locale.ROOT)));
             } catch (IllegalArgumentException e) {
                 throw new BadRequestException("Invalid price type: " + request.getPriceType());
             }
+        }
+
+        if (request.getNationalId() != null) {
+            if (providerRepository.existsByNationalIdAndIdNot(request.getNationalId(), providerId)) {
+                throw new BadRequestException("National ID already exists");
+            }
+            provider.setNationalId(request.getNationalId());
         }
 
         if (request.getServiceArea() != null) {
