@@ -1,5 +1,6 @@
 package com.aykhedma.auth;
 
+import com.aykhedma.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -10,28 +11,44 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class OtpService {
 
+    private final NotificationService notificationService;
     private final Map<String, String> otpStorage = new ConcurrentHashMap<>();
 
-    public void generateOtp(String phone) {
-        String otp = String.valueOf((int)(Math.random() * 900000) + 100000);
+    public String generateOtp(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
 
-        otpStorage.put(phone.trim(), otp.trim());
+        otpStorage.put(normalizedEmail, otp.trim());
+        notificationService.sendOtpEmail(normalizedEmail, otp.trim());
 
-        System.out.println("OTP for " + phone + ": " + otp);
+        return otp.trim();
     }
 
+    public boolean validateOtp(String email, String otp) {
+        if (email == null || otp == null) {
+            return false;
+        }
 
-    public boolean validateOtp(String phone, String otp) {
+        String normalizedEmail = normalizeEmail(email);
+        String providedOtp = otp.trim();
 
-        String storedOtp = otpStorage.get(phone);
+        String storedOtp = otpStorage.get(normalizedEmail);
 
         if (storedOtp == null) {
             return false;
         }
 
-        return storedOtp.trim().equals(otp.trim());
+        boolean matches = storedOtp.equals(providedOtp);
+
+        if (matches) {
+            otpStorage.remove(normalizedEmail);
+        }
+
+        return matches;
     }
 
-
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
+    }
 
 }

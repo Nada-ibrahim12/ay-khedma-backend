@@ -34,7 +34,7 @@ public class NotificationService {
     private final NotificationPreferenceRepository preferenceRepository;
     private final FirebaseService firebaseService;
     private final EmailService emailService;
-    //    private final SmsService smsService;
+    // private final SmsService smsService;
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
 
@@ -78,8 +78,7 @@ public class NotificationService {
                     request.getUserId(),
                     request.getTitle(),
                     request.getContent(),
-                    request.getData()
-            );
+                    request.getData());
         }
 
         // 4. Send email
@@ -90,13 +89,14 @@ public class NotificationService {
             }
         }
 
-//        // 5. Send SMS
-//        if (request.isSendSms()) {
-//            String phone = request.getPhoneNumber() != null ? request.getPhoneNumber() : getUserPhone(request.getUserId());
-//            if (phone != null) {
-//                smsService.sendSms(phone, request.getContent());
-//            }
-//        }
+        // // 5. Send SMS
+        // if (request.isSendSms()) {
+        // String phone = request.getPhoneNumber() != null ? request.getPhoneNumber() :
+        // getUserPhone(request.getUserId());
+        // if (phone != null) {
+        // smsService.sendSms(phone, request.getContent());
+        // }
+        // }
     }
 
     private Notification saveNotification(NotificationRequest request) {
@@ -122,7 +122,8 @@ public class NotificationService {
      */
     private void sendWebSocketNotification(Notification notification) {
         try {
-            if (notification == null) return;
+            if (notification == null)
+                return;
 
             NotificationDTO dto = NotificationDTO.fromEntity(notification);
 
@@ -130,8 +131,7 @@ public class NotificationService {
             messagingTemplate.convertAndSendToUser(
                     notification.getUserId().toString(),
                     "/queue/notifications",
-                    dto
-            );
+                    dto);
 
             // Update unread count
             long unreadCount = notificationRepository.countUnreadByUserId(notification.getUserId());
@@ -139,8 +139,7 @@ public class NotificationService {
             messagingTemplate.convertAndSendToUser(
                     notification.getUserId().toString(),
                     "/queue/notifications/count",
-                    Map.of("count", unreadCount)
-            );
+                    Map.of("count", unreadCount));
 
             notification.setDelivered(true);
             notification.setDeliveredAt(LocalDateTime.now());
@@ -165,6 +164,12 @@ public class NotificationService {
         emailService.sendHtmlEmail(email, request.getTitle(), templateName, templateVars);
     }
 
+    public void sendOtpEmail(String email, String otp) {
+        String subject = "Your OTP Verification Code";
+        String content = "Your OTP code is " + otp + ". Do not share this code with anyone.";
+        emailService.sendSimpleEmail(email, subject, content);
+    }
+
     private String getEmailTemplate(NotificationType type) {
         switch (type) {
             case BOOKING_CONFIRMATION:
@@ -175,7 +180,8 @@ public class NotificationService {
                 return "email/general-notification";
         }
     }
-    //  send app notification (websocket + push)
+
+    // send app notification (websocket + push)
     private void sendAppNotification(NotificationRequest request) {
         Notification notification = saveNotification(request);
         sendWebSocketNotification(notification);
@@ -184,8 +190,7 @@ public class NotificationService {
                     request.getUserId(),
                     request.getTitle(),
                     request.getContent(),
-                    request.getData()
-            );
+                    request.getData());
         }
     }
 
@@ -226,8 +231,7 @@ public class NotificationService {
         messagingTemplate.convertAndSendToUser(
                 userId.toString(),
                 "/queue/notifications/count",
-                Map.of("count", unreadCount)
-        );
+                Map.of("count", unreadCount));
     }
 
     @Transactional
@@ -239,8 +243,7 @@ public class NotificationService {
         messagingTemplate.convertAndSendToUser(
                 userId.toString(),
                 "/queue/notifications/count",
-                Map.of("count", 0)
-        );
+                Map.of("count", 0));
     }
 
     @Transactional
@@ -254,14 +257,16 @@ public class NotificationService {
     /**
      * Get notifications filtered by date range
      *
-     * @param userId User ID (passed as header or parameter)
+     * @param userId    User ID (passed as header or parameter)
      * @param startDate Start date (optional)
-     * @param endDate End date (optional)
-     * @param pageable Pagination information
+     * @param endDate   End date (optional)
+     * @param pageable  Pagination information
      * @return Filtered notifications
      */
-    public Page<NotificationDTO> getUserNotificationsByDateRange(Long userId, LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
-        List<Notification> notifications = notificationRepository.findByUserIdAndCreatedAtBetween(userId, startDate, endDate, pageable);
+    public Page<NotificationDTO> getUserNotificationsByDateRange(Long userId, LocalDateTime startDate,
+            LocalDateTime endDate, Pageable pageable) {
+        List<Notification> notifications = notificationRepository.findByUserIdAndCreatedAtBetween(userId, startDate,
+                endDate, pageable);
         List<NotificationDTO> notificationDTOs = notifications.stream()
                 .map(NotificationDTO::fromEntity)
                 .collect(Collectors.toList());

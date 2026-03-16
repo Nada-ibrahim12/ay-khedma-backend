@@ -1,10 +1,13 @@
 package com.aykhedma.auth;
+
 import com.aykhedma.security.CustomUserDetails;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import com.aykhedma.dto.request.LoginRequest;
 import com.aykhedma.dto.request.RegisterRequest;
 import com.aykhedma.dto.response.AuthResponse;
+import com.aykhedma.exception.BadRequestException;
+import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.model.user.RefreshToken;
 import com.aykhedma.model.user.User;
 import com.aykhedma.repository.RefreshTokenRepository;
@@ -39,22 +42,23 @@ public class AuthController {
             @Valid @RequestBody RegisterRequest request) {
 
         authService.register(request);
-        return ResponseEntity.ok("Registered successfully. Verify OTP.");
+        otpService.generateOtp(request.getEmail());
+        return ResponseEntity.ok("Registered successfully. OTP sent to your email.");
     }
 
     @PostMapping("/verify-otp")
     public ResponseEntity<String> verifyOtp(
-            @RequestParam String phone,
+            @RequestParam String email,
             @RequestParam String otp) {
 
-        boolean valid = otpService.validateOtp(phone, otp);
+        boolean valid = otpService.validateOtp(email, otp);
 
         if (!valid) {
-            throw new RuntimeException("Invalid OTP");
+            throw new BadRequestException("Invalid OTP");
         }
 
-        User user = userRepository.findByPhoneNumber(phone)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         user.setEnabled(true);
         userRepository.save(user);
@@ -76,8 +80,7 @@ public class AuthController {
                         .refreshToken(refreshToken)
                         .tokenType("Bearer")
                         .expiresIn(3600L)
-                        .build()
-        );
+                        .build());
     }
 
     @PostMapping("/logout")
@@ -88,12 +91,16 @@ public class AuthController {
 
         return ResponseEntity.ok("Logged out");
     }
+
     @PostMapping("/send-otp")
-    public ResponseEntity<String> sendOtp(@RequestParam String phone) {
+    public ResponseEntity<String> sendOtp(@RequestParam String email) {
 
-        otpService.generateOtp(phone);
+        userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        return ResponseEntity.ok("OTP sent");
+        otpService.generateOtp(email);
+
+        return ResponseEntity.ok("OTP sent to your email");
     }
 
 }
