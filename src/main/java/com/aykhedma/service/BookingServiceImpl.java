@@ -245,37 +245,25 @@ public class BookingServiceImpl implements BookingService {
         return bookingMapper.toBookingResponse(booking);
     }
 
-    public Page<BookingResponse> getBookingsByStatus(Long userId, BookingStatus status, Pageable pageable) {
+    @Override
+    public Page<BookingResponse> getFilteredBookings(Long userId, BookingStatus status, boolean upcoming,
+            Pageable pageable) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Page<Booking> bookings;
-        if (user.getRole().equals(UserType.CONSUMER))
-            bookings = bookingRepository.findByConsumerIdAndStatus(userId, status, pageable);
-        else if (user.getRole().equals(UserType.PROVIDER))
-            bookings = bookingRepository.findByProviderIdAndStatus(userId, status, pageable);
-        else
-            throw new ForbiddenException("User is not a provider or a consumer");
+
+        if (upcoming) {
+            BookingStatus effectiveStatus = status != null ? status : BookingStatus.ACCEPTED;
+            bookings = bookingRepository.findByUserIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(
+                    userId, effectiveStatus, LocalDate.now(), LocalTime.now(), pageable);
+        } else if (status != null) {
+            bookings = bookingRepository.findByUserIdAndStatus(userId, status, pageable);
+        } else {
+            bookings = bookingRepository.findByUserId(userId, pageable);
+        }
 
         return bookings.map(bookingMapper::toBookingResponse);
     }
 
-    public List<BookingResponse> getUpcomingBookings(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        List<Booking> bookings;
-        if (user.getRole().equals(UserType.CONSUMER)) {
-            bookings = bookingRepository
-                    .findByConsumerIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(userId, BookingStatus.ACCEPTED,
-                            LocalDate.now(), LocalTime.now());
-        } else if (user.getRole().equals(UserType.PROVIDER)) {
-            bookings = bookingRepository
-                    .findByProviderIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(userId, BookingStatus.ACCEPTED,
-                            LocalDate.now(), LocalTime.now());
-        } else
-            throw new ForbiddenException("User is not a provider or a consumer");
-
-        return bookings.stream().map(bookingMapper::toBookingResponse).toList();
-    }
 }
