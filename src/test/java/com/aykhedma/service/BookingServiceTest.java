@@ -510,8 +510,8 @@ class BookingServiceTest {
         }
 
         @Nested
-        @DisplayName("Get Bookings By Status Tests")
-        class GetBookingsByStatusTest {
+        @DisplayName("Get Filtered Bookings Tests")
+        class GetFilteredBookingsTest {
                 private Pageable pageable;
                 private Page<Booking> bookingPage;
 
@@ -522,77 +522,75 @@ class BookingServiceTest {
                 }
 
                 @Test
-                @DisplayName("Get Bookings By Status As Consumer")
-                void getBookingsByStatusAsConsumerTest() {
+                @DisplayName("Get All Bookings With No Filters")
+                void getAllBookingsTest() {
                         when(userRepository.findById(consumer.getId())).thenReturn(Optional.of(consumer));
-                        when(bookingRepository.findByConsumerIdAndStatus(consumer.getId(), BookingStatus.PENDING,
-                                        pageable))
+                        when(bookingRepository.findByUserId(consumer.getId(), pageable)).thenReturn(bookingPage);
+                        when(bookingMapper.toBookingResponse(booking))
+                                        .thenReturn(BookingResponse.builder().id(booking.getId()).build());
+
+                        Page<BookingResponse> result = bookingService.getFilteredBookings(consumer.getId(), null,
+                                        false, pageable);
+
+                        assertThat(result).hasSize(1);
+                        verify(bookingRepository).findByUserId(consumer.getId(), pageable);
+                }
+
+                @Test
+                @DisplayName("Get Bookings Filtered By Status")
+                void getBookingsByStatusTest() {
+                        when(userRepository.findById(consumer.getId())).thenReturn(Optional.of(consumer));
+                        when(bookingRepository.findByUserIdAndStatus(consumer.getId(), BookingStatus.PENDING, pageable))
                                         .thenReturn(bookingPage);
                         when(bookingMapper.toBookingResponse(booking))
                                         .thenReturn(BookingResponse.builder().id(booking.getId()).build());
 
-                        Page<BookingResponse> result = bookingService.getBookingsByStatus(consumer.getId(),
-                                        BookingStatus.PENDING, pageable);
+                        Page<BookingResponse> result = bookingService.getFilteredBookings(consumer.getId(),
+                                        BookingStatus.PENDING, false, pageable);
 
                         assertThat(result).hasSize(1);
-                        verify(bookingRepository).findByConsumerIdAndStatus(consumer.getId(), BookingStatus.PENDING,
+                        verify(bookingRepository).findByUserIdAndStatus(consumer.getId(), BookingStatus.PENDING,
                                         pageable);
                 }
 
                 @Test
-                @DisplayName("Get Bookings By Status As Provider")
-                void getBookingsByStatusAsProviderTest() {
-                        when(userRepository.findById(provider.getId())).thenReturn(Optional.of(provider));
-                        when(bookingRepository.findByProviderIdAndStatus(provider.getId(), BookingStatus.ACCEPTED,
-                                        pageable))
-                                        .thenReturn(bookingPage);
-                        when(bookingMapper.toBookingResponse(booking))
-                                        .thenReturn(BookingResponse.builder().id(booking.getId()).build());
-
-                        Page<BookingResponse> result = bookingService.getBookingsByStatus(provider.getId(),
-                                        BookingStatus.ACCEPTED, pageable);
-
-                        assertThat(result).hasSize(1);
-                        verify(bookingRepository).findByProviderIdAndStatus(provider.getId(), BookingStatus.ACCEPTED,
-                                        pageable);
-                }
-        }
-
-        @Nested
-        @DisplayName("Get Today's Upcoming Bookings Tests")
-        class GetUpcomingBookingsTest {
-                @Test
-                @DisplayName("Get Today's Upcoming Bookings As Consumer")
-                void getUpcomingBookingsAsConsumerTest() {
-                        List<Booking> bookings = List.of(booking);
+                @DisplayName("Get Upcoming Bookings Defaults To ACCEPTED When Status Is Null")
+                void getUpcomingBookingsDefaultsToAcceptedTest() {
                         when(userRepository.findById(consumer.getId())).thenReturn(Optional.of(consumer));
-                        when(bookingRepository.findByConsumerIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(
+                        when(bookingRepository.findByUserIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(
                                         eq(consumer.getId()), eq(BookingStatus.ACCEPTED), any(LocalDate.class),
-                                        any(LocalTime.class)))
-                                        .thenReturn(bookings);
+                                        any(LocalTime.class), eq(pageable)))
+                                        .thenReturn(bookingPage);
                         when(bookingMapper.toBookingResponse(booking))
                                         .thenReturn(BookingResponse.builder().id(booking.getId()).build());
 
-                        List<BookingResponse> result = bookingService.getUpcomingBookings(consumer.getId());
+                        Page<BookingResponse> result = bookingService.getFilteredBookings(consumer.getId(), null,
+                                        true, pageable);
 
                         assertThat(result).hasSize(1);
+                        verify(bookingRepository).findByUserIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(
+                                        eq(consumer.getId()), eq(BookingStatus.ACCEPTED), any(LocalDate.class),
+                                        any(LocalTime.class), eq(pageable));
                 }
 
                 @Test
-                @DisplayName("Get Today's Upcoming Bookings As Provider")
-                void getUpcomingBookingsAsProviderTest() {
-                        List<Booking> bookings = List.of(booking);
+                @DisplayName("Get Upcoming Bookings With Specific Status")
+                void getUpcomingBookingsWithStatusTest() {
                         when(userRepository.findById(provider.getId())).thenReturn(Optional.of(provider));
-                        when(bookingRepository.findByProviderIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(
-                                        eq(provider.getId()), eq(BookingStatus.ACCEPTED), any(LocalDate.class),
-                                        any(LocalTime.class)))
-                                        .thenReturn(bookings);
+                        when(bookingRepository.findByUserIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(
+                                        eq(provider.getId()), eq(BookingStatus.PENDING), any(LocalDate.class),
+                                        any(LocalTime.class), eq(pageable)))
+                                        .thenReturn(bookingPage);
                         when(bookingMapper.toBookingResponse(booking))
                                         .thenReturn(BookingResponse.builder().id(booking.getId()).build());
 
-                        List<BookingResponse> result = bookingService.getUpcomingBookings(provider.getId());
+                        Page<BookingResponse> result = bookingService.getFilteredBookings(provider.getId(),
+                                        BookingStatus.PENDING, true, pageable);
 
                         assertThat(result).hasSize(1);
+                        verify(bookingRepository).findByUserIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(
+                                        eq(provider.getId()), eq(BookingStatus.PENDING), any(LocalDate.class),
+                                        any(LocalTime.class), eq(pageable));
                 }
         }
 }

@@ -40,294 +40,280 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = BookingController.class,
-        excludeAutoConfiguration = SecurityAutoConfiguration.class)
-@Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
+@WebMvcTest(controllers = BookingController.class, excludeAutoConfiguration = SecurityAutoConfiguration.class)
+@Import({ TestSecurityConfig.class, GlobalExceptionHandler.class })
 @DisplayName("BookingController Tests")
-class BookingControllerTest
-{
-    @Autowired
-    private MockMvc mockMvc;
+class BookingControllerTest {
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @MockBean
-    private BookingService bookingService;
+        @MockBean
+        private BookingService bookingService;
 
-    @MockBean
-    private JwtService jwtService;
+        @MockBean
+        private JwtService jwtService;
 
-    @MockBean
-    private CustomUserDetailsService customUserDetailsService;
+        @MockBean
+        private CustomUserDetailsService customUserDetailsService;
 
-    private BookingResponse bookingResponse;
-    private AcceptBookingResponse acceptSuccessResponse;
-    private AcceptBookingResponse acceptConflictResponse;
-    private AcceptBookingResponse acceptWarningResponse;
-    private final Long consumerId = 2L;
-    private final Long providerId = 1L;
-    private final Long bookingId = 10L;
+        private BookingResponse bookingResponse;
+        private AcceptBookingResponse acceptSuccessResponse;
+        private AcceptBookingResponse acceptConflictResponse;
+        private AcceptBookingResponse acceptWarningResponse;
+        private final Long consumerId = 2L;
+        private final Long providerId = 1L;
+        private final Long bookingId = 10L;
 
-    @BeforeEach
-    void setUp()
-    {
-        ConsumerSummaryResponse consumerSummary = ConsumerSummaryResponse.builder()
-                .id(consumerId)
-                .name("Test Consumer")
-                .build();
+        @BeforeEach
+        void setUp() {
+                ConsumerSummaryResponse consumerSummary = ConsumerSummaryResponse.builder()
+                                .id(consumerId)
+                                .name("Test Consumer")
+                                .build();
 
-        ProviderSummaryResponse providerSummary = ProviderSummaryResponse.builder()
-                .id(providerId)
-                .name("Test Provider")
-                .build();
+                ProviderSummaryResponse providerSummary = ProviderSummaryResponse.builder()
+                                .id(providerId)
+                                .name("Test Provider")
+                                .build();
 
-        bookingResponse = BookingResponse.builder()
-                .id(bookingId)
-                .consumer(consumerSummary)
-                .provider(providerSummary)
-                .requestedDate(LocalDate.now().plusDays(1))
-                .requestedStartTime(LocalTime.of(10, 0))
-                .estimatedDuration(60L)
-                .problemDescription("Test problem")
-                .status(BookingStatus.PENDING)
-                .build();
+                bookingResponse = BookingResponse.builder()
+                                .id(bookingId)
+                                .consumer(consumerSummary)
+                                .provider(providerSummary)
+                                .requestedDate(LocalDate.now().plusDays(1))
+                                .requestedStartTime(LocalTime.of(10, 0))
+                                .estimatedDuration(60L)
+                                .problemDescription("Test problem")
+                                .status(BookingStatus.PENDING)
+                                .build();
 
-        acceptSuccessResponse = AcceptBookingResponse.builder()
-                .status("ACCEPTED")
-                .booking(bookingResponse)
-                .build();
+                acceptSuccessResponse = AcceptBookingResponse.builder()
+                                .status("ACCEPTED")
+                                .booking(bookingResponse)
+                                .build();
 
-        acceptConflictResponse = AcceptBookingResponse.builder()
-                .status("CONFLICT")
-                .conflictingBookings(List.of(bookingResponse))
-                .build();
+                acceptConflictResponse = AcceptBookingResponse.builder()
+                                .status("CONFLICT")
+                                .conflictingBookings(List.of(bookingResponse))
+                                .build();
 
-        acceptWarningResponse = AcceptBookingResponse.builder()
-                .status("WARNING")
-                .warningMessage("The booking end time will exceed the end time of the working day")
-                .build();
-    }
-
-    @Nested
-    @DisplayName("Consumer Side Endpoints")
-    class ConsumerSideTest
-    {
-        @Test
-        @WithMockUser(roles = "CONSUMER")
-        @DisplayName("Request Booking - Success")
-        void requestBookingSuccess() throws Exception
-        {
-            BookingRequest request = BookingRequest.builder()
-                    .providerId(providerId)
-                    .requestedDate(LocalDate.now().plusDays(1))
-                    .requestedTime(LocalTime.of(10, 0))
-                    .problemDescription("Test problem")
-                    .build();
-
-            when(bookingService.requestBooking(eq(consumerId), any(BookingRequest.class)))
-                    .thenReturn(bookingResponse);
-
-            mockMvc.perform(post("/api/bookings/{consumerId}/request-booking", consumerId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.id").value(bookingId))
-                    .andExpect(jsonPath("$.consumer.id").value(consumerId))
-                    .andExpect(jsonPath("$.provider.id").value(providerId))
-                    .andExpect(jsonPath("$.status").value("PENDING"));
+                acceptWarningResponse = AcceptBookingResponse.builder()
+                                .status("WARNING")
+                                .warningMessage("The booking end time will exceed the end time of the working day")
+                                .build();
         }
 
-        @Test
-        @WithMockUser(roles = "CONSUMER")
-        @DisplayName("Request Booking - Invalid Request Data (400)")
-        void requestBookingBadRequest() throws Exception
-        {
-            BookingRequest invalidRequest = BookingRequest.builder().build(); // missing required fields
+        @Nested
+        @DisplayName("Consumer Side Endpoints")
+        class ConsumerSideTest {
+                @Test
+                @WithMockUser(roles = "CONSUMER")
+                @DisplayName("Request Booking - Success")
+                void requestBookingSuccess() throws Exception {
+                        BookingRequest request = BookingRequest.builder()
+                                        .providerId(providerId)
+                                        .requestedDate(LocalDate.now().plusDays(1))
+                                        .requestedTime(LocalTime.of(10, 0))
+                                        .problemDescription("Test problem")
+                                        .build();
 
-            mockMvc.perform(post("/api/bookings/{consumerId}/request-booking", consumerId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(invalidRequest)))
-                    .andExpect(status().isBadRequest());
-        }
-    }
+                        when(bookingService.requestBooking(any(), any(BookingRequest.class)))
+                                        .thenReturn(bookingResponse);
 
-    @Nested
-    @DisplayName("Provider Side Endpoints")
-    class ProviderSideTest
-    {
-        @Test
-        @WithMockUser(roles = "PROVIDER")
-        @DisplayName("Accept Booking - ACCEPTED")
-        void acceptBookingAccepted() throws Exception
-        {
-            AcceptBookingRequest request = AcceptBookingRequest.builder()
-                    .bookingId(bookingId)
-                    .estimatedDuration(60L)
-                    .overrideWorkingHours(false)
-                    .build();
+                        mockMvc.perform(post("/api/bookings/request-booking")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isCreated())
+                                        .andExpect(jsonPath("$.id").value(bookingId))
+                                        .andExpect(jsonPath("$.consumer.id").value(consumerId))
+                                        .andExpect(jsonPath("$.provider.id").value(providerId))
+                                        .andExpect(jsonPath("$.status").value("PENDING"));
+                }
 
-            when(bookingService.acceptBooking(eq(providerId), any(AcceptBookingRequest.class)))
-                    .thenReturn(acceptSuccessResponse);
+                @Test
+                @WithMockUser(roles = "CONSUMER")
+                @DisplayName("Request Booking - Invalid Request Data (400)")
+                void requestBookingBadRequest() throws Exception {
+                        BookingRequest invalidRequest = BookingRequest.builder().build(); // missing required fields
 
-            mockMvc.perform(post("/api/bookings/{providerId}/accept-booking", providerId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("ACCEPTED"))
-                    .andExpect(jsonPath("$.booking.id").value(bookingId));
-        }
-
-        @Test
-        @WithMockUser(roles = "PROVIDER")
-        @DisplayName("Accept Booking - CONFLICT (409)")
-        void acceptBookingConflict() throws Exception
-        {
-            AcceptBookingRequest request = AcceptBookingRequest.builder()
-                    .bookingId(bookingId)
-                    .estimatedDuration(60L)
-                    .overrideWorkingHours(false)
-                    .build();
-
-            when(bookingService.acceptBooking(eq(providerId), any(AcceptBookingRequest.class)))
-                    .thenReturn(acceptConflictResponse);
-
-            mockMvc.perform(post("/api/bookings/{providerId}/accept-booking", providerId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.status").value("CONFLICT"))
-                    .andExpect(jsonPath("$.conflictingBookings").isArray());
+                        mockMvc.perform(post("/api/bookings/request-booking")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                                        .andExpect(status().isBadRequest());
+                }
         }
 
-        @Test
-        @WithMockUser(roles = "PROVIDER")
-        @DisplayName("Accept Booking - WARNING (200)")
-        void acceptBookingWarning() throws Exception
-        {
-            AcceptBookingRequest request = AcceptBookingRequest.builder()
-                    .bookingId(bookingId)
-                    .estimatedDuration(60L)
-                    .overrideWorkingHours(false)
-                    .build();
+        @Nested
+        @DisplayName("Provider Side Endpoints")
+        class ProviderSideTest {
+                @Test
+                @WithMockUser(roles = "PROVIDER")
+                @DisplayName("Accept Booking - ACCEPTED")
+                void acceptBookingAccepted() throws Exception {
+                        AcceptBookingRequest request = AcceptBookingRequest.builder()
+                                        .bookingId(bookingId)
+                                        .estimatedDuration(60L)
+                                        .overrideWorkingHours(false)
+                                        .build();
 
-            when(bookingService.acceptBooking(eq(providerId), any(AcceptBookingRequest.class)))
-                    .thenReturn(acceptWarningResponse);
+                        when(bookingService.acceptBooking(any(), any(AcceptBookingRequest.class)))
+                                        .thenReturn(acceptSuccessResponse);
 
-            mockMvc.perform(post("/api/bookings/{providerId}/accept-booking", providerId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("WARNING"))
-                    .andExpect(jsonPath("$.warningMessage").exists());
+                        mockMvc.perform(post("/api/bookings/accept-booking")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.status").value("ACCEPTED"))
+                                        .andExpect(jsonPath("$.booking.id").value(bookingId));
+                }
+
+                @Test
+                @WithMockUser(roles = "PROVIDER")
+                @DisplayName("Accept Booking - CONFLICT (409)")
+                void acceptBookingConflict() throws Exception {
+                        AcceptBookingRequest request = AcceptBookingRequest.builder()
+                                        .bookingId(bookingId)
+                                        .estimatedDuration(60L)
+                                        .overrideWorkingHours(false)
+                                        .build();
+
+                        when(bookingService.acceptBooking(any(), any(AcceptBookingRequest.class)))
+                                        .thenReturn(acceptConflictResponse);
+
+                        mockMvc.perform(post("/api/bookings/accept-booking")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isConflict())
+                                        .andExpect(jsonPath("$.status").value("CONFLICT"))
+                                        .andExpect(jsonPath("$.conflictingBookings").isArray());
+                }
+
+                @Test
+                @WithMockUser(roles = "PROVIDER")
+                @DisplayName("Accept Booking - WARNING (200)")
+                void acceptBookingWarning() throws Exception {
+                        AcceptBookingRequest request = AcceptBookingRequest.builder()
+                                        .bookingId(bookingId)
+                                        .estimatedDuration(60L)
+                                        .overrideWorkingHours(false)
+                                        .build();
+
+                        when(bookingService.acceptBooking(any(), any(AcceptBookingRequest.class)))
+                                        .thenReturn(acceptWarningResponse);
+
+                        mockMvc.perform(post("/api/bookings/accept-booking")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.status").value("WARNING"))
+                                        .andExpect(jsonPath("$.warningMessage").exists());
+                }
+
+                @Test
+                @WithMockUser(roles = "PROVIDER")
+                @DisplayName("Decline Booking - Success")
+                void declineBookingSuccess() throws Exception {
+                        when(bookingService.declineBooking(any(), eq(bookingId)))
+                                        .thenReturn(bookingResponse);
+
+                        mockMvc.perform(post("/api/bookings/decline-booking/{bookingId}", bookingId))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.id").value(bookingId))
+                                        .andExpect(jsonPath("$.status").value("PENDING"));
+                }
         }
 
-        @Test
-        @WithMockUser(roles = "PROVIDER")
-        @DisplayName("Decline Booking - Success")
-        void declineBookingSuccess() throws Exception
-        {
-            when(bookingService.declineBooking(providerId, bookingId))
-                    .thenReturn(bookingResponse);
+        @Nested
+        @DisplayName("User Side Endpoints")
+        class UserSideTest {
+                @Test
+                @WithMockUser(roles = "CONSUMER")
+                @DisplayName("Cancel Booking - Success (Consumer)")
+                void cancelBookingByConsumerSuccess() throws Exception {
+                        CancelBookingRequest request = CancelBookingRequest.builder()
+                                        .bookingId(bookingId)
+                                        .cancellationReason("Personal reasons")
+                                        .build();
 
-            mockMvc.perform(post("/api/bookings/{providerId}/decline-booking/{bookingId}", providerId, bookingId))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(bookingId))
-                    .andExpect(jsonPath("$.status").value("PENDING"));
+                        when(bookingService.cancelBooking(any(), any(CancelBookingRequest.class)))
+                                        .thenReturn(bookingResponse);
+
+                        mockMvc.perform(post("/api/bookings/cancel-booking/{bookingId}", bookingId)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.id").value(bookingId));
+                }
+
+                @Test
+                @WithMockUser(roles = "PROVIDER")
+                @DisplayName("Cancel Booking - Success (Provider)")
+                void cancelBookingByProviderSuccess() throws Exception {
+                        CancelBookingRequest request = CancelBookingRequest.builder()
+                                        .bookingId(bookingId)
+                                        .cancellationReason("Provider unavailable")
+                                        .build();
+
+                        when(bookingService.cancelBooking(any(), any(CancelBookingRequest.class)))
+                                        .thenReturn(bookingResponse);
+
+                        mockMvc.perform(post("/api/bookings/cancel-booking/{bookingId}", bookingId)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.id").value(bookingId));
+                }
+
+                @Test
+                @WithMockUser(roles = "CONSUMER")
+                @DisplayName("Get Pending Bookings - Success")
+                void getBookingsByStatusSuccess() throws Exception {
+                        Pageable pageable = PageRequest.of(0, 10);
+                        Page<BookingResponse> page = new PageImpl<>(List.of(bookingResponse), pageable, 1);
+
+                        when(bookingService.getFilteredBookings(any(), eq(BookingStatus.PENDING), eq(false),
+                                        any(Pageable.class)))
+                                        .thenReturn(page);
+
+                        mockMvc.perform(get("/api/bookings/me")
+                                        .param("status", "PENDING")
+                                        .param("page", "0")
+                                        .param("size", "10"))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.content[0].id").value(bookingId))
+                                        .andExpect(jsonPath("$.content[0].consumer.id").value(consumerId))
+                                        .andExpect(jsonPath("$.content[0].provider.id").value(providerId))
+                                        .andExpect(jsonPath("$.totalElements").value(1));
+                }
+
+                @Test
+                @WithMockUser(roles = "CONSUMER")
+                @DisplayName("Get Invalid Status Bookings - Invalid status (500)")
+                void getBookingsByStatusInvalidStatus() throws Exception {
+                        mockMvc.perform(get("/api/bookings/me")
+                                        .param("status", "INVALID_STATUS"))
+                                        .andExpect(status().isInternalServerError());
+                }
+
+                @Test
+                @WithMockUser(roles = "CONSUMER")
+                @DisplayName("Get Upcoming Bookings - Success")
+                void getUpcomingBookingsSuccess() throws Exception {
+                        Pageable pageable = PageRequest.of(0, 10);
+                        Page<BookingResponse> page = new PageImpl<>(List.of(bookingResponse), pageable, 1);
+
+                        when(bookingService.getFilteredBookings(any(), isNull(), eq(true), any(Pageable.class)))
+                                        .thenReturn(page);
+
+                        mockMvc.perform(get("/api/bookings/me")
+                                        .param("upcoming", "true"))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.content[0].id").value(bookingId))
+                                        .andExpect(jsonPath("$.content[0].consumer.id").value(consumerId))
+                                        .andExpect(jsonPath("$.content[0].provider.id").value(providerId));
+                }
         }
-    }
-
-    @Nested
-    @DisplayName("User Side Endpoints")
-    class UserSideTest
-    {
-        @Test
-        @WithMockUser(roles = "CONSUMER")
-        @DisplayName("Cancel Booking - Success (Consumer)")
-        void cancelBookingByConsumerSuccess() throws Exception
-        {
-            CancelBookingRequest request = CancelBookingRequest.builder()
-                    .bookingId(bookingId)
-                    .cancellationReason("Personal reasons")
-                    .build();
-
-            when(bookingService.cancelBooking(eq(consumerId), any(CancelBookingRequest.class)))
-                    .thenReturn(bookingResponse);
-
-            mockMvc.perform(post("/api/bookings/{userId}/cancel-booking", consumerId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(bookingId));
-        }
-
-        @Test
-        @WithMockUser(roles = "PROVIDER")
-        @DisplayName("Cancel Booking - Success (Provider)")
-        void cancelBookingByProviderSuccess() throws Exception
-        {
-            CancelBookingRequest request = CancelBookingRequest.builder()
-                    .bookingId(bookingId)
-                    .cancellationReason("Provider unavailable")
-                    .build();
-
-            when(bookingService.cancelBooking(eq(providerId), any(CancelBookingRequest.class)))
-                    .thenReturn(bookingResponse);
-
-            mockMvc.perform(post("/api/bookings/{userId}/cancel-booking", providerId)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(bookingId));
-        }
-
-        @Test
-        @WithMockUser(roles = "CONSUMER")
-        @DisplayName("Get Pending Bookings - Success")
-        void getBookingsByStatusSuccess() throws Exception
-        {
-            Pageable pageable = PageRequest.of(0, 10);
-            Page<BookingResponse> page = new PageImpl<>(List.of(bookingResponse), pageable, 1);
-
-            when(bookingService.getBookingsByStatus(eq(consumerId), eq(BookingStatus.PENDING), any(Pageable.class)))
-                    .thenReturn(page);
-
-            mockMvc.perform(get("/api/bookings/{userId}", consumerId)
-                            .param("status", "PENDING")
-                            .param("page", "0")
-                            .param("size", "10"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content[0].id").value(bookingId))
-                    .andExpect(jsonPath("$.content[0].consumer.id").value(consumerId))
-                    .andExpect(jsonPath("$.content[0].provider.id").value(providerId))
-                    .andExpect(jsonPath("$.totalElements").value(1));
-        }
-
-        @Test
-        @WithMockUser(roles = "CONSUMER")
-        @DisplayName("Get Invalid Status Bookings - Invalid status (500)")
-        void getBookingsByStatusInvalidStatus() throws Exception
-        {
-            mockMvc.perform(get("/api/bookings/{userId}", consumerId)
-                            .param("status", "INVALID_STATUS"))
-                    .andExpect(status().isInternalServerError());
-        }
-
-        @Test
-        @WithMockUser(roles = "CONSUMER")
-        @DisplayName("Get Upcoming Bookings - Success")
-        void getUpcomingBookingsSuccess() throws Exception
-        {
-            List<BookingResponse> list = List.of(bookingResponse);
-
-            when(bookingService.getUpcomingBookings(consumerId))
-                    .thenReturn(list);
-
-            mockMvc.perform(get("/api/bookings/{userId}/upcoming-bookings", consumerId))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[0].id").value(bookingId))
-                    .andExpect(jsonPath("$[0].consumer.id").value(consumerId))
-                    .andExpect(jsonPath("$[0].provider.id").value(providerId));
-        }
-    }
 }
