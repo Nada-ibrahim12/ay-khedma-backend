@@ -11,15 +11,17 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-public interface BookingService {
-    BookingResponse requestBooking(Long consumerId, BookingRequest bookingRequest);
+public interface BookingService
+{
+    BookingResponse requestBooking (Long consumerId, BookingRequest bookingRequest);
 
-    AcceptBookingResponse acceptBooking(Long providerId, AcceptBookingRequest acceptBookingRequest);
+    AcceptBookingResponse acceptBooking (Long providerId, AcceptBookingRequest acceptBookingRequest);
 
-    BookingResponse declineBooking(Long providerId, Long bookingId);
+    BookingResponse declineBooking (Long providerId, Long bookingId);
 
-    BookingResponse cancelBooking(Long userId, CancelBookingRequest cancelBookingRequest);
+    BookingResponse cancelBooking (Long userId, CancelBookingRequest cancelBookingRequest);
 
-    Page<BookingResponse> getFilteredBookings(Long userId, BookingStatus status, boolean upcoming, Pageable pageable);
+    Page<BookingResponse> getBookingsByStatus (Long userId, BookingStatus status, Pageable pageable);
 
+    List<BookingResponse> getUpcomingBookings (Long userId);
 }

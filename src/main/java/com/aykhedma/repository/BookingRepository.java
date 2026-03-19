@@ -15,61 +15,68 @@ import java.time.LocalTime;
 import java.util.List;
 
 @Repository
-public interface BookingRepository extends JpaRepository<Booking, Long> {
+public interface BookingRepository extends JpaRepository<Booking, Long>
+{
+    Page<Booking> findByConsumerId(Long consumerId, Pageable pageable);
 
-        Page<Booking> findByUserId(Long consumerId, Pageable pageable);
+    Page<Booking> findByProviderId(Long providerId, Pageable pageable);
 
-        @Query("SELECT b FROM Booking b WHERE b.provider.id = :providerId AND b.requestedDate = :date")
-        List<Booking> findProviderBookingsByDate(@Param("providerId") Long providerId,
-                        @Param("date") LocalDate date);
+    Page<Booking> findByConsumerIdAndStatus(Long consumerId, BookingStatus status, Pageable pageable);
 
-        @Query("SELECT b FROM Booking b WHERE b.provider.id = :providerId " +
-                        "AND b.status IN ('PENDING', 'ACCEPTED') " +
-                        "AND b.requestedDate >= :startDate")
-        List<Booking> findUpcomingBookings(@Param("providerId") Long providerId,
-                        @Param("startDate") LocalDate startDate);
+    Page<Booking> findByProviderIdAndStatus(Long providerId, BookingStatus status, Pageable pageable);
 
-        @Query("SELECT COUNT(b) FROM Booking b WHERE b.provider.id = :providerId AND b.status = 'COMPLETED'")
-        Long countCompletedBookingsByProvider(@Param("providerId") Long providerId);
+    List<Booking> findByConsumerIdAndStatusAndRequestedDateAndRequestedStartTimeAfter
+            (Long consumerId, BookingStatus status, LocalDate date, LocalTime time);
 
-        @Query("SELECT AVG(b.consumerRating) FROM Booking b WHERE b.provider.id = :providerId AND b.consumerRating IS NOT NULL")
-        Double getAverageRatingForProvider(@Param("providerId") Long providerId);
+    List<Booking> findByProviderIdAndStatusAndRequestedDateAndRequestedStartTimeAfter
+            (Long providerId, BookingStatus status, LocalDate date, LocalTime time);
 
-        @Query("SELECT b FROM Booking b WHERE b.provider.id = :providerId AND b.status = 'COMPLETED' ORDER BY b.completedAt DESC")
-        List<Booking> findRecentCompletedBookings(@Param("providerId") Long providerId, Pageable pageable);
+    @Query("SELECT b FROM Booking b WHERE b.provider.id = :providerId AND b.requestedDate = :date")
+    List<Booking> findProviderBookingsByDate(@Param("providerId") Long providerId,
+                                             @Param("date") LocalDate date);
 
-        @Query(value = "SELECT * FROM bookings " +
-                        "WHERE provider_id = :providerId " +
-                        "AND requested_date = :requestedDate " +
-                        "AND id != :bookingId " +
-                        "AND " +
-                        "(" +
-                        "   (status = 'ACCEPTED' " +
-                        "    AND requested_start_time < :newEndTime " +
-                        "    AND :newStartTime < (requested_start_time + (estimated_duration * INTERVAL '1 minute'))) "
-                        +
-                        "   OR" +
-                        "   (status = 'PENDING' " +
-                        "    AND :newStartTime <= requested_start_time " +
-                        "    AND requested_start_time < :newEndTime)" +
-                        ")" +
-                        "ORDER BY status", nativeQuery = true)
-        List<Booking> findConflictingBookings(@Param("providerId") Long providerId,
-                        @Param("bookingId") Long bookingId,
-                        @Param("requestedDate") LocalDate requestedDate,
-                        @Param("newStartTime") LocalTime newStartTime,
-                        @Param("newEndTime") LocalTime newEndTime);
+    @Query("SELECT b FROM Booking b WHERE b.provider.id = :providerId " +
+            "AND b.status IN ('PENDING', 'ACCEPTED') " +
+            "AND b.requestedDate >= :startDate")
+    List<Booking> findUpcomingBookings(@Param("providerId") Long providerId,
+                                       @Param("startDate") LocalDate startDate);
 
-        Page<Booking> findByUserIdAndStatus(Long userId, BookingStatus status, Pageable pageable);
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.provider.id = :providerId AND b.status = 'COMPLETED'")
+    Long countCompletedBookingsByProvider(@Param("providerId") Long providerId);
 
-        Page<Booking> findByUserIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(Long providerId,
-                        BookingStatus status, LocalDate date, LocalTime time, Pageable pageable);
+    @Query("SELECT AVG(b.consumerRating) FROM Booking b WHERE b.provider.id = :providerId AND b.consumerRating IS NOT NULL")
+    Double getAverageRatingForProvider(@Param("providerId") Long providerId);
 
-        @Modifying(clearAutomatically = true)
-        @Query("UPDATE Booking b " +
-                        "SET b.status = 'EXPIRED', b.expiredAt = CURRENT_TIMESTAMP " +
-                        "WHERE b.status = 'PENDING' " +
-                        "AND (b.requestedDate < :date " +
-                        "OR (b.requestedDate = :date AND b.requestedStartTime < :time))")
-        void expirePendingBookings(@Param("date") LocalDate date, @Param("time") LocalTime time);
+    @Query("SELECT b FROM Booking b WHERE b.provider.id = :providerId AND b.status = 'COMPLETED' ORDER BY b.completedAt DESC")
+    List<Booking> findRecentCompletedBookings(@Param("providerId") Long providerId, Pageable pageable);
+
+    @Query(value = "SELECT * FROM bookings " +
+            "WHERE provider_id = :providerId " +
+            "AND requested_date = :requestedDate " +
+            "AND id != :bookingId " +
+            "AND " +
+            "(" +
+            "   (status = 'ACCEPTED' " +
+            "    AND requested_start_time < :newEndTime " +
+            "    AND :newStartTime < (requested_start_time + (estimated_duration * INTERVAL '1 minute'))) " +
+            "   OR" +
+            "   (status = 'PENDING' " +
+            "    AND :newStartTime <= requested_start_time " +
+            "    AND requested_start_time < :newEndTime)" +
+            ")" +
+            "ORDER BY status",
+            nativeQuery = true)
+    List<Booking> findConflictingBookings(@Param("providerId") Long providerId,
+                                          @Param("bookingId") Long bookingId,
+                                          @Param("requestedDate") LocalDate requestedDate,
+                                          @Param("newStartTime") LocalTime newStartTime,
+                                          @Param("newEndTime") LocalTime newEndTime);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Booking b " +
+            "SET b.status = 'EXPIRED', b.expiredAt = CURRENT_TIMESTAMP " +
+            "WHERE b.status = 'PENDING' " +
+            "AND (b.requestedDate < :date " +
+            "OR (b.requestedDate = :date AND b.requestedStartTime < :time))")
+    void expirePendingBookings(@Param("date") LocalDate date, @Param("time") LocalTime time);
 }

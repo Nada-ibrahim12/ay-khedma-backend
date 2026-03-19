@@ -30,7 +30,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class BookingServiceImpl implements BookingService {
+public class BookingServiceImpl implements BookingService
+{
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final ConsumerRepository consumerRepository;
@@ -42,7 +43,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public BookingResponse requestBooking(Long consumerId, BookingRequest bookingRequest) {
+    public BookingResponse requestBooking (Long consumerId, BookingRequest bookingRequest)
+    {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
 
@@ -85,7 +87,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public AcceptBookingResponse acceptBooking(Long providerId, AcceptBookingRequest acceptBookingRequest) {
+    public AcceptBookingResponse acceptBooking (Long providerId, AcceptBookingRequest acceptBookingRequest)
+    {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -115,11 +118,13 @@ public class BookingServiceImpl implements BookingService {
         else
             scheduleId = schedule.getId();
 
-        if (!acceptBookingRequest.isOverrideWorkingHours()) {
+        if (!acceptBookingRequest.isOverrideWorkingHours())
+        {
             WorkingDay workingDay = workingDayRepository.findByScheduleIdAndDate(scheduleId, date)
                     .orElseThrow(() -> new ResourceNotFoundException("Working day by the booking date is not found"));
 
-            if (endTime.isAfter(workingDay.getEndTime())) {
+            if (endTime.isAfter(workingDay.getEndTime()))
+            {
                 return AcceptBookingResponse.builder()
                         .status("WARNING")
                         .warningMessage("The booking end time will exceed the end time of the working day")
@@ -127,17 +132,14 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        List<Booking> conflictingBookings = bookingRepository.findConflictingBookings(providerId, bookingId, date,
-                startTime, endTime);
-        List<Booking> acceptedConflictingBookings = conflictingBookings.stream()
-                .filter(conflictingBooking -> BookingStatus.ACCEPTED.equals(conflictingBooking.getStatus()))
-                .toList();
-        if (!acceptedConflictingBookings.isEmpty()) {
+        List<Booking> conflictingBookings = bookingRepository.findConflictingBookings(providerId, bookingId, date, startTime, endTime);
+        if (!conflictingBookings.isEmpty())
+        {
             return AcceptBookingResponse.builder()
                     .status("CONFLICT")
-                    .conflictingBookings(acceptedConflictingBookings.stream()
-                            .map(bookingMapper::toBookingResponse)
-                            .toList())
+                    .conflictingBookings(conflictingBookings.stream()
+                                                            .map(bookingMapper::toBookingResponse)
+                                                            .toList())
                     .build();
         }
 
@@ -148,18 +150,6 @@ public class BookingServiceImpl implements BookingService {
         booking.setAcceptedAt(LocalDateTime.now());
         booking.setTimeSlot(reservedBookedSlot);
         bookingRepository.save(booking);
-
-        List<Booking> pendingConflictingBookings = conflictingBookings.stream()
-                .filter(conflictingBooking -> BookingStatus.PENDING.equals(conflictingBooking.getStatus()))
-                .toList();
-        if (!pendingConflictingBookings.isEmpty()) {
-            LocalDateTime declinedAt = LocalDateTime.now();
-            pendingConflictingBookings.forEach(conflictingBooking -> {
-                conflictingBooking.setStatus(BookingStatus.DECLINED);
-                conflictingBooking.setDeclinedAt(declinedAt);
-            });
-            bookingRepository.saveAll(pendingConflictingBookings);
-        }
 
         providerRepository.incrementTotalBookings(booking.getProvider().getId());
         consumerRepository.incrementTotalBookings(booking.getConsumer().getId());
@@ -172,7 +162,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public BookingResponse declineBooking(Long providerId, Long bookingId) {
+    public BookingResponse declineBooking (Long providerId, Long bookingId)
+    {
         providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -198,7 +189,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public BookingResponse cancelBooking(Long userId, CancelBookingRequest cancelBookingRequest) {
+    public BookingResponse cancelBooking (Long userId, CancelBookingRequest cancelBookingRequest)
+    {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -206,17 +198,21 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
         boolean isConsumer;
-        if (user.getRole().equals(UserType.CONSUMER)) {
+        if (user.getRole().equals(UserType.CONSUMER))
+        {
             if (!userId.equals(booking.getConsumer().getId()))
                 throw new ForbiddenException("Booking does not belong to this consumer");
 
             isConsumer = true;
-        } else if (user.getRole().equals(UserType.PROVIDER)) {
+        }
+        else if (user.getRole().equals(UserType.PROVIDER))
+        {
             if (!userId.equals(booking.getProvider().getId()))
                 throw new ForbiddenException("Booking does not belong to this provider");
 
             isConsumer = false;
-        } else
+        }
+        else
             throw new ForbiddenException("User is not a provider or a consumer");
 
         if (!booking.getStatus().equals(BookingStatus.ACCEPTED))
@@ -245,25 +241,53 @@ public class BookingServiceImpl implements BookingService {
         return bookingMapper.toBookingResponse(booking);
     }
 
-    @Override
-    public Page<BookingResponse> getFilteredBookings(Long userId, BookingStatus status, boolean upcoming,
-            Pageable pageable) {
+    public Page<BookingResponse> getBookingsByStatus (Long userId, BookingStatus status, Pageable pageable)
+    {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        Page<Booking> bookings;
-
-        if (upcoming) {
-            BookingStatus effectiveStatus = status != null ? status : BookingStatus.ACCEPTED;
-            bookings = bookingRepository.findByUserIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(
-                    userId, effectiveStatus, LocalDate.now(), LocalTime.now(), pageable);
-        } else if (status != null) {
-            bookings = bookingRepository.findByUserIdAndStatus(userId, status, pageable);
-        } else {
-            bookings = bookingRepository.findByUserId(userId, pageable);
+        Page<Booking>  bookings;
+        if (user.getRole().equals(UserType.CONSUMER))
+        {
+            if (status == null)
+                bookings = bookingRepository.findByConsumerId(userId, pageable);
+            else
+                bookings = bookingRepository.findByConsumerIdAndStatus(userId, status, pageable);
         }
+        else if (user.getRole().equals(UserType.PROVIDER))
+        {
+            if (status == null)
+                bookings = bookingRepository.findByProviderId(userId, pageable);
+            else
+                bookings = bookingRepository.findByProviderIdAndStatus(userId, status, pageable);
+        }
+        else
+            throw new ForbiddenException("User is not a provider or a consumer");
 
         return bookings.map(bookingMapper::toBookingResponse);
     }
 
+    public List<BookingResponse> getUpcomingBookings (Long userId)
+    {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<Booking>  bookings;
+        if (user.getRole().equals(UserType.CONSUMER))
+        {
+            bookings = bookingRepository
+                    .findByConsumerIdAndStatusAndRequestedDateAndRequestedStartTimeAfter
+                            (userId, BookingStatus.ACCEPTED, LocalDate.now(), LocalTime.now());
+        }
+        else if (user.getRole().equals(UserType.PROVIDER))
+        {
+            bookings = bookingRepository
+                    .findByProviderIdAndStatusAndRequestedDateAndRequestedStartTimeAfter
+                            (userId, BookingStatus.ACCEPTED, LocalDate.now(), LocalTime.now());
+        }
+        else
+            throw new ForbiddenException("User is not a provider or a consumer");
+
+        return bookings.stream().map(bookingMapper::toBookingResponse).toList();
+    }
 }
