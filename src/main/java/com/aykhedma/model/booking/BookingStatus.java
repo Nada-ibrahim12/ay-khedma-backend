@@ -1,6 +1,7 @@
 package com.aykhedma.model.booking;
 
-public enum BookingStatus {
+public enum BookingStatus
+{
     PENDING,
     ACCEPTED,
     DECLINED,

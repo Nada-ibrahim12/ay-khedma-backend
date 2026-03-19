@@ -20,8 +20,8 @@ import java.time.LocalTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Booking {
-
+public class Booking
+{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -111,37 +111,7 @@ public class Booking {
     @Column(length = 500)
     private String providerReview;
 
-    // Link to the booked time slot
     @OneToOne
     @JoinColumn(name = "time_slot_id")
     private TimeSlot timeSlot;
-
-//    // These validation methods need to be updated to work with the new Schedule model
-//    @AssertTrue(message = "Requested time must be within provider's working hours")
-//    private boolean isValidRequestedTime() {
-//        if (requestedStartTime == null || provider == null || provider.getSchedule() == null) return true;
-//
-//        // Find the working day for this date
-//        WorkingDay workingDay = provider.getSchedule().getWorkingDays().stream()
-//                .filter(wd -> wd.getDayOfWeek() == requestedDate.getDayOfWeek())
-//                .findFirst()
-//                .orElse(null);
-//
-//        if (workingDay == null) return false;
-//
-//        // Calculate end time if not set
-//        LocalTime endTime = requestedEndTime != null ? requestedEndTime :
-//                requestedStartTime.plusHours(1); // Default 1 hour if not set
-//
-//        return !requestedStartTime.isBefore(workingDay.getStartTime()) &&
-//                !endTime.isAfter(workingDay.getEndTime());
-//    }
-//
-//    @AssertTrue(message = "Requested date must be a working day")
-//    private boolean isValidRequestedDate() {
-//        if (requestedDate == null || provider == null || provider.getSchedule() == null) return true;
-//
-//        return provider.getSchedule().getWorkingDays().stream()
-//                .anyMatch(wd -> wd.getDayOfWeek() == requestedDate.getDayOfWeek());
-//    }
 }
