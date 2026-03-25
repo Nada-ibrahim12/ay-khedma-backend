@@ -17,6 +17,7 @@ import com.aykhedma.repository.ServiceTypeRepository;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,9 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+
+    @Value("${jwt.expiration:3600000}")
+    private long jwtExpirationMs;
 
     public AuthResponse login(LoginRequest request) {
 
@@ -53,7 +57,7 @@ public class AuthService {
                 .token(jwt)
                 .refreshToken(refresh.getToken())
                 .tokenType("Bearer")
-                .expiresIn(3600L)
+                .expiresIn(jwtExpirationMs / 1000)
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())

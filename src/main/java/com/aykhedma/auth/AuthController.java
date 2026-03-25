@@ -1,6 +1,7 @@
 package com.aykhedma.auth;
 
 import com.aykhedma.security.CustomUserDetails;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import com.aykhedma.dto.request.LoginRequest;
@@ -29,6 +30,9 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final JwtService jwtService;
     private final RefreshTokenRepository refreshTokenRepository;
+
+    @Value("${jwt.expiration:3600000}")
+    private long jwtExpirationMs;
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
@@ -79,7 +83,7 @@ public class AuthController {
                         .token(newJwt)
                         .refreshToken(refreshToken)
                         .tokenType("Bearer")
-                        .expiresIn(3600L)
+                        .expiresIn(jwtExpirationMs / 1000)
                         .build());
     }
 
