@@ -1,5 +1,6 @@
 package com.aykhedma.model.chat;
 
+import com.aykhedma.model.user.UserType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -32,9 +33,8 @@ public class ChatMessage {
     @Column(nullable = false, length = 20)
     private MessageRole senderRole;
 
-    @NotBlank(message = "Message content is required")
     @Size(max = 5000, message = "Message content cannot exceed 5000 characters")
-    @Column(length = 5000, nullable = false)
+    @Column(length = 5000, nullable = true)
     private String content;
 
     @NotNull(message = "Message type is required")
@@ -47,7 +47,7 @@ public class ChatMessage {
     private LocalDateTime timestamp;
 
     @Size(max = 500, message = "Media URL cannot exceed 500 characters")
-    @Pattern(regexp = "^(http|https|ftp)://.*$", message = "Invalid media URL format")
+    //@Pattern(regexp = "^(http|https|ftp)://.*$", message = "Invalid media URL format")
     private String mediaUrl;
 
     @Size(max = 64, message = "Audio hash must be 64 characters or less")

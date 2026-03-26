@@ -18,6 +18,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
         registry.addEndpoint("/ws-notifications")
                 .setAllowedOriginPatterns("*"); // for native apps
+
+        registry.addEndpoint("/ws-chat")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
     }
 
     @Override
