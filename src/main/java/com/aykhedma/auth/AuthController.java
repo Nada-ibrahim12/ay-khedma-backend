@@ -15,9 +15,11 @@ import com.aykhedma.repository.RefreshTokenRepository;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.security.JwtService;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/auth")
@@ -41,11 +43,22 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
-    @PostMapping("/register")
+    @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> register(
             @Valid @RequestBody RegisterRequest request) {
 
         authService.register(request);
+        otpService.generateOtp(request.getEmail());
+        return ResponseEntity.ok("Registered successfully. OTP sent to your email.");
+    }
+
+    @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> registerWithNationalIdImages(
+            @Valid @ModelAttribute RegisterRequest request,
+            @RequestParam(value = "nationalIdFrontImage", required = false) MultipartFile nationalIdFrontImage,
+            @RequestParam(value = "nationalIdBackImage", required = false) MultipartFile nationalIdBackImage) {
+
+        authService.register(request, nationalIdFrontImage, nationalIdBackImage);
         otpService.generateOtp(request.getEmail());
         return ResponseEntity.ok("Registered successfully. OTP sent to your email.");
     }

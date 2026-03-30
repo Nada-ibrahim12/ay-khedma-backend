@@ -87,6 +87,9 @@ public class ProviderServiceImpl implements ProviderService {
         if (request.getBio() != null) {
             provider.setBio(request.getBio());
         }
+        if (request.getYearsOfExperience() != null) {
+            provider.setYearsOfExperience(request.getYearsOfExperience());
+        }
 
         // Update service info
         if (request.getServiceTypeId() != null) {
@@ -638,27 +641,30 @@ public class ProviderServiceImpl implements ProviderService {
 
     // @Override
     // @Transactional
-    // public ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId, LocalDate date, LocalTime startTime,
-    //         Integer durationMinutes) {
-    //     Provider provider = providerRepository.findById(providerId)
-    //             .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
+    // public ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId,
+    // LocalDate date, LocalTime startTime,
+    // Integer durationMinutes) {
+    // Provider provider = providerRepository.findById(providerId)
+    // .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id:
+    // " + providerId));
 
-    //     if (provider.getSchedule() == null) {
-    //         throw new ResourceNotFoundException("Provider has no schedule");
-    //     }
+    // if (provider.getSchedule() == null) {
+    // throw new ResourceNotFoundException("Provider has no schedule");
+    // }
 
-    //     if (durationMinutes == null || durationMinutes <= 0) {
-    //         throw new BadRequestException("Duration must be positive");
-    //     }
+    // if (durationMinutes == null || durationMinutes <= 0) {
+    // throw new BadRequestException("Duration must be positive");
+    // }
 
-    //     validateHalfHourBoundary(startTime);
+    // validateHalfHourBoundary(startTime);
 
-    //     LocalTime bookingEndTime = startTime.plusMinutes(durationMinutes);
+    // LocalTime bookingEndTime = startTime.plusMinutes(durationMinutes);
 
-    //     TimeSlot bookedSlot = reserveTimeSlotWithBuffer(provider.getSchedule().getId(), date, startTime,
-    //             bookingEndTime);
+    // TimeSlot bookedSlot =
+    // reserveTimeSlotWithBuffer(provider.getSchedule().getId(), date, startTime,
+    // bookingEndTime);
 
-    //     return mapToTimeSlotResponse(bookedSlot);
+    // return mapToTimeSlotResponse(bookedSlot);
     // }
 
     @Override

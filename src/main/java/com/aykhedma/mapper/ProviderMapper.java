@@ -8,8 +8,7 @@ import org.mapstruct.*;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
-        uses = {ScheduleMapper.class})
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE, uses = { ScheduleMapper.class })
 public interface ProviderMapper {
 
     @Mapping(source = "id", target = "id")
@@ -18,6 +17,9 @@ public interface ProviderMapper {
     @Mapping(source = "phoneNumber", target = "phoneNumber")
     @Mapping(source = "profileImage", target = "profileImage")
     @Mapping(source = "bio", target = "bio")
+    @Mapping(source = "yearsOfExperience", target = "yearsOfExperience")
+    @Mapping(source = "nationalIdFrontImage", target = "nationalIdFrontImage")
+    @Mapping(source = "nationalIdBackImage", target = "nationalIdBackImage")
     @Mapping(source = "verificationStatus", target = "verificationStatus")
     @Mapping(source = "completedJobs", target = "completedJobs")
     @Mapping(source = "totalBookings", target = "totalBookings")
@@ -40,6 +42,7 @@ public interface ProviderMapper {
     @Named("providerSummary")
     @Mapping(source = "name", target = "name")
     @Mapping(source = "serviceType.name", target = "serviceType")
+    @Mapping(source = "yearsOfExperience", target = "yearsOfExperience")
     @Mapping(source = "averageRating", target = "averageRating")
     @Mapping(source = "completedJobs", target = "completedJobs")
 
@@ -53,7 +56,6 @@ public interface ProviderMapper {
     @Mapping(source = "serviceArea", target = "serviceArea")
     ProviderSummaryResponse toProviderSummaryResponse(Provider provider);
 
-
     @Mapping(source = "serviceType.name", target = "serviceType")
     @Mapping(source = "serviceType.nameAr", target = "serviceTypeAr")
     @Mapping(source = "serviceType.category.name", target = "categoryName")
@@ -63,6 +65,7 @@ public interface ProviderMapper {
     @Mapping(target = "estimatedArrivalTime", ignore = true)
     @Mapping(target = "withinServiceArea", ignore = true)
     @Mapping(source = "bio", target = "bio")
+    @Mapping(source = "yearsOfExperience", target = "yearsOfExperience")
     SearchResponse toSearchResponse(Provider provider);
 
     List<ProviderResponse> toProviderResponseList(List<Provider> providers);

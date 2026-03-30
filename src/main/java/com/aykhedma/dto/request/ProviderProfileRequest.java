@@ -31,6 +31,9 @@ public class ProviderProfileRequest {
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
     private String bio;
 
+    @Min(value = 0, message = "Years of experience cannot be negative")
+    private Integer yearsOfExperience;
+
     @Positive(message = "Service type ID must be positive")
     private Long serviceTypeId;
 

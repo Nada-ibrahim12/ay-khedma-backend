@@ -22,8 +22,7 @@ public class FileStorageServiceImpl implements FileStorageService {
     private String uploadDir;
 
     private static final List<String> ALLOWED_IMAGE_TYPES = Arrays.asList(
-            "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"
-    );
+            "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp");
 
     private static final List<String> ALLOWED_DOCUMENT_TYPES = Arrays.asList(
             "application/pdf",
@@ -32,8 +31,7 @@ public class FileStorageServiceImpl implements FileStorageService {
             "application/vnd.ms-excel",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "text/plain",
-            "application/rtf"
-    );
+            "application/rtf");
 
     private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024;
     private static final long MAX_DOCUMENT_SIZE = 10 * 1024 * 1024;
@@ -45,7 +43,7 @@ public class FileStorageServiceImpl implements FileStorageService {
         }
 
         // FIXED: Correct directory validation
-        if (directory.equals("profile-images")) {
+        if (directory.equals("profile-images") || directory.equals("national-id-images")) {
             validateImageFile(file);
         } else if (directory.equals("documents")) {
             validateDocumentFile(file);
@@ -92,7 +90,9 @@ public class FileStorageServiceImpl implements FileStorageService {
                 String fileName = parts[3];
 
                 // Only allow specific directories
-                if (!directory.equals("profile-images") && !directory.equals("documents")) {
+                if (!directory.equals("profile-images")
+                        && !directory.equals("national-id-images")
+                        && !directory.equals("documents")) {
                     return;
                 }
 
@@ -118,7 +118,8 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public boolean isValidImage(MultipartFile file) {
-        if (file == null || file.isEmpty()) return false;
+        if (file == null || file.isEmpty())
+            return false;
 
         String contentType = file.getContentType();
         return contentType != null && ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase());
@@ -126,7 +127,8 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public boolean isValidDocument(MultipartFile file) {
-        if (file == null || file.isEmpty()) return false;
+        if (file == null || file.isEmpty())
+            return false;
 
         String contentType = file.getContentType();
         return contentType != null && ALLOWED_DOCUMENT_TYPES.contains(contentType.toLowerCase());
@@ -134,7 +136,8 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String getFileSize(MultipartFile file) {
-        if (file == null) return "0 B";
+        if (file == null)
+            return "0 B";
 
         long size = file.getSize();
         if (size < 1024) {
@@ -151,7 +154,8 @@ public class FileStorageServiceImpl implements FileStorageService {
             throw new BadRequestException("Invalid image type. Allowed types: JPEG, PNG, GIF, WEBP");
         }
         if (file.getSize() > MAX_IMAGE_SIZE) {
-            throw new BadRequestException("Image size exceeds maximum limit of 5MB. Current size: " + getFileSize(file));
+            throw new BadRequestException(
+                    "Image size exceeds maximum limit of 5MB. Current size: " + getFileSize(file));
         }
     }
 
@@ -160,7 +164,8 @@ public class FileStorageServiceImpl implements FileStorageService {
             throw new BadRequestException("Invalid document type. Allowed types: PDF, DOC, DOCX, XLS, XLSX, TXT, RTF");
         }
         if (file.getSize() > MAX_DOCUMENT_SIZE) {
-            throw new BadRequestException("Document size exceeds maximum limit of 10MB. Current size: " + getFileSize(file));
+            throw new BadRequestException(
+                    "Document size exceeds maximum limit of 10MB. Current size: " + getFileSize(file));
         }
     }
 }

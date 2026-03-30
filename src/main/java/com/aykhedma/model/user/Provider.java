@@ -28,6 +28,9 @@ public class Provider extends User {
     @Column(length = 500)
     private String bio;
 
+    @Min(value = 0, message = "Years of experience cannot be negative")
+    private Integer yearsOfExperience;
+
     @Builder.Default
     @NotNull(message = "Verification status is required")
     @Enumerated(EnumType.STRING)
@@ -78,6 +81,14 @@ public class Provider extends User {
     @Column(unique = true, nullable = false, length = 14)
     private String nationalId;
 
+    @Size(max = 500, message = "National ID front image URL cannot exceed 500 characters")
+    @Column(length = 500)
+    private String nationalIdFrontImage;
+
+    @Size(max = 500, message = "National ID back image URL cannot exceed 500 characters")
+    @Column(length = 500)
+    private String nationalIdBackImage;
+
     @NotNull(message = "Schedule is required")
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "schedule_id", nullable = false)
@@ -86,7 +97,7 @@ public class Provider extends User {
     @Builder.Default
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average rating cannot exceed 5.0")
-    //@Column(precision = 3, scale = 2)
+    // @Column(precision = 3, scale = 2)
     private Double averageRating = 0.0;
 
     @Builder.Default
@@ -97,7 +108,7 @@ public class Provider extends User {
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Price cannot exceed 100,000")
-    //@Column(nullable = false, precision = 10, scale = 2)
+    // @Column(nullable = false, precision = 10, scale = 2)
     private Double price;
 
     @NotNull(message = "Price type is required")

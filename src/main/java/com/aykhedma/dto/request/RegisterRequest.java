@@ -42,6 +42,9 @@ public class RegisterRequest {
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
     private String bio;
 
+    @Min(value = 0, message = "Years of experience cannot be negative")
+    private Integer yearsOfExperience;
+
     @Positive(message = "Service type ID must be positive")
     private Long serviceTypeId;
 
@@ -83,11 +86,6 @@ public class RegisterRequest {
 
     @Size(max = 100, message = "City cannot exceed 100 characters")
     private String city;
-
-    @AssertTrue(message = "Bio is required for providers")
-    public boolean isProviderBioValid() {
-        return userType != UserType.PROVIDER || hasText(bio);
-    }
 
     @AssertTrue(message = "Service type is required for providers")
     public boolean isProviderServiceTypeValid() {

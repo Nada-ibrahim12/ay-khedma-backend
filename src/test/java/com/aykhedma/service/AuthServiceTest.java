@@ -11,6 +11,7 @@ import com.aykhedma.model.user.*;
 import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
 import com.aykhedma.repository.UserRepository;
+import com.aykhedma.service.FileStorageService;
 import com.aykhedma.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,6 +46,8 @@ class AuthServiceTest {
         private JwtService jwtService;
         @Mock
         private RefreshTokenService refreshTokenService;
+        @Mock
+        private FileStorageService fileStorageService;
 
         @InjectMocks
         private AuthService authService;

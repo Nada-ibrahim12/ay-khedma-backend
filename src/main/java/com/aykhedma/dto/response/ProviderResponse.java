@@ -22,6 +22,9 @@ public class ProviderResponse {
     private String phoneNumber;
     private String profileImage;
     private String bio;
+    private Integer yearsOfExperience;
+    private String nationalIdFrontImage;
+    private String nationalIdBackImage;
     private VerificationStatus verificationStatus;
     private Integer completedJobs;
     private Integer totalBookings;

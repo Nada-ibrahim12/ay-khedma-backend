@@ -37,8 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test-postgresql")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @DisplayName("BookingRepository Tests")
-class BookingRepositoryTest
-{
+class BookingRepositoryTest {
     @Autowired
     private BookingRepository bookingRepository;
 
@@ -50,8 +49,7 @@ class BookingRepositoryTest
     private Consumer consumer;
 
     @BeforeEach
-    void setUp()
-    {
+    void setUp() {
         bookingRepository.deleteAll();
         entityManager.flush();
 
@@ -75,7 +73,6 @@ class BookingRepositoryTest
                 .longitude(31.2357)
                 .address("Test Address")
                 .city("Cairo")
-                .country("Egypt")
                 .build();
         entityManager.persist(location);
 
@@ -108,8 +105,7 @@ class BookingRepositoryTest
         entityManager.persist(consumer);
     }
 
-    private Booking buildBooking(BookingStatus status, LocalDate date, LocalTime time)
-    {
+    private Booking buildBooking(BookingStatus status, LocalDate date, LocalTime time) {
         return Booking.builder()
                 .consumer(consumer)
                 .provider(provider)
@@ -123,12 +119,10 @@ class BookingRepositoryTest
 
     @Nested
     @DisplayName("Find Conflicting Bookings Tests")
-    class FindConflictingBookingsTest
-    {
+    class FindConflictingBookingsTest {
         @Test
         @DisplayName("Return Conflicting Accepted Booking")
-        void conflictingAcceptedBookingTest()
-        {
+        void conflictingAcceptedBookingTest() {
             LocalDate date = LocalDate.now();
             LocalTime time = LocalTime.of(10, 0);
 
@@ -147,8 +141,7 @@ class BookingRepositoryTest
 
         @Test
         @DisplayName("Return Conflicting Pending Booking")
-        void conflictingPendingBookingTest()
-        {
+        void conflictingPendingBookingTest() {
             LocalDate date = LocalDate.now();
             LocalTime time = LocalTime.of(11, 0);
 
@@ -170,14 +163,12 @@ class BookingRepositoryTest
 
     @Nested
     @DisplayName("Expire Pending Bookings Tests")
-    class ExpirePendingBookingsTest
-    {
+    class ExpirePendingBookingsTest {
         @Test
         @Transactional
         @Rollback
         @DisplayName("Expire Past Pending Bookings")
-        void expirePastPendingBookingsTest()
-        {
+        void expirePastPendingBookingsTest() {
             LocalDate date = LocalDate.now();
             LocalTime time = LocalTime.now().minusHours(1);
 
@@ -198,8 +189,7 @@ class BookingRepositoryTest
         @Transactional
         @Rollback
         @DisplayName("Do Not Expire Future Pending Bookings")
-        void doNotExpireFuturePendingBookingsTest()
-        {
+        void doNotExpireFuturePendingBookingsTest() {
             LocalDate date = LocalDate.now();
             LocalTime time = LocalTime.now().plusHours(1);
 
