@@ -16,7 +16,6 @@ public class LocationResponse {
     private String address;
     private String area;
     private String city;
-    private String country;
     private String formattedAddress;
     private boolean success;
     private String message;

@@ -49,7 +49,7 @@ public class Consumer extends User {
     @Column(nullable = false)
     private Integer cancelledBookings = 0;
 
-    @ManyToOne
+    @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "location_id")
     private Location location;
 

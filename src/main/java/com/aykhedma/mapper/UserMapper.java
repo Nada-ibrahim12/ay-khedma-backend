@@ -46,7 +46,6 @@ public interface UserMapper {
     @Mapping(target = "credentialsNonExpired", ignore = true)
     @Mapping(target = "averageTime", ignore = true)
     @Mapping(target = "serviceType", ignore = true)
-    @Mapping(target = "serviceArea", ignore = true)
     @Mapping(target = "responseTime", ignore = true)
     Provider toEntity(ProviderProfileRequest request);
 
@@ -59,7 +58,7 @@ public interface UserMapper {
     @Mapping(source = "bio", target = "bio")
     @Mapping(source = "verificationStatus", target = "verificationStatus")
     @Mapping(source = "completedJobs", target = "completedJobs")
-    @Mapping(source = "serviceType", target = "serviceType", qualifiedByName = "mapServiceTypeToString")  // FIXED
+    @Mapping(source = "serviceType", target = "serviceType", qualifiedByName = "mapServiceTypeToString") // FIXED
     @Mapping(source = "serviceType.id", target = "serviceTypeId")
     @Mapping(source = "location", target = "location")
     @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")

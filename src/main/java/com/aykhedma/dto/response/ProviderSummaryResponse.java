@@ -16,6 +16,7 @@ public class ProviderSummaryResponse {
     private String name;
     private String profileImage;
     private String serviceType;
+    private Integer yearsOfExperience;
     private Double averageRating;
     private Integer completedJobs;
     private Integer totalBookings;
@@ -25,5 +26,5 @@ public class ProviderSummaryResponse {
     private Double distance; // in km
     private Integer estimatedArrivalTime; // in minutes
     private boolean emergencyEnabled;
-    private String serviceArea;
+    private String area;
 }

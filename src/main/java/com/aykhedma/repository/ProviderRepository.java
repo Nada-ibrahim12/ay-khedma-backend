@@ -57,6 +57,7 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
         @Query("SELECT p FROM Provider p " +
                         "LEFT JOIN p.serviceType s " +
                         "LEFT JOIN s.category c " +
+                        "LEFT JOIN p.location l " +
                         "WHERE p.enabled = true " +
                         "AND p.verificationStatus = 'VERIFIED' " +
                         "AND (:keyword IS NULL OR :keyword = '' OR " +
@@ -65,7 +66,7 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
                         "    LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
                         "    LOWER(COALESCE(s.nameAr, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
                         "    LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-                        "    LOWER(COALESCE(p.serviceArea, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+                        "    LOWER(COALESCE(l.area, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
                         "AND (:categoryId IS NULL OR c.id = :categoryId) " +
                         "AND (:categoryName IS NULL OR :categoryName = '' OR " +
                         "    LOWER(c.name) = LOWER(:categoryName))")

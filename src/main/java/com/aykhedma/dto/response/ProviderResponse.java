@@ -22,6 +22,9 @@ public class ProviderResponse {
     private String phoneNumber;
     private String profileImage;
     private String bio;
+    private Integer yearsOfExperience;
+    private String nationalIdFrontImage;
+    private String nationalIdBackImage;
     private VerificationStatus verificationStatus;
     private Integer completedJobs;
     private Integer totalBookings;
@@ -38,5 +41,5 @@ public class ProviderResponse {
     private List<DocumentResponse> documents;
     private ScheduleResponse schedule;
     private Double serviceAreaRadius;
-    private String serviceArea;
+    private String area;
 }

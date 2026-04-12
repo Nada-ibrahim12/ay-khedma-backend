@@ -27,21 +27,24 @@ public class SearchResponse {
     private boolean emergencyEnabled;
     private Double serviceAreaRadius;
     private boolean withinServiceArea;
-    private String serviceArea;
+    private String area;
     private String bio;
+    private Integer yearsOfExperience;
 
     private String formattedDistance;
     private String formattedArrivalTime;
 
     public String getFormattedDistance() {
-        if (distance == null) return null;
-        return distance < 1 ?
-                Math.round(distance * 1000) + " m" :
-                String.format("%.1f km", distance);
+        if (distance == null)
+            return null;
+        return distance < 1 ? Math.round(distance * 1000) + " m" : String.format("%.1f km", distance);
     }
+
     public String getFormattedArrivalTime() {
-        if (estimatedArrivalTime == null) return null;
-        if (estimatedArrivalTime < 60) return estimatedArrivalTime + " min";
+        if (estimatedArrivalTime == null)
+            return null;
+        if (estimatedArrivalTime < 60)
+            return estimatedArrivalTime + " min";
         return (estimatedArrivalTime / 60) + "h " + (estimatedArrivalTime % 60) + "min";
     }
 }
