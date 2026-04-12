@@ -2,7 +2,6 @@ package com.aykhedma.controller;
 
 import com.aykhedma.dto.request.ChatMessageRequest;
 import com.aykhedma.dto.response.ChatMessageResponse;
-import com.aykhedma.dto.response.DraftMessageResponse;
 import com.aykhedma.model.chat.MessageType;
 import com.aykhedma.model.user.User;
 import com.aykhedma.repository.UserRepository;
@@ -16,7 +15,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -59,7 +57,7 @@ public class ChatController {
     })
     public ResponseEntity<ChatMessageResponse> send(
             @RequestPart(required = false) String content,
-            @RequestPart(required = false) MultipartFile mediaFile,
+            @RequestPart(required = false) List<MultipartFile> mediaFiles,
             @RequestPart(required = false) MessageType type,
             @RequestPart String roomId,
             HttpServletRequest req
@@ -68,7 +66,7 @@ public class ChatController {
         // Build request DTO
         ChatMessageRequest request = new ChatMessageRequest();
         request.setContent(content);
-        request.setMediaFile(mediaFile);
+        request.setMediaFiles(mediaFiles);
         request.setType(type != null ? type : MessageType.TEXT);
         request.setRoomId(roomId);
 
@@ -106,22 +104,7 @@ public class ChatController {
         return ResponseEntity.ok(count);
     }
 
-    @PutMapping("/message/{id}")
-    @Operation(summary = "Edit a message")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Message edited successfully",
-                    content = @Content(schema = @Schema(implementation = ChatMessageResponse.class))),
-            @ApiResponse(responseCode = "403", description = "User not owner of message"),
-            @ApiResponse(responseCode = "404", description = "Message not found")
-    })
-    public ResponseEntity<ChatMessageResponse> edit(@PathVariable String id,
-                                                    @RequestParam String content,
-                                                    HttpServletRequest req) {
-        ChatMessageResponse response =
-                chatService.editMessage(id, content, getUser(req));
 
-        return ResponseEntity.ok(response);
-    }
 
     @DeleteMapping("/message/{id}")
     @Operation(summary = "Delete a message")
@@ -137,31 +120,5 @@ public class ChatController {
     }
 
 
-    @GetMapping("/draft/{receiverId}")
-    @Operation(summary = "Get or create draft message for a room")
-    public ResponseEntity<DraftMessageResponse> getDraft(
-            @PathVariable Long receiverId,
-            HttpServletRequest req) {
-        DraftMessageResponse draft = chatService.getOrCreateDraft(getUser(req), receiverId);
-        return ResponseEntity.ok(draft);
-    }
 
-    @PutMapping("/draft/{roomId}")
-    @Operation(summary = "Update draft message before sending")
-    public ResponseEntity<DraftMessageResponse> updateDraft(
-            @PathVariable String roomId,
-            @RequestBody String newContent,
-            HttpServletRequest req) {
-        DraftMessageResponse draft = chatService.updateDraft(roomId, getUser(req).getId(), newContent);
-        return ResponseEntity.ok(draft);
-    }
-
-    @PostMapping("/draft/send/{roomId}")
-    @Operation(summary = "Send the draft message to the chat")
-    public ResponseEntity<ChatMessageResponse> sendDraft(
-            @PathVariable String roomId,
-            HttpServletRequest req) {
-        ChatMessageResponse sentMessage = chatService.sendDraft(roomId, getUser(req));
-        return ResponseEntity.ok(sentMessage);
-    }
 }

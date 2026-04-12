@@ -7,6 +7,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "chat_messages")
@@ -47,13 +48,16 @@ public class ChatMessage {
     private LocalDateTime timestamp;
 
     @Size(max = 500, message = "Media URL cannot exceed 500 characters")
+    @ElementCollection
     //@Pattern(regexp = "^(http|https|ftp)://.*$", message = "Invalid media URL format")
-    private String mediaUrl;
+    private List<String> mediaUrls;
 
     @Size(max = 64, message = "Audio hash must be 64 characters or less")
     private String originalAudioHash;
 
     private Boolean isRead = false;
+//    @Enumerated(EnumType.STRING)
+//    private MessageStatus status;
 
     @PastOrPresent(message = "Read timestamp cannot be in the future")
     private LocalDateTime readAt;

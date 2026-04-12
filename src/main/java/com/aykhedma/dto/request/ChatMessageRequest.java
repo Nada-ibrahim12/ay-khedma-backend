@@ -12,6 +12,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,10 +25,11 @@ public class ChatMessageRequest {
 
     private String sessionId;
 
+    private Boolean isDraft;
 //    @NotNull(message = "Sender ID is required")
 //    private Long senderId;
 
-    @NotNull(message = "Sender ID is required")
+    @NotNull(message = "receiver ID is required")
     private Long receiverId;
 
     @NotNull(message = "Sender role is required")
@@ -37,7 +40,7 @@ public class ChatMessageRequest {
     private String content;
 
     private String mediaUrl;
-    private MultipartFile mediaFile;
+    private List<MultipartFile> mediaFiles;
 
     private MessageType type = MessageType.TEXT;
 
@@ -46,10 +49,12 @@ public class ChatMessageRequest {
         return (roomId != null && !roomId.isEmpty()) ||
                 (sessionId != null && !sessionId.isEmpty());
     }
-    @AssertTrue(message = "Message must have content, media URL, or a file")
+
+    @AssertTrue(message = "Message must have content or media files")
     private boolean isValidMessage() {
-        return (content != null && !content.isEmpty()) ||
-                (mediaUrl != null && !mediaUrl.isEmpty()) ||
-                (mediaFile != null && !mediaFile.isEmpty());
+        boolean hasContent = content != null && !content.isEmpty();
+        boolean hasFiles = mediaFiles != null && !mediaFiles.isEmpty();
+
+        return hasContent || hasFiles;
     }
 }
