@@ -1,18 +1,21 @@
 package com.aykhedma.service;
 
 import com.aykhedma.exception.BadRequestException;
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import com.aykhedma.service.FileStorageService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -20,6 +23,12 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
+
+    private final Cloudinary cloudinary;
+
+    public FileStorageServiceImpl(Cloudinary cloudinary) {
+        this.cloudinary = cloudinary;
+    }
 
     private static final List<String> ALLOWED_IMAGE_TYPES = Arrays.asList(
             "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp");
@@ -51,30 +60,34 @@ public class FileStorageServiceImpl implements FileStorageService {
             throw new BadRequestException("Invalid directory: " + directory);
         }
 
-        Path uploadPath = Paths.get(uploadDir, directory).normalize();
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
-
         String originalFileName = file.getOriginalFilename();
         String fileExtension = "";
         if (originalFileName != null && originalFileName.contains(".")) {
             fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
-            // Sanitize extension
             fileExtension = fileExtension.replaceAll("[^a-zA-Z0-9.]", "");
         }
 
         String fileName = UUID.randomUUID().toString() + fileExtension;
-        Path filePath = uploadPath.resolve(fileName).normalize();
 
-        // Ensure the resolved path is still within the upload directory
-        if (!filePath.startsWith(uploadPath)) {
-            throw new BadRequestException("Invalid file path");
+        try {
+            Map<String, Object> uploadOptions = ObjectUtils.asMap(
+                    "folder", directory,
+                    "public_id", fileName,
+                    "resource_type", "auto");
+
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), uploadOptions);
+            Object secureUrl = uploadResult.get("secure_url");
+
+            if (secureUrl == null) {
+                throw new IOException("Cloudinary did not return a secure URL");
+            }
+
+            return secureUrl.toString();
+        } catch (IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IOException("Failed to upload file to Cloudinary", e);
         }
-
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-        return "/files/" + directory + "/" + fileName;
     }
 
     @Override
@@ -84,28 +97,12 @@ public class FileStorageServiceImpl implements FileStorageService {
         }
 
         try {
-            String[] parts = fileUrl.split("/");
-            if (parts.length >= 4) {
-                String directory = parts[2];
-                String fileName = parts[3];
-
-                // Only allow specific directories
-                if (!directory.equals("profile-images")
-                        && !directory.equals("national-id-images")
-                        && !directory.equals("documents")) {
-                    return;
-                }
-
-                // Sanitize filename
-                fileName = Paths.get(fileName).getFileName().toString();
-                Path filePath = Paths.get(uploadDir, directory, fileName).normalize();
-
-                // Ensure the path is still within the upload directory
-                Path uploadPath = Paths.get(uploadDir).normalize();
-                if (filePath.startsWith(uploadPath)) {
-                    Files.deleteIfExists(filePath);
-                }
+            if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+                deleteCloudinaryFile(fileUrl);
+                return;
             }
+
+            deleteLocalFile(fileUrl);
         } catch (IOException e) {
             // Ignore deletion errors
         }
@@ -113,7 +110,7 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     @Override
     public String getFileUrl(String fileName) {
-        return "/files/profile-images/" + fileName;
+        return fileName;
     }
 
     @Override
@@ -167,5 +164,78 @@ public class FileStorageServiceImpl implements FileStorageService {
             throw new BadRequestException(
                     "Document size exceeds maximum limit of 10MB. Current size: " + getFileSize(file));
         }
+    }
+
+    private void deleteCloudinaryFile(String fileUrl) throws IOException {
+        URI uri = URI.create(fileUrl);
+        String path = uri.getPath();
+
+        if (path == null || !path.contains("/upload/")) {
+            return;
+        }
+
+        String[] segments = path.split("/");
+        if (segments.length < 5) {
+            return;
+        }
+
+        String resourceType = segments[2];
+        String publicId = extractPublicId(path);
+
+        if (publicId == null || publicId.isBlank()) {
+            return;
+        }
+
+        cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("resource_type", resourceType));
+    }
+
+    private void deleteLocalFile(String fileUrl) {
+        try {
+            String[] parts = fileUrl.split("/");
+            if (parts.length >= 4) {
+                String directory = parts[2];
+                String fileName = parts[3];
+
+                if (!directory.equals("profile-images")
+                        && !directory.equals("national-id-images")
+                        && !directory.equals("documents")) {
+                    return;
+                }
+
+                fileName = Paths.get(fileName).getFileName().toString();
+                Path filePath = Paths.get(uploadDir, directory, fileName).normalize();
+                Path uploadPath = Paths.get(uploadDir).normalize();
+                if (filePath.startsWith(uploadPath)) {
+                    Files.deleteIfExists(filePath);
+                }
+            }
+        } catch (IOException e) {
+            // Ignore deletion errors
+        }
+    }
+
+    private String extractPublicId(String fileUrlPath) {
+        int uploadIndex = fileUrlPath.indexOf("/upload/");
+        if (uploadIndex < 0) {
+            return null;
+        }
+
+        String publicPath = fileUrlPath.substring(uploadIndex + "/upload/".length());
+        if (publicPath.matches("^v\\d+/.*")) {
+            publicPath = publicPath.substring(publicPath.indexOf('/') + 1);
+        }
+
+        int lastSlash = publicPath.lastIndexOf('/');
+        String filePart = lastSlash >= 0 ? publicPath.substring(lastSlash + 1) : publicPath;
+        int extensionIndex = filePart.lastIndexOf('.');
+        if (extensionIndex > 0) {
+            filePart = filePart.substring(0, extensionIndex);
+        }
+
+        if (lastSlash >= 0) {
+            return publicPath.substring(0, lastSlash + 1) + filePart;
+        }
+
+        return filePart;
     }
 }
