@@ -46,7 +46,6 @@ public interface UserMapper {
     @Mapping(target = "credentialsNonExpired", ignore = true)
     @Mapping(target = "averageTime", ignore = true)
     @Mapping(target = "serviceType", ignore = true)
-    @Mapping(target = "serviceArea", ignore = true)
     @Mapping(target = "responseTime", ignore = true)
     Provider toEntity(ProviderProfileRequest request);
 

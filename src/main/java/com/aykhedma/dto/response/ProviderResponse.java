@@ -41,5 +41,5 @@ public class ProviderResponse {
     private List<DocumentResponse> documents;
     private ScheduleResponse schedule;
     private Double serviceAreaRadius;
-    private String serviceArea;
+    private String area;
 }

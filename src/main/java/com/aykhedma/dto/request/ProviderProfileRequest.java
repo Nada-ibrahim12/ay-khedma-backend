@@ -49,9 +49,6 @@ public class ProviderProfileRequest {
 
     private Boolean emergencyEnabled;
 
-    @Size(max = 100, message = "Area cannot exceed 100 characters")
-    private String serviceArea;
-
     @DecimalMin(value = "0.0", message = "Service area radius cannot be negative")
     private Double serviceAreaRadius;
 

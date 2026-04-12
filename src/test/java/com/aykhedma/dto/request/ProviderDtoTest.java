@@ -41,7 +41,6 @@ class ProviderDtoTest {
                     .price(100.0)
                     .priceType("HOUR")
                     .emergencyEnabled(true)
-                    .serviceArea("Maadi")
                     .serviceAreaRadius(5.0)
                     .build();
 

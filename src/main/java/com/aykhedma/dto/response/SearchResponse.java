@@ -27,7 +27,7 @@ public class SearchResponse {
     private boolean emergencyEnabled;
     private Double serviceAreaRadius;
     private boolean withinServiceArea;
-    private String serviceArea;
+    private String area;
     private String bio;
     private Integer yearsOfExperience;
 

@@ -36,7 +36,7 @@ public interface ProviderMapper {
     @Mapping(source = "schedule", target = "schedule")
     @Mapping(target = "documents", ignore = true)
     @Mapping(source = "serviceAreaRadius", target = "serviceAreaRadius")
-    @Mapping(source = "serviceArea", target = "serviceArea")
+    @Mapping(source = "location.area", target = "area")
     ProviderResponse toProviderResponse(Provider provider);
 
     @Named("providerSummary")
@@ -53,14 +53,14 @@ public interface ProviderMapper {
     @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")
     @Mapping(target = "distance", ignore = true)
     @Mapping(target = "estimatedArrivalTime", ignore = true)
-    @Mapping(source = "serviceArea", target = "serviceArea")
+    @Mapping(source = "location.area", target = "area")
     ProviderSummaryResponse toProviderSummaryResponse(Provider provider);
 
     @Mapping(source = "serviceType.name", target = "serviceType")
     @Mapping(source = "serviceType.nameAr", target = "serviceTypeAr")
     @Mapping(source = "serviceType.category.name", target = "categoryName")
     @Mapping(source = "serviceAreaRadius", target = "serviceAreaRadius")
-    @Mapping(source = "serviceArea", target = "serviceArea")
+    @Mapping(source = "location.area", target = "area")
     @Mapping(target = "distance", ignore = true)
     @Mapping(target = "estimatedArrivalTime", ignore = true)
     @Mapping(target = "withinServiceArea", ignore = true)

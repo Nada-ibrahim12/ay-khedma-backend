@@ -146,7 +146,6 @@ class ProviderServiceImplTest {
                                         .serviceTypeId(10L)
                                         .price(120.0)
                                         .priceType("HOUR")
-                                        .serviceArea("Maadi")
                                         .serviceAreaRadius(5.5)
                                         .emergencyEnabled(true)
                                         .location(LocationDTO.builder().latitude(30.0).longitude(31.0).build())
@@ -167,7 +166,6 @@ class ProviderServiceImplTest {
                         assertThat(provider.getBio()).isEqualTo(request.getBio());
                         assertThat(provider.getPrice()).isEqualTo(request.getPrice());
                         assertThat(provider.getPriceType()).isEqualTo(PriceType.HOUR);
-                        assertThat(provider.getServiceArea()).isEqualTo(request.getServiceArea());
                         assertThat(provider.getServiceAreaRadius()).isEqualTo(request.getServiceAreaRadius());
                         assertThat(provider.getEmergencyEnabled()).isEqualTo(request.getEmergencyEnabled());
 

@@ -58,12 +58,6 @@ public class RegisterRequest {
     @Pattern(regexp = "^[0-9]{14}$", message = "National ID must be exactly 14 digits")
     private String nationalId;
 
-    @Size(max = 100, message = "Service area cannot exceed 100 characters")
-    private String serviceArea;
-
-    @DecimalMin(value = "0.0", message = "Service area radius cannot be negative")
-    private Double serviceAreaRadius;
-
     // Consumer specific fields
     @Size(min = 2, max = 10, message = "Language code must be between 2 and 10 characters")
     @Pattern(regexp = "^[a-z]{2}(-[A-Z]{2})?$", message = "Invalid language format (e.g., 'en', 'ar-EG')")
@@ -105,16 +99,6 @@ public class RegisterRequest {
     @AssertTrue(message = "National ID is required for providers")
     public boolean isProviderNationalIdValid() {
         return userType != UserType.PROVIDER || hasText(nationalId);
-    }
-
-    @AssertTrue(message = "Service area is required for providers")
-    public boolean isProviderServiceAreaValid() {
-        return userType != UserType.PROVIDER || hasText(serviceArea);
-    }
-
-    @AssertTrue(message = "Service area radius is required for providers")
-    public boolean isProviderServiceAreaRadiusValid() {
-        return userType != UserType.PROVIDER || serviceAreaRadius != null;
     }
 
     @AssertTrue(message = "Provider location latitude is required")

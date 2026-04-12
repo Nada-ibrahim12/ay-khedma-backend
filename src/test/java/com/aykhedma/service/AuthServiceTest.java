@@ -114,8 +114,6 @@ class AuthServiceTest {
                                         .price(150.0)
                                         .priceType("HOUR")
                                         .nationalId("12345678901234")
-                                        .serviceArea("Maadi")
-                                        .serviceAreaRadius(7.0)
                                         .latitude(30.0)
                                         .longitude(31.0)
                                         .build();

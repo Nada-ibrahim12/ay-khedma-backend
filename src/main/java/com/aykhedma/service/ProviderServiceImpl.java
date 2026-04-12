@@ -119,10 +119,6 @@ public class ProviderServiceImpl implements ProviderService {
             provider.setNationalId(request.getNationalId());
         }
 
-        if (request.getServiceArea() != null) {
-            provider.setServiceArea(request.getServiceArea());
-        }
-
         if (request.getServiceAreaRadius() != null) {
             provider.setServiceAreaRadius(request.getServiceAreaRadius());
         }

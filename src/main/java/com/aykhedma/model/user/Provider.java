@@ -116,9 +116,6 @@ public class Provider extends User {
     @Column(nullable = false, length = 20)
     private PriceType priceType;
 
-    @Size(max = 100, message = "Area cannot exceed 100 characters")
-    private String serviceArea;
-
     @Builder.Default
     @DecimalMin(value = "0.0", message = "Service area radius cannot be negative")
     private Double serviceAreaRadius = 7.0;

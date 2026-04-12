@@ -166,8 +166,6 @@ public class AuthService {
                         .nationalIdBackImage(backImageUrl)
                         .price(request.getPrice())
                         .priceType(priceType)
-                        .serviceArea(request.getServiceArea())
-                        .serviceAreaRadius(request.getServiceAreaRadius())
                         .schedule(schedule)
                         .build();
 
