@@ -173,8 +173,10 @@ public class AuthService {
                         .build();
 
                 Provider savedProvider = (Provider) userRepository.save(provider);
-                saveNationalIdDocument(savedProvider, nationalIdFrontImage, frontImageUrl, "NATIONAL_ID", "National ID Front");
-                saveNationalIdDocument(savedProvider, nationalIdBackImage, backImageUrl, "NATIONAL_ID", "National ID Back");
+                saveNationalIdDocument(savedProvider, nationalIdFrontImage, frontImageUrl, "NATIONAL_ID",
+                        "National ID Front");
+                saveNationalIdDocument(savedProvider, nationalIdBackImage, backImageUrl, "NATIONAL_ID",
+                        "National ID Back");
             } catch (IOException e) {
                 if (frontImageUrl != null) {
                     fileStorageService.deleteFile(frontImageUrl);

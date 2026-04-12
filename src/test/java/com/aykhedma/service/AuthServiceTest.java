@@ -178,9 +178,11 @@ class AuthServiceTest {
                         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
                         when(fileStorageService.storeFile(any(), eq("national-id-images")))
                                         .thenReturn("/uploads/national-id/front.jpg", "/uploads/national-id/back.jpg");
-                        when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
+                        when(documentRepository.save(any(Document.class)))
+                                        .thenAnswer(invocation -> invocation.getArgument(0));
 
-                        assertThatCode(() -> authService.register(req, frontImage, backImage)).doesNotThrowAnyException();
+                        assertThatCode(() -> authService.register(req, frontImage, backImage))
+                                        .doesNotThrowAnyException();
 
                         verify(documentRepository).save(any(Document.class));
                         verify(documentRepository, times(2)).save(any(Document.class));
