@@ -5,9 +5,11 @@ import com.aykhedma.auth.RefreshTokenService;
 import com.aykhedma.dto.request.LoginRequest;
 import com.aykhedma.dto.request.RegisterRequest;
 import com.aykhedma.dto.response.AuthResponse;
+import com.aykhedma.model.document.Document;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.RefreshToken;
 import com.aykhedma.model.user.*;
+import com.aykhedma.repository.DocumentRepository;
 import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
 import com.aykhedma.repository.UserRepository;
@@ -21,7 +23,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -38,6 +42,8 @@ class AuthServiceTest {
         private UserRepository userRepository;
         @Mock
         private ProviderRepository providerRepository;
+        @Mock
+        private DocumentRepository documentRepository;
         @Mock
         private ServiceTypeRepository serviceTypeRepository;
         @Mock
@@ -128,6 +134,56 @@ class AuthServiceTest {
                         assertThatCode(() -> authService.register(req)).doesNotThrowAnyException();
 
                         verify(userRepository).save(any(Provider.class));
+                }
+
+                @Test
+                @DisplayName("Should save national ID images as documents during provider registration")
+                void register_provider_withDocuments_savesDocumentRows() throws IOException {
+                        ServiceType serviceType = ServiceType.builder()
+                                        .id(10L)
+                                        .name("Plumbing")
+                                        .build();
+
+                        RegisterRequest req = RegisterRequest.builder()
+                                        .name("Mohamed")
+                                        .email("mo@mail.com")
+                                        .phoneNumber("01098765432")
+                                        .password("Password123")
+                                        .userType(UserType.PROVIDER)
+                                        .bio("Experienced plumber")
+                                        .serviceTypeId(10L)
+                                        .price(150.0)
+                                        .priceType("HOUR")
+                                        .nationalId("12345678901234")
+                                        .latitude(30.0)
+                                        .longitude(31.0)
+                                        .build();
+
+                        MockMultipartFile frontImage = new MockMultipartFile(
+                                        "nationalIdFrontImage",
+                                        "front.jpg",
+                                        "image/jpeg",
+                                        "front-bytes".getBytes());
+                        MockMultipartFile backImage = new MockMultipartFile(
+                                        "nationalIdBackImage",
+                                        "back.jpg",
+                                        "image/jpeg",
+                                        "back-bytes".getBytes());
+
+                        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+                        when(userRepository.existsByPhoneNumber(anyString())).thenReturn(false);
+                        when(providerRepository.existsByNationalId(anyString())).thenReturn(false);
+                        when(serviceTypeRepository.findById(10L)).thenReturn(Optional.of(serviceType));
+                        when(passwordEncoder.encode(anyString())).thenReturn("encoded");
+                        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+                        when(fileStorageService.storeFile(any(), eq("national-id-images")))
+                                        .thenReturn("/uploads/national-id/front.jpg", "/uploads/national-id/back.jpg");
+                        when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+                        assertThatCode(() -> authService.register(req, frontImage, backImage)).doesNotThrowAnyException();
+
+                        verify(documentRepository).save(any(Document.class));
+                        verify(documentRepository, times(2)).save(any(Document.class));
                 }
 
                 @Test

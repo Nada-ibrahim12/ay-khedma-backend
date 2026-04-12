@@ -58,7 +58,7 @@ public interface UserMapper {
     @Mapping(source = "bio", target = "bio")
     @Mapping(source = "verificationStatus", target = "verificationStatus")
     @Mapping(source = "completedJobs", target = "completedJobs")
-    @Mapping(source = "serviceType", target = "serviceType", qualifiedByName = "mapServiceTypeToString")  // FIXED
+    @Mapping(source = "serviceType", target = "serviceType", qualifiedByName = "mapServiceTypeToString") // FIXED
     @Mapping(source = "serviceType.id", target = "serviceTypeId")
     @Mapping(source = "location", target = "location")
     @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")

@@ -6,11 +6,13 @@ import com.aykhedma.dto.response.AuthResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.exception.UnauthorizedException;
+import com.aykhedma.model.document.Document;
 import com.aykhedma.model.booking.Schedule;
 import com.aykhedma.model.location.Location;
 import com.aykhedma.model.service.PriceType;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.*;
+import com.aykhedma.repository.DocumentRepository;
 import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
 import com.aykhedma.repository.UserRepository;
@@ -31,6 +33,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final ProviderRepository providerRepository;
+    private final DocumentRepository documentRepository;
     private final ServiceTypeRepository serviceTypeRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -169,7 +172,9 @@ public class AuthService {
                         .schedule(schedule)
                         .build();
 
-                userRepository.save(provider);
+                Provider savedProvider = (Provider) userRepository.save(provider);
+                saveNationalIdDocument(savedProvider, nationalIdFrontImage, frontImageUrl, "NATIONAL_ID", "National ID Front");
+                saveNationalIdDocument(savedProvider, nationalIdBackImage, backImageUrl, "NATIONAL_ID", "National ID Back");
             } catch (IOException e) {
                 if (frontImageUrl != null) {
                     fileStorageService.deleteFile(frontImageUrl);
@@ -178,8 +183,40 @@ public class AuthService {
                     fileStorageService.deleteFile(backImageUrl);
                 }
                 throw new BadRequestException("Failed to upload national ID images");
+            } catch (RuntimeException e) {
+                if (frontImageUrl != null) {
+                    fileStorageService.deleteFile(frontImageUrl);
+                }
+                if (backImageUrl != null) {
+                    fileStorageService.deleteFile(backImageUrl);
+                }
+                throw e;
             }
         }
+    }
+
+    private void saveNationalIdDocument(Provider provider,
+            MultipartFile sourceFile,
+            String fileUrl,
+            String documentType,
+            String title) {
+        if (sourceFile == null || sourceFile.isEmpty() || fileUrl == null) {
+            return;
+        }
+
+        String documentTitle = sourceFile.getOriginalFilename();
+        if (documentTitle == null || documentTitle.isBlank()) {
+            documentTitle = title;
+        }
+
+        Document document = Document.builder()
+                .title(documentTitle)
+                .type(documentType)
+                .filePath(fileUrl)
+                .provider(provider)
+                .build();
+
+        documentRepository.save(document);
     }
 
 }
