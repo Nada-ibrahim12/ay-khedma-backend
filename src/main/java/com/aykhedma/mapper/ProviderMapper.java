@@ -37,6 +37,7 @@ public interface ProviderMapper {
     @Mapping(target = "documents", ignore = true)
     @Mapping(source = "serviceAreaRadius", target = "serviceAreaRadius")
     @Mapping(source = "location.area", target = "area")
+    @Mapping(source = "rejectionReason", target = "rejectionReason")
     ProviderResponse toProviderResponse(Provider provider);
 
     @Named("providerSummary")

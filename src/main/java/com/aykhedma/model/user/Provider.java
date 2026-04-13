@@ -132,4 +132,8 @@ public class Provider extends User {
     @Min(value = 0, message = "Response time cannot be negative")
     @Max(value = 60, message = "Response time cannot exceed 60 minutes")
     private Integer responseTime;
+
+    @Size(max = 500, message = "Rejection reason cannot exceed 500 characters")
+    @Column(length = 500)
+    private String rejectionReason;
 }

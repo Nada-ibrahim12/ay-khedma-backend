@@ -112,6 +112,21 @@ public class AuthService {
 
             userRepository.save(consumer);
 
+        } else if (request.getUserType() == UserType.ADMIN) {
+
+            Admin admin = Admin.builder()
+                    .name(request.getName())
+                    .email(request.getEmail())
+                    .phoneNumber(request.getPhoneNumber())
+                    .password(encodedPassword)
+                    .role(UserType.ADMIN)
+                    .department(request.getDepartment() != null ? request.getDepartment() : "General")
+                    .enabled(true) // Admins enabled by default for testing, or set to false if OTP is required
+                    .credentialsNonExpired(true)
+                    .build();
+
+            userRepository.save(admin);
+
         } else if (request.getUserType() == UserType.PROVIDER) {
 
             if (providerRepository.existsByNationalId(request.getNationalId())) {

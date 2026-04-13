@@ -65,8 +65,8 @@ public class AuthController {
 
     @PostMapping("/verify-otp")
     public ResponseEntity<String> verifyOtp(
-            @RequestParam String email,
-            @RequestParam String otp) {
+            @RequestParam("email") String email,
+            @RequestParam("otp") String otp) {
 
         boolean valid = otpService.validateOtp(email, otp);
 

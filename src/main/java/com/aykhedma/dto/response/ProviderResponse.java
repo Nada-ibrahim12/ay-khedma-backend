@@ -42,4 +42,5 @@ public class ProviderResponse {
     private ScheduleResponse schedule;
     private Double serviceAreaRadius;
     private String area;
+    private String rejectionReason;
 }

@@ -170,6 +170,28 @@ public class NotificationService {
         emailService.sendSimpleEmail(email, subject, content);
     }
 
+    public void sendProviderRejectionEmail(String email, String reason) {
+        String subject = "AyKhedma - Application Status Update";
+        String content = "Dear Provider,\n\n" +
+                "We regret to inform you that your registration application has been rejected for the following reason:\n\n" +
+                "\"" + reason + "\"\n\n" +
+                "Please address these issues and update your profile or contact support for more details.\n\n" +
+                "Best regards,\n" +
+                "AyKhedma Team";
+        emailService.sendSimpleEmail(email, subject, content);
+    }
+
+    public void sendProviderApprovalEmail(String email) {
+        String subject = "AyKhedma - Account Approved!";
+        String content = "Dear Provider,\n\n" +
+                "Congratulations! Your registration application has been reviewed and approved.\n\n" +
+                "Your account is now fully active, and you can start receiving booking requests on the platform.\n\n" +
+                "Welcome to the AyKhedma family!\n\n" +
+                "Best regards,\n" +
+                "AyKhedma Team";
+        emailService.sendSimpleEmail(email, subject, content);
+    }
+
     private String getEmailTemplate(NotificationType type) {
         switch (type) {
             case BOOKING_CONFIRMATION:
