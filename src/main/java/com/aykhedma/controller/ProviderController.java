@@ -14,10 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -431,5 +428,15 @@ public class ProviderController {
                                 keyword, categoryId, categoryName, consumerId, radius, sortBy, pageable);
 
                 return ResponseEntity.ok(page);
+        }
+        @GetMapping("/top-rated-near-me")
+        public ResponseEntity<Page<SearchResponse>> topRatedNearMe(
+                @RequestParam Long consumerId,
+                @RequestParam(defaultValue = "10.0") Double radius,
+                Pageable pageable
+        ) {
+                return ResponseEntity.ok(
+                        providerService.topRatedNearMe(consumerId, radius, PageRequest.of(0, 10))
+                );
         }
 }

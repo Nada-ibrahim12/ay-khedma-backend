@@ -380,6 +380,62 @@ public class ProviderServiceImpl implements ProviderService {
                         .collect(Collectors.toList());
         }
     }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
+
+        Page<Provider> providersPage =
+                providerRepository.searchProviders(null, null, null, Pageable.unpaged());
+
+        List<SearchResponse> ranked = providersPage.getContent().stream()
+                .filter(p -> p.getLocation() != null)
+                .map(provider -> {
+
+                    try {
+                        double distance = locationService
+                                .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
+                                .getDistanceKm();
+
+                        if (distance > radius) return null;
+
+                        SearchResponse res = providerMapper.toSearchResponse(provider);
+
+                        res.setDistance(distance);
+                        res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
+
+
+                        double score = calculateScore(provider, distance);
+                        res.setScore(score);
+
+                        return res;
+
+                    } catch (Exception e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
+                .toList();
+
+        return toPage(ranked, pageable);
+    }
+    private double calculateScore(Provider p, double distance) {
+
+        double ratingWeight = 0.5;
+        double distanceWeight = 0.3;
+        double experienceWeight = 0.2;
+
+        double ratingScore = (p.getAverageRating() != null ? p.getAverageRating() : 0) * 20;
+
+        double distanceScore = Math.max(0, 100 - (distance * 10));
+
+
+        double experienceScore = (p.getCompletedJobs() != null ? p.getCompletedJobs() : 0) / 10.0;
+
+        return (ratingScore * ratingWeight)
+                + (distanceScore * distanceWeight)
+                + (experienceScore * experienceWeight);
+    }
 
     @Override
     @Transactional

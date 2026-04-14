@@ -39,7 +39,7 @@ public interface ProviderService {
             Double radius,
             String sortBy,
             Pageable pageable);
-
+    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable);
     // Schedule Management
     ScheduleResponse addWorkingDay(Long providerId, WorkingDayRequest request);
 
