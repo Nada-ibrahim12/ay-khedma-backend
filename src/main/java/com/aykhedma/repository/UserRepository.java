@@ -25,4 +25,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u WHERE u.email = :email AND u.enabled = true")
     Optional<User> findActiveUserByEmail(@Param("email") String email);
+
+    @Query("SELECT u FROM User u WHERE " +
+            "(:role IS NULL OR u.role = :role) AND " +
+            "(:status IS NULL OR u.enabled = :status) AND " +
+            "(CAST(:startDate AS timestamp) IS NULL OR u.createdAt >= :startDate) AND " +
+            "(CAST(:endDate AS timestamp) IS NULL OR u.createdAt <= :endDate)")
+    org.springframework.data.domain.Page<User> searchUsers(
+            @Param("role") UserType role,
+            @Param("status") Boolean status,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate,
+            org.springframework.data.domain.Pageable pageable);
 }

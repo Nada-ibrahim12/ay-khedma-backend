@@ -5,6 +5,7 @@ import com.aykhedma.dto.request.ProviderProfileRequest;
 import com.aykhedma.dto.response.ConsumerResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.ProviderSummaryResponse;
+import com.aykhedma.dto.response.UserResponse;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
@@ -81,4 +82,7 @@ public interface UserMapper {
     @Mapping(source = "priceType", target = "priceType")
     @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")
     ProviderSummaryResponse toSummaryResponse(Provider provider);
+
+    // UserResponse mapping
+    UserResponse toUserResponse(User user);
 }

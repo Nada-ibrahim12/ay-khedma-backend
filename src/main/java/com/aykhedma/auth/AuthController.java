@@ -74,18 +74,14 @@ public class AuthController {
             throw new BadRequestException("Invalid OTP");
         }
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        user.setEnabled(true);
-        userRepository.save(user);
+        authService.verifyOtp(email, otp);
 
         return ResponseEntity.ok("Account verified");
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(
-            @RequestParam String refreshToken) {
+            @RequestParam("refreshToken") String refreshToken) {
 
         RefreshToken token = refreshTokenService.verify(refreshToken);
 
@@ -110,7 +106,7 @@ public class AuthController {
     }
 
     @PostMapping("/send-otp")
-    public ResponseEntity<String> sendOtp(@RequestParam String email) {
+    public ResponseEntity<String> sendOtp(@RequestParam("email") String email) {
 
         userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));

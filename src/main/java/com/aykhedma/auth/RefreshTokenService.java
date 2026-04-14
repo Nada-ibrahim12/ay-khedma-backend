@@ -50,6 +50,10 @@ public class RefreshTokenService {
             throw new RuntimeException("Expired refresh token. Please login again.");
         }
 
+        if (!refreshToken.getUser().isEnabled()) {
+            throw new RuntimeException("Account is suspended. Please contact support.");
+        }
+
         return refreshToken;
     }
 

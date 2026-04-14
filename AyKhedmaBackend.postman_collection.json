@@ -1,0 +1,700 @@
+{
+  "info": {
+    "name": "Ay-Khedma Backend API",
+    "description": "Complete API testing collection for Ay-Khedma Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register Consumer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"Password123\",\n  \"phoneNumber\": \"01012345678\",\n  \"userType\": \"CONSUMER\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register Provider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ahmed Electrician\",\n  \"email\": \"ahmed@providers.com\",\n  \"password\": \"Password123\",\n  \"phoneNumber\": \"01098765432\",\n  \"userType\": \"PROVIDER\",\n  \"serviceType\": \"ELECTRICAL\",\n  \"city\": \"Cairo\",\n  \"serviceArea\": \"Zamalek\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emailOrPhone\": \"john@example.com\",\n  \"password\": \"Password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Consumers",
+      "item": [
+        {
+          "name": "Get Consumer Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/consumers/2",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "consumers", "2"]
+            }
+          }
+        },
+        {
+          "name": "Get My Consumer Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/consumers/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "consumers", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update My Consumer Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Updated Doe\",\n  \"phoneNumber\": \"01987654321\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/consumers/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "consumers", "me"]
+            }
+          }
+        },
+        {
+          "name": "Save Provider to Favorites",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/consumers/me/saved-providers/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "consumers", "me", "saved-providers", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get My Saved Providers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/consumers/me/saved-providers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "consumers", "me", "saved-providers"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Providers",
+      "item": [
+        {
+          "name": "Get Provider Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/providers/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "providers", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get My Provider Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/providers/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "providers", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update My Provider Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Professional electrician with 15 years experience\",\n  \"serviceType\": \"ELECTRICAL_AND_PLUMBING\",\n  \"phoneNumber\": \"01987654321\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/providers/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "providers", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get Provider Schedule",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/providers/1/schedule",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "providers", "1", "schedule"]
+            }
+          }
+        },
+        {
+          "name": "Add Working Day",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dayOfWeek\": \"MONDAY\",\n  \"startTime\": \"08:00\",\n  \"endTime\": \"18:00\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/providers/me/schedule/working-days",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "providers", "me", "schedule", "working-days"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Request Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": 1,\n  \"requestedDate\": \"2026-04-15\",\n  \"requestedStartTime\": \"10:00\",\n  \"problemDescription\": \"My electrical outlets are not working\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bookings/request-booking",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "request-booking"]
+            }
+          }
+        },
+        {
+          "name": "Accept Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": 10,\n  \"estimatedDuration\": 120\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bookings/accept-booking",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "accept-booking"]
+            }
+          }
+        },
+        {
+          "name": "Decline Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bookings/decline-booking/10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "decline-booking", "10"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": 10,\n  \"cancellationReason\": \"Provider is not available\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bookings/cancel-booking",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "cancel-booking"]
+            }
+          }
+        },
+        {
+          "name": "Get Bookings by Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bookings/get-bookings?status=PENDING&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "get-bookings"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Upcoming Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bookings/upcoming-bookings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bookings", "upcoming-bookings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications?page=0&size=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/unread/count",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "notifications", "unread", "count"]
+            }
+          }
+        },
+        {
+          "name": "Get Single Notification",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "notifications", "100"]
+            }
+          }
+        },
+        {
+          "name": "Mark Single as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/100/read",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "notifications", "100", "read"]
+            }
+          }
+        },
+        {
+          "name": "Mark Multiple as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationIds\": [100, 101, 102]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/read-batch",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "notifications", "read-batch"]
+            }
+          }
+        },
+        {
+          "name": "Mark All as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/read-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "notifications", "read-all"]
+            }
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/100",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "notifications", "100"]
+            }
+          }
+        },
+        {
+          "name": "Send Test Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 1,\n  \"title\": \"Test Notification\",\n  \"content\": \"This is a test notification\",\n  \"type\": \"BOOKING_CONFIRMATION\",\n  \"sendInApp\": true,\n  \"sendPush\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/test/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "notifications", "test", "send"]
+            }
+          }
+        },
+        {
+          "name": "Send Email Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 1,\n  \"title\": \"Email Notification\",\n  \"content\": \"This is an email notification\",\n  \"type\": \"BOOKING_CONFIRMATION\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/notifications/send-email?email=test@example.com",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "notifications", "send-email"],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "test@example.com"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Locations",
+      "item": [
+        {
+          "name": "Save Consumer Location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 30.0444,\n  \"longitude\": 31.2357,\n  \"address\": \"123 Main St, Cairo\",\n  \"city\": \"Cairo\",\n  \"postalCode\": \"11511\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/locations/consumer/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "locations", "consumer", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update Consumer Location",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 30.0555,\n  \"longitude\": 31.2500,\n  \"address\": \"456 New St, Cairo\",\n  \"city\": \"Cairo\",\n  \"postalCode\": \"11512\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/locations/consumer/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "locations", "consumer", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get My Consumer Location",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/locations/consumers/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "locations", "consumers", "me"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": "1"
+    }
+  ]
+}

@@ -53,6 +53,10 @@ public class AuthService {
             throw new UnauthorizedException("Invalid credentials");
         }
 
+        if (!user.isEnabled()) {
+            throw new UnauthorizedException("Your account is suspended. Please contact support.");
+        }
+
         // 🔹 Generate access token
         String jwt = jwtService.generateToken(user);
 
@@ -70,6 +74,14 @@ public class AuthService {
                 .role(user.getRole())
                 .verified(user.isEnabled())
                 .build();
+    }
+
+    public void verifyOtp(String email, String otp) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setEnabled(true);
+        userRepository.save(user);
     }
 
     public void register(RegisterRequest request) {
