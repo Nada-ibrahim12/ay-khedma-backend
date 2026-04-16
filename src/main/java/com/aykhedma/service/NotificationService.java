@@ -192,6 +192,16 @@ public class NotificationService {
         emailService.sendSimpleEmail(email, subject, content);
     }
 
+    public void sendProviderBlockedEmail(String email) {
+        String subject = "AyKhedma - Account Status Update";
+        String content = "Dear Provider,\n\n" +
+                "We are writing to inform you that your provider account has been blocked due to a violation of our platform rules.\n\n" +
+                "If you believe this is a mistake, please contact our support team.\n\n" +
+                "Best regards,\n" +
+                "AyKhedma Team";
+        emailService.sendSimpleEmail(email, subject, content);
+    }
+
     private String getEmailTemplate(NotificationType type) {
         switch (type) {
             case BOOKING_CONFIRMATION:

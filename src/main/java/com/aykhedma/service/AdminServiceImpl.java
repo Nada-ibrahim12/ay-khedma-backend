@@ -89,6 +89,16 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    public Page<ProviderResponse> searchProviders(
+            String keyword, VerificationStatus status, 
+            Boolean enabled, Pageable pageable) {
+        
+        Page<Provider> providers = providerRepository.findAllProvidersForAdmin(keyword, status, enabled, pageable);
+        
+        return providers.map(providerMapper::toProviderResponse);
+    }
+
+    @Override
     @Transactional
     public UserResponse updateUser(Long userId, UpdateUserRequest request) {
         User user = userRepository.findById(userId)
@@ -120,6 +130,11 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
         user.setEnabled(false);
+        
+        if (user instanceof Provider) {
+            notificationService.sendProviderBlockedEmail(user.getEmail());
+        }
+        
         return userMapper.toUserResponse(user);
     }
 

@@ -4,6 +4,7 @@ import com.aykhedma.dto.request.UpdateUserRequest;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
 import com.aykhedma.model.user.UserType;
+import com.aykhedma.model.user.VerificationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -22,6 +23,12 @@ public interface AdminService {
             Boolean status,
             LocalDateTime startDate,
             LocalDateTime endDate,
+            Pageable pageable);
+
+    Page<ProviderResponse> searchProviders(
+            String keyword,
+            VerificationStatus status,
+            Boolean enabled,
             Pageable pageable);
     
     UserResponse updateUser(Long userId, UpdateUserRequest request);

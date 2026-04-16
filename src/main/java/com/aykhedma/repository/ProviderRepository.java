@@ -83,4 +83,20 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
         @Modifying
         @Query("UPDATE Provider p SET p.cancelledBookings = p.cancelledBookings + 1 WHERE p.id = :providerId")
         void incrementCancelledBookings(@Param("providerId") Long providerId);
+
+        @Query("SELECT p FROM Provider p " +
+                "LEFT JOIN p.serviceType s " +
+                "LEFT JOIN s.category c " +
+                "WHERE (:status IS NULL OR p.verificationStatus = :status) " +
+                "AND (:enabled IS NULL OR p.enabled = :enabled) " +
+                "AND (:keyword IS NULL OR :keyword = '' OR " +
+                "    LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                "    LOWER(p.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                "    LOWER(p.phoneNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                "    LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+        Page<Provider> findAllProvidersForAdmin(
+                @Param("keyword") String keyword,
+                @Param("status") VerificationStatus status,
+                @Param("enabled") Boolean enabled,
+                Pageable pageable);
 }

@@ -87,8 +87,6 @@ public class AuthService {
         userRepository.save(user);
     }
 
-
-
     @Transactional
     public void register(RegisterRequest request,
             MultipartFile nationalIdFrontImage,
@@ -214,10 +212,11 @@ public class AuthService {
                         "National ID Front");
                 saveNationalIdDocument(savedProvider, nationalIdBackImage, backImageUrl, "NATIONAL_ID",
                         "National ID Back");
-                
+
                 if (documents != null && !documents.isEmpty()) {
                     for (MultipartFile file : documents) {
-                        if (file == null || file.isEmpty()) continue;
+                        if (file == null || file.isEmpty())
+                            continue;
 
                         String fileUrl = fileStorageService.storeFile(file, folderName);
 
@@ -250,26 +249,29 @@ public class AuthService {
             }
         }
     }
-private void validateProviderDocuments(ServiceType serviceType,
-                                           MultipartFile front,
-                                           MultipartFile back,
-                                           List<MultipartFile> documents) {
 
-    if (front == null || front.isEmpty()) {
-        throw new BadRequestException("National ID front image is required");
-    }
+    private void validateProviderDocuments(ServiceType serviceType,
+            MultipartFile front,
+            MultipartFile back,
+            List<MultipartFile> documents) {
 
-    if (back == null || back.isEmpty()) {
-        throw new BadRequestException("National ID back image is required");
-    }
+        if (front == null || front.isEmpty()) {
+            throw new BadRequestException("National ID front image is required");
+        }
 
-    if (serviceType.getRiskLevel() == RiskLevel.HIGH) {
-        boolean hasValidDocument = documents != null && documents.stream().anyMatch(doc -> doc != null && !doc.isEmpty());
-        if (!hasValidDocument) {
-            throw new BadRequestException("You must upload additional documents for HIGH risk services");
+        if (back == null || back.isEmpty()) {
+            throw new BadRequestException("National ID back image is required");
+        }
+
+        if (serviceType.getRiskLevel() == RiskLevel.HIGH) {
+            boolean hasValidDocument = documents != null
+                    && documents.stream().anyMatch(doc -> doc != null && !doc.isEmpty());
+            if (!hasValidDocument) {
+                throw new BadRequestException("You must upload additional documents for HIGH risk services");
+            }
         }
     }
-}
+
     private void saveNationalIdDocument(Provider provider,
             MultipartFile sourceFile,
             String fileUrl,

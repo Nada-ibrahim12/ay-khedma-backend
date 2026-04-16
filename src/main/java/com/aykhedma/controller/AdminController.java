@@ -7,6 +7,7 @@ import com.aykhedma.dto.request.UpdateUserRequest;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
 import com.aykhedma.model.user.UserType;
+import com.aykhedma.model.user.VerificationStatus;
 import com.aykhedma.service.AdminService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,27 @@ public class AdminController {
             @PathVariable Long id, 
             @Valid @RequestBody RejectProviderRequest request) {
         return ResponseEntity.ok(adminService.rejectProvider(id, request.getReason()));
+    }
+
+    @GetMapping("/providers")
+    public ResponseEntity<Page<ProviderResponse>> searchProviders(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) VerificationStatus status,
+            @RequestParam(required = false) Boolean enabled,
+            Pageable pageable) {
+        return ResponseEntity.ok(adminService.searchProviders(keyword, status, enabled, pageable));
+    }
+
+    @PutMapping("/providers/{id}/block")
+    public ResponseEntity<Void> blockProvider(@PathVariable Long id) {
+        adminService.suspendUser(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/providers/{id}/unblock")
+    public ResponseEntity<Void> unblockProvider(@PathVariable Long id) {
+        adminService.reactivateUser(id);
+        return ResponseEntity.noContent().build();
     }
 
     // --- User Management Endpoints ---
