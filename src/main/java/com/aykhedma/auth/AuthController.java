@@ -21,6 +21,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -47,7 +49,8 @@ public class AuthController {
     public ResponseEntity<String> register(
             @Valid @RequestBody RegisterRequest request) {
 
-        authService.register(request);
+        authService.register(request, null, null, null);
+
         otpService.generateOtp(request.getEmail());
         return ResponseEntity.ok("Registered successfully. OTP sent to your email.");
     }
@@ -56,9 +59,11 @@ public class AuthController {
     public ResponseEntity<String> registerWithNationalIdImages(
             @Valid @ModelAttribute RegisterRequest request,
             @RequestParam(value = "nationalIdFrontImage", required = false) MultipartFile nationalIdFrontImage,
-            @RequestParam(value = "nationalIdBackImage", required = false) MultipartFile nationalIdBackImage) {
+            @RequestParam(value = "nationalIdBackImage", required = false) MultipartFile nationalIdBackImage,
+            @RequestParam(value = "documents", required = false) List<MultipartFile> documents
+        ) {
 
-        authService.register(request, nationalIdFrontImage, nationalIdBackImage);
+        authService.register(request, nationalIdFrontImage, nationalIdBackImage, documents);
         otpService.generateOtp(request.getEmail());
         return ResponseEntity.ok("Registered successfully. OTP sent to your email.");
     }

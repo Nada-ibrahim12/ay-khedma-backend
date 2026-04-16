@@ -63,7 +63,7 @@ public class AdminController {
 
     @PostMapping("/users")
     public ResponseEntity<String> addUser(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request);
+        authService.register(request, null, null, null);
         return ResponseEntity.ok("User created successfully");
     }
 
