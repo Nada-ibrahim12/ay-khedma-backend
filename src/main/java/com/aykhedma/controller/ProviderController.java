@@ -430,9 +430,24 @@ public class ProviderController {
                 return ResponseEntity.ok(page);
         }
         @GetMapping("/top-rated-near-me")
+        @Operation(summary = "Get top 10 top-rated providers near the consumer based on location and scoring system")
+        @PreAuthorize("hasRole('CONSUMER')")
+        @ApiResponses(value = {
+                @ApiResponse(responseCode = "200", description = "Top rated providers fetched successfully"),
+                @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+                @ApiResponse(responseCode = "404", description = "Consumer not found"),
+                @ApiResponse(responseCode = "500", description = "Internal server error")
+        })
+
         public ResponseEntity<Page<SearchResponse>> topRatedNearMe(
+
+                @Parameter(description = "Consumer ID for location-based search", required = true)
                 @RequestParam Long consumerId,
+
+                @Parameter(description = "Search radius in kilometers (default = 10 km)")
                 @RequestParam(defaultValue = "10.0") Double radius,
+
+                @Parameter(hidden = true)
                 Pageable pageable
         ) {
                 return ResponseEntity.ok(

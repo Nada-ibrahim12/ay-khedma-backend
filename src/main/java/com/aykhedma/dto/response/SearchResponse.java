@@ -25,7 +25,7 @@ public class SearchResponse {
     @JsonIgnore
     private Integer completedJobs;
     private Double price;
-    //private PriceType priceType;
+    private PriceType priceType;
     @JsonIgnore
     private Double distance;
     private Integer estimatedArrivalTime;
