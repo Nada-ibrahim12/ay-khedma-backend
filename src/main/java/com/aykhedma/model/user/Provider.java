@@ -58,7 +58,7 @@ public class Provider extends User {
 
     @Builder.Default
     @Min(value = 0, message = "Total requests cannot be negative")
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "integer default 0")
     private Integer totalRequests = 0;
 
     @NotNull(message = "Service type is required")
@@ -123,10 +123,12 @@ public class Provider extends User {
     @Builder.Default
     @DecimalMin(value = "0.0", message = "Average interaction rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average interaction rating cannot exceed 5.0")
+    @Column(nullable = false, columnDefinition = "double precision default 0.0")
     private Double averageInteractionRating = 0.0;
 
     @Builder.Default
     @Min(value = 0, message = "Interaction rating count cannot be negative")
+    @Column(nullable = false, columnDefinition = "integer default 0")
     private Integer interactionRatingCount = 0;
 
     @Builder.Default
