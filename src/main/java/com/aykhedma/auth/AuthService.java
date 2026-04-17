@@ -10,6 +10,7 @@ import com.aykhedma.model.document.Document;
 import com.aykhedma.model.booking.Schedule;
 import com.aykhedma.model.location.Location;
 import com.aykhedma.model.service.PriceType;
+import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.*;
 import com.aykhedma.repository.DocumentRepository;
@@ -24,7 +25,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 
 @Service
@@ -53,6 +56,10 @@ public class AuthService {
             throw new UnauthorizedException("Invalid credentials");
         }
 
+        if (!user.isEnabled()) {
+            throw new UnauthorizedException("Your account is suspended. Please contact support.");
+        }
+
         // 🔹 Generate access token
         String jwt = jwtService.generateToken(user);
 
@@ -72,13 +79,19 @@ public class AuthService {
                 .build();
     }
 
-    public void register(RegisterRequest request) {
-        register(request, null, null);
+    public void verifyOtp(String email, String otp) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setEnabled(true);
+        userRepository.save(user);
     }
 
+    @Transactional
     public void register(RegisterRequest request,
             MultipartFile nationalIdFrontImage,
-            MultipartFile nationalIdBackImage) {
+            MultipartFile nationalIdBackImage,
+            List<MultipartFile> documents) {
 
         if (userRepository.existsByEmail(request.getEmail()))
             throw new RuntimeException("Email already exists");
@@ -112,6 +125,21 @@ public class AuthService {
 
             userRepository.save(consumer);
 
+        } else if (request.getUserType() == UserType.ADMIN) {
+
+            Admin admin = Admin.builder()
+                    .name(request.getName())
+                    .email(request.getEmail())
+                    .phoneNumber(request.getPhoneNumber())
+                    .password(encodedPassword)
+                    .role(UserType.ADMIN)
+                    .department(request.getDepartment() != null ? request.getDepartment() : "General")
+                    .enabled(true) // Admins enabled by default for testing, or set to false if OTP is required
+                    .credentialsNonExpired(true)
+                    .build();
+
+            userRepository.save(admin);
+
         } else if (request.getUserType() == UserType.PROVIDER) {
 
             if (providerRepository.existsByNationalId(request.getNationalId())) {
@@ -143,14 +171,9 @@ public class AuthService {
             String backImageUrl = null;
 
             try {
-                if (nationalIdFrontImage != null && !nationalIdFrontImage.isEmpty()) {
-                    frontImageUrl = fileStorageService.storeFile(nationalIdFrontImage, "national-id-images");
-                }
+                validateProviderDocuments(serviceType, nationalIdFrontImage, nationalIdBackImage, documents);
 
-                if (nationalIdBackImage != null && !nationalIdBackImage.isEmpty()) {
-                    backImageUrl = fileStorageService.storeFile(nationalIdBackImage, "national-id-images");
-                }
-
+                // Build provider first to generate ID
                 Provider provider = Provider.builder()
                         .name(request.getName())
                         .email(request.getEmail())
@@ -165,18 +188,48 @@ public class AuthService {
                         .serviceType(serviceType)
                         .location(location)
                         .nationalId(request.getNationalId())
-                        .nationalIdFrontImage(frontImageUrl)
-                        .nationalIdBackImage(backImageUrl)
                         .price(request.getPrice())
                         .priceType(priceType)
                         .schedule(schedule)
                         .build();
 
                 Provider savedProvider = (Provider) userRepository.save(provider);
+                String folderName = savedProvider.getId().toString();
+
+                if (nationalIdFrontImage != null && !nationalIdFrontImage.isEmpty()) {
+                    frontImageUrl = fileStorageService.storeFile(nationalIdFrontImage, folderName);
+                }
+
+                if (nationalIdBackImage != null && !nationalIdBackImage.isEmpty()) {
+                    backImageUrl = fileStorageService.storeFile(nationalIdBackImage, folderName);
+                }
+
+                savedProvider.setNationalIdFrontImage(frontImageUrl);
+                savedProvider.setNationalIdBackImage(backImageUrl);
+                savedProvider = (Provider) userRepository.save(savedProvider);
+
                 saveNationalIdDocument(savedProvider, nationalIdFrontImage, frontImageUrl, "NATIONAL_ID",
                         "National ID Front");
                 saveNationalIdDocument(savedProvider, nationalIdBackImage, backImageUrl, "NATIONAL_ID",
                         "National ID Back");
+
+                if (documents != null && !documents.isEmpty()) {
+                    for (MultipartFile file : documents) {
+                        if (file == null || file.isEmpty())
+                            continue;
+
+                        String fileUrl = fileStorageService.storeFile(file, folderName);
+
+                        Document doc = Document.builder()
+                                .title(file.getOriginalFilename())
+                                .type("CERTIFICATE") // later make dynamic
+                                .filePath(fileUrl)
+                                .provider(savedProvider)
+                                .build();
+
+                        documentRepository.save(doc);
+                    }
+                }
             } catch (IOException e) {
                 if (frontImageUrl != null) {
                     fileStorageService.deleteFile(frontImageUrl);
@@ -193,6 +246,28 @@ public class AuthService {
                     fileStorageService.deleteFile(backImageUrl);
                 }
                 throw e;
+            }
+        }
+    }
+
+    private void validateProviderDocuments(ServiceType serviceType,
+            MultipartFile front,
+            MultipartFile back,
+            List<MultipartFile> documents) {
+
+        if (front == null || front.isEmpty()) {
+            throw new BadRequestException("National ID front image is required");
+        }
+
+        if (back == null || back.isEmpty()) {
+            throw new BadRequestException("National ID back image is required");
+        }
+
+        if (serviceType.getRiskLevel() == RiskLevel.HIGH) {
+            boolean hasValidDocument = documents != null
+                    && documents.stream().anyMatch(doc -> doc != null && !doc.isEmpty());
+            if (!hasValidDocument) {
+                throw new BadRequestException("You must upload additional documents for HIGH risk services");
             }
         }
     }

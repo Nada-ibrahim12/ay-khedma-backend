@@ -56,6 +56,11 @@ public class Provider extends User {
     @Column(nullable = false)
     private Integer cancelledBookings = 0;
 
+    @Builder.Default
+    @Min(value = 0, message = "Total requests cannot be negative")
+    @Column(nullable = false)
+    private Integer totalRequests = 0;
+
     @NotNull(message = "Service type is required")
     @ManyToOne
     @JoinColumn(name = "service_type_id", nullable = false)
@@ -95,10 +100,34 @@ public class Provider extends User {
     private Schedule schedule;
 
     @Builder.Default
+    @DecimalMin(value = "0.0", message = "Average punctuality cannot be negative")
+    @DecimalMax(value = "5.0", message = "Average punctuality cannot exceed 5.0")
+    private Double averagePunctualityRating = 0.0;
+
+    @Builder.Default
+    @DecimalMin(value = "0.0", message = "Average commitment cannot be negative")
+    @DecimalMax(value = "5.0", message = "Average commitment cannot exceed 5.0")
+    private Double averageCommitmentRating = 0.0;
+
+    @Builder.Default
+    @DecimalMin(value = "0.0", message = "Average quality cannot be negative")
+    @DecimalMax(value = "5.0", message = "Average quality cannot exceed 5.0")
+    private Double averageQualityOfWorkRating = 0.0;
+
+    @Builder.Default
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average rating cannot exceed 5.0")
     // @Column(precision = 3, scale = 2)
     private Double averageRating = 0.0;
+
+    @Builder.Default
+    @DecimalMin(value = "0.0", message = "Average interaction rating cannot be negative")
+    @DecimalMax(value = "5.0", message = "Average interaction rating cannot exceed 5.0")
+    private Double averageInteractionRating = 0.0;
+
+    @Builder.Default
+    @Min(value = 0, message = "Interaction rating count cannot be negative")
+    private Integer interactionRatingCount = 0;
 
     @Builder.Default
     @Min(value = 0, message = "Booking rate cannot be negative")
@@ -132,4 +161,15 @@ public class Provider extends User {
     @Min(value = 0, message = "Response time cannot be negative")
     @Max(value = 60, message = "Response time cannot exceed 60 minutes")
     private Integer responseTime;
+
+    @Size(max = 500, message = "Rejection reason cannot exceed 500 characters")
+    @Column(length = 500)
+    private String rejectionReason;
+
+    public Double getCancellationRate() {
+        if (totalBookings == null || totalBookings == 0) {
+            return 0.0;
+        }
+        return Math.round(((double) cancelledBookings / totalBookings) * 100.0 * 10.0) / 10.0;
+    }
 }

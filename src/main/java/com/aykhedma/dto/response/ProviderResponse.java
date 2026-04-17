@@ -33,13 +33,21 @@ public class ProviderResponse {
     private Long serviceTypeId;
     private LocationDTO location;
     private Boolean emergencyEnabled;
+    private Double averagePunctualityRating;
+    private Double averageCommitmentRating;
+    private Double averageQualityOfWorkRating;
     private Double averageRating;
     private Double price;
     private PriceType priceType;
     private Integer averageTime;
     private Integer acceptanceRate;
+    private Double cancellationRate;
+    private Double averageInteractionRating;
+    private Integer interactionRatingCount;
+    private List<CancellationResponse> cancellationHistory;
     private List<DocumentResponse> documents;
     private ScheduleResponse schedule;
     private Double serviceAreaRadius;
     private String area;
+    private String rejectionReason;
 }

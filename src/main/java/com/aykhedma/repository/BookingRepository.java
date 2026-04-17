@@ -47,6 +47,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
     @Query("SELECT AVG(b.consumerRating) FROM Booking b WHERE b.provider.id = :providerId AND b.consumerRating IS NOT NULL")
     Double getAverageRatingForProvider(@Param("providerId") Long providerId);
 
+    long countByProviderIdAndConsumerRatingIsNotNull(Long providerId);
+
+    long countByConsumerIdAndProviderRatingIsNotNull(Long consumerId);
+
     @Query("SELECT b FROM Booking b WHERE b.provider.id = :providerId AND b.status = 'COMPLETED' ORDER BY b.completedAt DESC")
     List<Booking> findRecentCompletedBookings(@Param("providerId") Long providerId, Pageable pageable);
 
@@ -79,4 +83,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
             "AND (b.requestedDate < :date " +
             "OR (b.requestedDate = :date AND b.requestedStartTime < :time))")
     void expirePendingBookings(@Param("date") LocalDate date, @Param("time") LocalTime time);
+
+    @Query("SELECT b FROM Booking b WHERE b.status = 'ACCEPTED' " +
+            "AND (b.consumerRating IS NULL OR b.providerRating IS NULL) " +
+            "AND (b.requestedDate < :date OR (b.requestedDate = :date AND b.requestedStartTime <= :time))")
+    List<Booking> findBookingsNeedingRating(@Param("date") LocalDate date, @Param("time") LocalTime time);
 }

@@ -18,6 +18,9 @@ public class SearchResponse {
     private String serviceType;
     private String serviceTypeAr;
     private String categoryName;
+    private Double averagePunctualityRating;
+    private Double averageCommitmentRating;
+    private Double averageQualityOfWorkRating;
     private Double averageRating;
 
     @JsonIgnore

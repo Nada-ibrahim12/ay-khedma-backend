@@ -24,4 +24,8 @@ public interface BookingService
     Page<BookingResponse> getBookingsByStatus (Long userId, BookingStatus status, Pageable pageable);
 
     List<BookingResponse> getUpcomingBookings (Long userId);
+
+    BookingResponse submitRating(Long consumerId, com.aykhedma.dto.request.RatingRequest ratingRequest);
+
+    BookingResponse submitConsumerRating(Long providerId, com.aykhedma.dto.request.ProviderRatingRequest ratingRequest);
 }

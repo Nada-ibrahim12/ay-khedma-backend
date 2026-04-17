@@ -32,4 +32,12 @@ public class BookingResponse
     private LocalDateTime cancelledAt;
     private String cancellationReason;
     private String cancelledBy;
+    
+    private Double punctualityRating;
+    private Double commitmentRating;
+    private Double qualityOfWorkRating;
+    private Double providerRating;
+    private String providerReview;
+    private Double consumerRating;
+    private String consumerReview;
 }
