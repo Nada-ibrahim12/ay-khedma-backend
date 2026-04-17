@@ -82,6 +82,9 @@ public class BookingServiceImpl implements BookingService
                 .build();
         bookingRepository.save(booking);
 
+        providerRepository.incrementTotalRequests(provider.getId());
+        updateProviderRates(provider.getId());
+
         return bookingMapper.toBookingResponse(booking);
     }
 
@@ -154,6 +157,8 @@ public class BookingServiceImpl implements BookingService
         providerRepository.incrementTotalBookings(booking.getProvider().getId());
         consumerRepository.incrementTotalBookings(booking.getConsumer().getId());
 
+        updateProviderRates(booking.getProvider().getId());
+
         return AcceptBookingResponse.builder()
                 .status("ACCEPTED")
                 .booking(bookingMapper.toBookingResponse(booking))
@@ -183,6 +188,8 @@ public class BookingServiceImpl implements BookingService
         booking.setStatus(BookingStatus.DECLINED);
         booking.setDeclinedAt(LocalDateTime.now());
         bookingRepository.save(booking);
+
+        updateProviderRates(providerId);
 
         return bookingMapper.toBookingResponse(booking);
     }
@@ -300,11 +307,18 @@ public class BookingServiceImpl implements BookingService
         if (!consumerId.equals(booking.getConsumer().getId()))
             throw new ForbiddenException("Booking does not belong to this consumer");
 
-        if (booking.getStatus() != BookingStatus.COMPLETED)
-            throw new BadRequestException("Only completed bookings can be rated");
+        LocalDateTime serviceStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
+        if (serviceStartTime.plusMinutes(30).isAfter(LocalDateTime.now()))
+            throw new BadRequestException("Rating is allowed only 30 minutes after service start");
+
+        if (booking.getStatus() == BookingStatus.CANCELLED)
+            throw new BadRequestException("Cancelled bookings cannot be rated");
+
+        if (booking.getStatus() != BookingStatus.ACCEPTED && booking.getStatus() != BookingStatus.COMPLETED)
+            throw new BadRequestException("Only accepted or completed bookings can be rated");
 
         if (booking.getConsumerRating() != null)
-            throw new BadRequestException("Booking has already been rated");
+            throw new BadRequestException("You have already rated this booking");
 
         booking.setPunctualityRating(ratingRequest.getPunctualityRating().doubleValue());
         booking.setCommitmentRating(ratingRequest.getCommitmentRating().doubleValue());
@@ -316,6 +330,13 @@ public class BookingServiceImpl implements BookingService
         booking.setConsumerRating(overallRating);
         booking.setConsumerReview(ratingRequest.getReview()); // consumerReview stores the review FROM consumer TO provider
         
+        // Mark as completed if both parties have rated
+        if (booking.getProviderRating() != null) {
+            booking.setStatus(BookingStatus.COMPLETED);
+            booking.setCompletedAt(LocalDateTime.now());
+            providerRepository.incrementCompletedJobs(booking.getProvider().getId());
+        }
+
         bookingRepository.save(booking);
 
         // Update provider averages
@@ -356,6 +377,7 @@ public class BookingServiceImpl implements BookingService
             );
         }
         providerRepository.save(provider);
+        updateProviderRates(provider.getId());
 
         return bookingMapper.toBookingResponse(booking);
     }
@@ -369,17 +391,32 @@ public class BookingServiceImpl implements BookingService
         if (!providerId.equals(booking.getProvider().getId()))
             throw new ForbiddenException("Booking does not belong to this provider");
 
-        if (booking.getStatus() != BookingStatus.COMPLETED)
-            throw new BadRequestException("Only completed bookings can be rated");
+        LocalDateTime serviceStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
+        if (serviceStartTime.plusMinutes(30).isAfter(LocalDateTime.now()))
+            throw new BadRequestException("Rating is allowed only 30 minutes after service start");
+
+        if (booking.getStatus() == BookingStatus.CANCELLED)
+            throw new BadRequestException("Cancelled bookings cannot be rated");
+
+        if (booking.getStatus() != BookingStatus.ACCEPTED && booking.getStatus() != BookingStatus.COMPLETED)
+            throw new BadRequestException("Only accepted or completed bookings can be rated");
 
         // providerRating stores score given BY provider TO consumer
         if (booking.getProviderRating() != null)
-            throw new BadRequestException("Booking has already been rated");
+            throw new BadRequestException("You have already rated this booking");
 
         booking.setProviderRating(ratingRequest.getRating().doubleValue());
         booking.setProviderReview(ratingRequest.getReview());
         
+        // Mark as completed if both parties have rated
+        if (booking.getConsumerRating() != null) {
+            booking.setStatus(BookingStatus.COMPLETED);
+            booking.setCompletedAt(LocalDateTime.now());
+            providerRepository.incrementCompletedJobs(booking.getProvider().getId());
+        }
+
         bookingRepository.save(booking);
+        updateProviderRates(booking.getProvider().getId());
 
         // Update consumer average
         Consumer consumer = booking.getConsumer();
@@ -399,5 +436,26 @@ public class BookingServiceImpl implements BookingService
         consumerRepository.save(consumer);
 
         return bookingMapper.toBookingResponse(booking);
+    }
+
+    private void updateProviderRates(Long providerId) {
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        Integer totalRequests = provider.getTotalRequests();
+        if (totalRequests != null && totalRequests > 0) {
+            // Acceptance Rate = (Accepted Bookings / Total Requests) * 100
+            // totalBookings is used as accepted count in this system
+            Integer accepted = provider.getTotalBookings();
+            provider.setAcceptanceRate((accepted * 100) / totalRequests);
+
+            // Booking Rate = (Completed Jobs / Total Requests) * 100
+            Integer completed = provider.getCompletedJobs();
+            provider.setBookingRate((completed * 100) / totalRequests);
+        } else {
+            provider.setAcceptanceRate(100);
+            provider.setBookingRate(0);
+        }
+        providerRepository.save(provider);
     }
 }

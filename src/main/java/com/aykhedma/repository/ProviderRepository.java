@@ -81,8 +81,16 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
         void incrementTotalBookings(@Param("providerId") Long providerId);
 
         @Modifying
+        @Query("UPDATE Provider p SET p.totalRequests = p.totalRequests + 1 WHERE p.id = :providerId")
+        void incrementTotalRequests(@Param("providerId") Long providerId);
+
+        @Modifying
         @Query("UPDATE Provider p SET p.cancelledBookings = p.cancelledBookings + 1 WHERE p.id = :providerId")
         void incrementCancelledBookings(@Param("providerId") Long providerId);
+
+        @Modifying
+        @Query("UPDATE Provider p SET p.completedJobs = p.completedJobs + 1 WHERE p.id = :providerId")
+        void incrementCompletedJobs(@Param("providerId") Long providerId);
 
         @Query("SELECT p FROM Provider p " +
                 "LEFT JOIN p.serviceType s " +

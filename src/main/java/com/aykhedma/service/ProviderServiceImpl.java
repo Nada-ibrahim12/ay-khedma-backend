@@ -724,6 +724,7 @@ private void validateHighRiskProvider(Provider provider) {
             }
 
             bookingRepository.save(booking);
+            providerRepository.incrementCancelledBookings(booking.getProvider().getId());
         } else {
             timeSlot.setStatus(TimeSlotStatus.AVAILABLE);
             timeSlotRepository.save(timeSlot);

@@ -61,4 +61,11 @@ public class Consumer extends User {
 
     public void updateProfile() {
     }
+
+    public Double getCancellationRate() {
+        if (totalBookings == null || totalBookings == 0) {
+            return 0.0;
+        }
+        return Math.round(((double) cancelledBookings / totalBookings) * 100.0 * 10.0) / 10.0;
+    }
 }

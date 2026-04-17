@@ -56,6 +56,11 @@ public class Provider extends User {
     @Column(nullable = false)
     private Integer cancelledBookings = 0;
 
+    @Builder.Default
+    @Min(value = 0, message = "Total requests cannot be negative")
+    @Column(nullable = false)
+    private Integer totalRequests = 0;
+
     @NotNull(message = "Service type is required")
     @ManyToOne
     @JoinColumn(name = "service_type_id", nullable = false)
@@ -116,6 +121,15 @@ public class Provider extends User {
     private Double averageRating = 0.0;
 
     @Builder.Default
+    @DecimalMin(value = "0.0", message = "Average interaction rating cannot be negative")
+    @DecimalMax(value = "5.0", message = "Average interaction rating cannot exceed 5.0")
+    private Double averageInteractionRating = 0.0;
+
+    @Builder.Default
+    @Min(value = 0, message = "Interaction rating count cannot be negative")
+    private Integer interactionRatingCount = 0;
+
+    @Builder.Default
     @Min(value = 0, message = "Booking rate cannot be negative")
     @Max(value = 100, message = "Booking rate cannot exceed 100")
     private Integer bookingRate = 0;
@@ -151,4 +165,11 @@ public class Provider extends User {
     @Size(max = 500, message = "Rejection reason cannot exceed 500 characters")
     @Column(length = 500)
     private String rejectionReason;
+
+    public Double getCancellationRate() {
+        if (totalBookings == null || totalBookings == 0) {
+            return 0.0;
+        }
+        return Math.round(((double) cancelledBookings / totalBookings) * 100.0 * 10.0) / 10.0;
+    }
 }

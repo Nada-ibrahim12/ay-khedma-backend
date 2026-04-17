@@ -24,6 +24,7 @@ public class ProviderSummaryResponse {
     private Integer completedJobs;
     private Integer totalBookings;
     private Integer cancelledBookings;
+    private Double cancellationRate;
     private Double price;
     private PriceType priceType;
     private Double distance; // in km

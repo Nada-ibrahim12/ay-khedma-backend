@@ -41,6 +41,10 @@ public class ProviderResponse {
     private PriceType priceType;
     private Integer averageTime;
     private Integer acceptanceRate;
+    private Double cancellationRate;
+    private Double averageInteractionRating;
+    private Integer interactionRatingCount;
+    private List<CancellationResponse> cancellationHistory;
     private List<DocumentResponse> documents;
     private ScheduleResponse schedule;
     private Double serviceAreaRadius;
