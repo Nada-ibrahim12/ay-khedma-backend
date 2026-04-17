@@ -290,4 +290,114 @@ public class BookingServiceImpl implements BookingService
 
         return bookings.stream().map(bookingMapper::toBookingResponse).toList();
     }
+
+    @Override
+    @Transactional
+    public BookingResponse submitRating(Long consumerId, com.aykhedma.dto.request.RatingRequest ratingRequest) {
+        Booking booking = bookingRepository.findById(ratingRequest.getBookingId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!consumerId.equals(booking.getConsumer().getId()))
+            throw new ForbiddenException("Booking does not belong to this consumer");
+
+        if (booking.getStatus() != BookingStatus.COMPLETED)
+            throw new BadRequestException("Only completed bookings can be rated");
+
+        if (booking.getConsumerRating() != null)
+            throw new BadRequestException("Booking has already been rated");
+
+        booking.setPunctualityRating(ratingRequest.getPunctualityRating().doubleValue());
+        booking.setCommitmentRating(ratingRequest.getCommitmentRating().doubleValue());
+        booking.setQualityOfWorkRating(ratingRequest.getQualityOfWorkRating().doubleValue());
+        
+        Double overallRating = (booking.getPunctualityRating() + booking.getCommitmentRating() + booking.getQualityOfWorkRating()) / 3.0;
+        // Keep to 1 decimal place
+        overallRating = Math.round(overallRating * 10.0) / 10.0;
+        booking.setConsumerRating(overallRating);
+        booking.setConsumerReview(ratingRequest.getReview()); // consumerReview stores the review FROM consumer TO provider
+        
+        bookingRepository.save(booking);
+
+        // Update provider averages
+        Provider provider = booking.getProvider();
+        // Since we are adding one more rating, we can calculate it dynamically or update using formula.
+        // Assuming completedJobs is already incremented when booking was marked COMPLETED.
+        // If not, we should probably calculate from all completed ratings.
+        long ratedBookingsCount = bookingRepository.countByProviderIdAndConsumerRatingIsNotNull(provider.getId());
+
+        if (ratedBookingsCount <= 1 || provider.getAverageRating() == null || provider.getAverageRating() == 0.0) {
+            provider.setAveragePunctualityRating(booking.getPunctualityRating());
+            provider.setAverageCommitmentRating(booking.getCommitmentRating());
+            provider.setAverageQualityOfWorkRating(booking.getQualityOfWorkRating());
+            provider.setAverageRating(overallRating);
+        } else {
+            // Because completed jobs usually include unrated ones, it's safer to use a count of rated bookings.
+            // Formula: new_avg = ((old_avg * old_count) + new_rating) / new_count
+            long oldCount = ratedBookingsCount - 1; // since this booking was already saved and is included in the count
+            // However, the count query includes this booking because we just saved it and the transaction is open.
+            if (oldCount < 1) oldCount = 1;
+
+            double oldPunctuality = provider.getAveragePunctualityRating() != null ? provider.getAveragePunctualityRating() : 0.0;
+            double oldCommitment = provider.getAverageCommitmentRating() != null ? provider.getAverageCommitmentRating() : 0.0;
+            double oldQuality = provider.getAverageQualityOfWorkRating() != null ? provider.getAverageQualityOfWorkRating() : 0.0;
+            double oldOverall = provider.getAverageRating() != null ? provider.getAverageRating() : 0.0;
+
+            provider.setAveragePunctualityRating(
+                ((oldPunctuality * oldCount) + booking.getPunctualityRating()) / ratedBookingsCount
+            );
+            provider.setAverageCommitmentRating(
+                ((oldCommitment * oldCount) + booking.getCommitmentRating()) / ratedBookingsCount
+            );
+            provider.setAverageQualityOfWorkRating(
+                ((oldQuality * oldCount) + booking.getQualityOfWorkRating()) / ratedBookingsCount
+            );
+            provider.setAverageRating(
+                ((oldOverall * oldCount) + overallRating) / ratedBookingsCount
+            );
+        }
+        providerRepository.save(provider);
+
+        return bookingMapper.toBookingResponse(booking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse submitConsumerRating(Long providerId, com.aykhedma.dto.request.ProviderRatingRequest ratingRequest) {
+        Booking booking = bookingRepository.findById(ratingRequest.getBookingId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!providerId.equals(booking.getProvider().getId()))
+            throw new ForbiddenException("Booking does not belong to this provider");
+
+        if (booking.getStatus() != BookingStatus.COMPLETED)
+            throw new BadRequestException("Only completed bookings can be rated");
+
+        // providerRating stores score given BY provider TO consumer
+        if (booking.getProviderRating() != null)
+            throw new BadRequestException("Booking has already been rated");
+
+        booking.setProviderRating(ratingRequest.getRating().doubleValue());
+        booking.setProviderReview(ratingRequest.getReview());
+        
+        bookingRepository.save(booking);
+
+        // Update consumer average
+        Consumer consumer = booking.getConsumer();
+        long ratedBookingsCount = bookingRepository.countByConsumerIdAndProviderRatingIsNotNull(consumer.getId());
+
+        if (ratedBookingsCount <= 1 || consumer.getAverageRating() == null || consumer.getAverageRating() == 0.0) {
+            consumer.setAverageRating(booking.getProviderRating());
+        } else {
+            long oldCount = ratedBookingsCount - 1;
+            if (oldCount < 1) oldCount = 1;
+
+            double oldOverall = consumer.getAverageRating() != null ? consumer.getAverageRating() : 0.0;
+            consumer.setAverageRating(
+                ((oldOverall * oldCount) + booking.getProviderRating()) / ratedBookingsCount
+            );
+        }
+        consumerRepository.save(consumer);
+
+        return bookingMapper.toBookingResponse(booking);
+    }
 }

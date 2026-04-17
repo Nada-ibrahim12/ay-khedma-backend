@@ -26,5 +26,12 @@ public interface BookingMapper
     @Mapping(source = "cancelledAt", target = "cancelledAt")
     @Mapping(source = "cancellationReason", target = "cancellationReason")
     @Mapping(source = "cancelledBy", target = "cancelledBy")
+    @Mapping(source = "consumerRating", target = "providerRating")
+    @Mapping(source = "consumerReview", target = "providerReview")
+    @Mapping(source = "providerRating", target = "consumerRating")
+    @Mapping(source = "providerReview", target = "consumerReview")
+    @Mapping(source = "punctualityRating", target = "punctualityRating")
+    @Mapping(source = "commitmentRating", target = "commitmentRating")
+    @Mapping(source = "qualityOfWorkRating", target = "qualityOfWorkRating")
     BookingResponse toBookingResponse(Booking booking);
 }

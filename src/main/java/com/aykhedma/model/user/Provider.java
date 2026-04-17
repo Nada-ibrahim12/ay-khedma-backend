@@ -95,6 +95,21 @@ public class Provider extends User {
     private Schedule schedule;
 
     @Builder.Default
+    @DecimalMin(value = "0.0", message = "Average punctuality cannot be negative")
+    @DecimalMax(value = "5.0", message = "Average punctuality cannot exceed 5.0")
+    private Double averagePunctualityRating = 0.0;
+
+    @Builder.Default
+    @DecimalMin(value = "0.0", message = "Average commitment cannot be negative")
+    @DecimalMax(value = "5.0", message = "Average commitment cannot exceed 5.0")
+    private Double averageCommitmentRating = 0.0;
+
+    @Builder.Default
+    @DecimalMin(value = "0.0", message = "Average quality cannot be negative")
+    @DecimalMax(value = "5.0", message = "Average quality cannot exceed 5.0")
+    private Double averageQualityOfWorkRating = 0.0;
+
+    @Builder.Default
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")
     @DecimalMax(value = "5.0", message = "Average rating cannot exceed 5.0")
     // @Column(precision = 3, scale = 2)

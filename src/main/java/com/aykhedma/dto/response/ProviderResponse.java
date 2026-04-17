@@ -33,6 +33,9 @@ public class ProviderResponse {
     private Long serviceTypeId;
     private LocationDTO location;
     private Boolean emergencyEnabled;
+    private Double averagePunctualityRating;
+    private Double averageCommitmentRating;
+    private Double averageQualityOfWorkRating;
     private Double averageRating;
     private Double price;
     private PriceType priceType;
