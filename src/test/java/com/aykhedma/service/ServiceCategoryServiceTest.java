@@ -2,11 +2,13 @@ package com.aykhedma.service;
 
 import com.aykhedma.dto.service.ServiceCategoryDTO;
 import com.aykhedma.dto.service.ServiceTypeDTO;
+import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.service.PriceType;
 import com.aykhedma.repository.ServiceCategoryRepository;
+import com.aykhedma.repository.ServiceTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class ServiceCategoryServiceTest {
@@ -27,6 +30,9 @@ class ServiceCategoryServiceTest {
 
     @InjectMocks
     private ServiceCategoryService service;
+
+    @Mock
+    private ServiceTypeRepository serviceTypeRepository;
 
     private ServiceCategory category;
     private ServiceType type;
@@ -126,12 +132,28 @@ class ServiceCategoryServiceTest {
     }
 
     @Test
-    @DisplayName("deleteCategory should call repository deleteById")
+    @DisplayName("deleteCategory should delete successfully when category exists")
     void testDeleteCategory() {
+
+        when(categoryRepository.existsById(1L)).thenReturn(true);
+        doNothing().when(categoryRepository).deleteById(1L);
+
         service.deleteCategory(1L);
+
+        verify(categoryRepository, times(1)).existsById(1L);
         verify(categoryRepository, times(1)).deleteById(1L);
     }
 
+    @Test
+    @DisplayName("deleteCategory should throw exception when category not found")
+    void testDeleteCategory_NotFound() {
+
+        when(categoryRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteCategory(1L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Category not found");
+    }
     @Test
     @DisplayName("countCategories should return repository count")
     void testCountCategories() {
