@@ -418,6 +418,13 @@ private void validateHighRiskProvider(Provider provider) {
     @Transactional(readOnly = true)
     public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
 
+        if (consumerId == null) {
+            throw new BadRequestException("consumerId is required");
+        }
+        if (radius == null || radius <= 0) {
+            throw new BadRequestException("radius must be greater than 0");
+        }
+
         Page<Provider> providersPage =
                 providerRepository.searchProviders(null, null, null, Pageable.unpaged());
 
@@ -443,8 +450,7 @@ private void validateHighRiskProvider(Provider provider) {
 
                         return res;
 
-                    } catch (Exception e) {
-                        return null;
+                    } catch (Exception e) { throw new BadRequestException("Distance calculation failed");
                     }
                 })
                 .filter(Objects::nonNull)

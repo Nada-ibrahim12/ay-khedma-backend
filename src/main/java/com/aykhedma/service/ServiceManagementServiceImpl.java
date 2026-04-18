@@ -1,26 +1,20 @@
 package com.aykhedma.service;
 
-
-import com.aykhedma.dto.response.*;
-import com.aykhedma.dto.service.CategoryWithServicesDTO;
+import com.aykhedma.dto.response.SearchResponse;
 import com.aykhedma.dto.service.ServiceCategoryDTO;
 import com.aykhedma.dto.service.ServiceTypeDTO;
-import com.aykhedma.dto.service.ServicesResponse;
+import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
 import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
-import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceCategoryRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
-import com.aykhedma.service.ServiceManagementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,24 +32,37 @@ public class ServiceManagementServiceImpl {
     private final ProviderRepository providerRepository;
     private final ProviderMapper providerMapper;
 
+
+
     public List<ServiceTypeDTO> getAllTypes() {
-        return typeRepository.findAll().stream()
+        return typeRepository.findAll()
+                .stream()
                 .map(this::mapToDTO)
                 .toList();
     }
 
     public ServiceTypeDTO getTypeById(Long id) {
+        validateId(id);
+
         ServiceType st = typeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Service type not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Service type not found"));
+
         return mapToDTO(st);
     }
 
     public ServiceTypeDTO createType(ServiceTypeDTO dto) {
+
+        validateType(dto);
+
+        if (typeRepository.existsByNameIgnoreCase(dto.getName())) {
+            throw new BadRequestException("SERVICE_TYPE_NAME_ALREADY_EXISTS");
+        }
+
         ServiceCategory category = categoryRepository.findById(dto.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 
         ServiceType type = ServiceType.builder()
-                .name(dto.getName())
+                .name(dto.getName().trim())
                 .nameAr(dto.getNameAr())
                 .description(dto.getDescription())
                 .category(category)
@@ -65,53 +72,51 @@ public class ServiceManagementServiceImpl {
                 .estimatedDuration(dto.getEstimatedDuration())
                 .build();
 
-        typeRepository.save(type);
-        return mapToDTO(type);
+        return mapToDTO(typeRepository.save(type));
     }
 
     public ServiceTypeDTO updateType(Long id, ServiceTypeDTO dto) {
-        ServiceType type = typeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Service type not found"));
 
-        if (dto.getName() != null) type.setName(dto.getName());
-        if (dto.getNameAr() != null) type.setNameAr(dto.getNameAr());
-        if (dto.getDescription() != null) type.setDescription(dto.getDescription());
-        if (dto.getRiskLevel() != null) type.setRiskLevel(dto.getRiskLevel());
-        if (dto.getBasePrice() != null) type.setBasePrice(dto.getBasePrice());
-        if (dto.getDefaultPriceType() != null) type.setDefaultPriceType(dto.getDefaultPriceType());
-        if (dto.getEstimatedDuration() != null) type.setEstimatedDuration(dto.getEstimatedDuration());
+        validateId(id);
+
+        ServiceType type = typeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Service type not found"));
+
+        if (dto.getName() != null &&
+                !dto.getName().equalsIgnoreCase(type.getName()) &&
+                typeRepository.existsByNameIgnoreCase(dto.getName())) {
+            throw new BadRequestException("SERVICE_TYPE_NAME_ALREADY_EXISTS");
+        }
+
+        Optional.ofNullable(dto.getName()).ifPresent(type::setName);
+        Optional.ofNullable(dto.getNameAr()).ifPresent(type::setNameAr);
+        Optional.ofNullable(dto.getDescription()).ifPresent(type::setDescription);
+        Optional.ofNullable(dto.getRiskLevel()).ifPresent(type::setRiskLevel);
+        Optional.ofNullable(dto.getBasePrice()).ifPresent(type::setBasePrice);
+        Optional.ofNullable(dto.getDefaultPriceType()).ifPresent(type::setDefaultPriceType);
+        Optional.ofNullable(dto.getEstimatedDuration()).ifPresent(type::setEstimatedDuration);
 
         if (dto.getCategoryId() != null) {
             ServiceCategory category = categoryRepository.findById(dto.getCategoryId())
-                    .orElseThrow(() -> new RuntimeException("Category not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
             type.setCategory(category);
         }
 
-        typeRepository.save(type);
-        return mapToDTO(type);
+        return mapToDTO(typeRepository.save(type));
     }
 
     public void deleteType(Long id) {
+        validateId(id);
+
+        if (!typeRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Service type not found");
+        }
+
         typeRepository.deleteById(id);
     }
 
     public long countTypes() {
         return typeRepository.countServices();
-    }
-
-    private ServiceTypeDTO mapToDTO(ServiceType st) {
-        return ServiceTypeDTO.builder()
-                .id(st.getId())
-                .name(st.getName())
-                .nameAr(st.getNameAr())
-                .description(st.getDescription())
-                .categoryId(st.getCategory().getId())
-                .categoryName(st.getCategory().getName())
-                .riskLevel(st.getRiskLevel())
-                .basePrice(st.getBasePrice())
-                .defaultPriceType(st.getDefaultPriceType())
-                .estimatedDuration(st.getEstimatedDuration())
-                .build();
     }
 
 
@@ -124,19 +129,23 @@ public class ServiceManagementServiceImpl {
                                        String sortBy,
                                        Pageable pageable) {
 
-        List<SearchResponse> fullList = searchList(keyword, categoryId, categoryName, consumerId, radius, sortBy);
-
+        List<SearchResponse> fullList =
+                searchList(keyword, categoryId, categoryName, consumerId, radius, sortBy);
 
         int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), fullList.size());
+        int end = Math.min(start + pageable.getPageSize(), fullList.size());
 
         List<SearchResponse> pageContent =
-                start >= fullList.size() ? Collections.emptyList() : fullList.subList(start, end);
+                start >= fullList.size()
+                        ? Collections.emptyList()
+                        : fullList.subList(start, end);
 
         return new PageImpl<>(pageContent, pageable, fullList.size());
     }
+
     @Transactional(readOnly = true)
-    @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy}")
+    @Cacheable(value = "searchProvidersCache",
+            key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy}")
     public List<SearchResponse> searchList(String keyword,
                                            Long categoryId,
                                            String categoryName,
@@ -144,101 +153,125 @@ public class ServiceManagementServiceImpl {
                                            Double radius,
                                            String sortBy) {
 
+        Page<Provider> providersPage =
+                providerRepository.searchProviders(keyword, categoryId, categoryName, Pageable.unpaged());
 
-        Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName, Pageable.unpaged());
+        List<Provider> providers = providersPage.getContent();
+
 
         if (consumerId == null || radius == null) {
-            List<SearchResponse> responses = providersPage.getContent()
-                    .stream()
+            return providers.stream()
                     .map(provider -> {
-                        SearchResponse response = providerMapper.toSearchResponse(provider);
-                        response.setDistance(null);
-                        response.setEstimatedArrivalTime(null);
-                        return response;
+                        SearchResponse r = providerMapper.toSearchResponse(provider);
+                        r.setDistance(null);
+                        r.setEstimatedArrivalTime(null);
+                        return r;
                     })
                     .collect(Collectors.toList());
-
-            return applySorting(responses, sortBy, null);
         }
 
-        try {
-            List<SearchResponse> filteredList = providersPage.getContent()
-                    .stream()
-                    .filter(provider -> provider.getLocation() != null)
-                    .map(provider -> {
-                        try {
-                            double distance = locationService
-                                    .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
-                                    .getDistanceKm();
+        List<SearchResponse> result = new ArrayList<>();
 
-                            if (distance > radius) return null;
+        for (Provider provider : providers) {
 
-                            SearchResponse response = providerMapper.toSearchResponse(provider);
-                            response.setDistance(Math.round(distance * 100.0) / 100.0);
-                            response.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
-                            response.setWithinServiceArea(distance <= provider.getServiceAreaRadius());
+            if (provider.getLocation() == null) continue;
 
-                            return response;
-                        } catch (Exception e) {
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
+            try {
+                double distance = locationService
+                        .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
+                        .getDistanceKm();
 
-            return applySorting(filteredList, sortBy, consumerId);
+                if (distance > radius) continue;
 
-        } catch (ResourceNotFoundException e) {
+                SearchResponse response = providerMapper.toSearchResponse(provider);
+                response.setDistance(Math.round(distance * 100.0) / 100.0);
+                response.setEstimatedArrivalTime((int) ((distance / 30.0) * 60));
+                response.setWithinServiceArea(distance <= provider.getServiceAreaRadius());
 
-            List<SearchResponse> responses = providersPage.getContent()
-                    .stream()
-                    .map(provider -> {
-                        SearchResponse response = providerMapper.toSearchResponse(provider);
-                        response.setDistance(null);
-                        response.setEstimatedArrivalTime(null);
-                        return response;
-                    })
-                    .collect(Collectors.toList());
+                result.add(response);
 
-            return applySorting(responses, sortBy, null);
+            } catch (Exception ex) {
+                // log instead of hiding silently
+                System.err.println("Distance calculation failed for provider " + provider.getId());
+            }
+        }
+
+        return applySorting(result, sortBy);
+    }
+
+
+
+    private List<SearchResponse> applySorting(List<SearchResponse> list, String sortBy) {
+
+        if (list == null || list.isEmpty()) return new ArrayList<>();
+
+        String sort = sortBy == null ? "rating" : sortBy.toLowerCase();
+
+        return switch (sort) {
+
+            case "price_low" ->
+                    list.stream().sorted(Comparator.comparing(SearchResponse::getPrice)).toList();
+
+            case "price_high" ->
+                    list.stream().sorted(Comparator.comparing(SearchResponse::getPrice).reversed()).toList();
+
+            case "experience" ->
+                    list.stream().sorted(Comparator.comparing(SearchResponse::getCompletedJobs).reversed()).toList();
+
+            case "distance" ->
+                    list.stream()
+                            .filter(r -> r.getDistance() != null)
+                            .sorted(Comparator.comparing(SearchResponse::getDistance))
+                            .toList();
+
+            default ->
+                    list.stream().sorted(
+                            Comparator.comparing(
+                                    SearchResponse::getAverageRating,
+                                    Comparator.nullsLast(Comparator.reverseOrder())
+                            )
+                    ).toList();
+        };
+    }
+
+    // ================= VALIDATION =================
+
+    private void validateType(ServiceTypeDTO dto) {
+
+        if (dto == null)
+            throw new BadRequestException("Request body is required");
+
+        if (dto.getName() == null || dto.getName().isBlank())
+            throw new BadRequestException("Service name is required");
+
+        if (dto.getCategoryId() == null)
+            throw new BadRequestException("Category ID is required");
+    }
+
+    private void validateId(Long id) {
+        if (id == null) {
+            throw new BadRequestException("ID is required");
         }
     }
 
-    private List<SearchResponse> applySorting(List<SearchResponse> responses, String sortBy, Long consumerId) {
-        if (responses == null || responses.isEmpty()) {
-            return new ArrayList<>();
+
+    private ServiceTypeDTO mapToDTO(ServiceType st) {
+
+        if (st.getCategory() == null) {
+            throw new ResourceNotFoundException("Category missing for service type");
         }
 
-        String sortField = sortBy != null ? sortBy.toLowerCase() : "rating";
-
-        switch (sortField) {
-            case "price_low":
-                return responses.stream()
-                        .sorted(Comparator.comparing(SearchResponse::getPrice))
-                        .collect(Collectors.toList());
-
-            case "price_high":
-                return responses.stream()
-                        .sorted(Comparator.comparing(SearchResponse::getPrice).reversed())
-                        .collect(Collectors.toList());
-
-            case "experience":
-                return responses.stream()
-                        .sorted(Comparator.comparing(SearchResponse::getCompletedJobs).reversed())
-                        .collect(Collectors.toList());
-
-            case "distance":
-                return responses.stream()
-                        .filter(r -> r.getDistance() != null)
-                        .sorted(Comparator.comparing(SearchResponse::getDistance))
-                        .collect(Collectors.toList());
-
-            case "rating":
-            default:
-                return responses.stream()
-                        .sorted(Comparator.comparing(SearchResponse::getAverageRating,
-                                Comparator.nullsLast(Comparator.reverseOrder())))
-                        .collect(Collectors.toList());
-        }
+        return ServiceTypeDTO.builder()
+                .id(st.getId())
+                .name(st.getName())
+                .nameAr(st.getNameAr())
+                .description(st.getDescription())
+                .categoryId(st.getCategory().getId())
+                .categoryName(st.getCategory().getName())
+                .riskLevel(st.getRiskLevel())
+                .basePrice(st.getBasePrice())
+                .defaultPriceType(st.getDefaultPriceType())
+                .estimatedDuration(st.getEstimatedDuration())
+                .build();
     }
 }

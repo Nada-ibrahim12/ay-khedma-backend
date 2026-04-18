@@ -40,4 +40,8 @@ public interface ServiceTypeRepository extends JpaRepository<ServiceType, Long> 
 
     @Query("SELECT COUNT(st) FROM ServiceType st")
     long countServices();
+
+    boolean existsByName(String name);
+
+    boolean existsByNameIgnoreCase(String name);
 }
