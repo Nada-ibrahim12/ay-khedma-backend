@@ -6,6 +6,7 @@ import com.aykhedma.dto.service.CategoryWithServicesDTO;
 import com.aykhedma.dto.service.ServiceCategoryDTO;
 import com.aykhedma.dto.service.ServiceTypeDTO;
 import com.aykhedma.dto.service.ServicesResponse;
+import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
 import com.aykhedma.model.service.ServiceCategory;
@@ -54,6 +55,9 @@ public class ServiceManagementServiceImpl {
         ServiceCategory category = categoryRepository.findById(dto.getCategoryId())
                 .orElseThrow(() -> new RuntimeException("Category not found"));
 
+        if (typeRepository.existsByNameIgnoreCase(dto.getName())) {
+            throw new BadRequestException("SERVICE_TYPE_NAME_ALREADY_EXISTS");
+        }
         ServiceType type = ServiceType.builder()
                 .name(dto.getName())
                 .nameAr(dto.getNameAr())
@@ -73,6 +77,12 @@ public class ServiceManagementServiceImpl {
         ServiceType type = typeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service type not found"));
 
+        if (dto.getName() != null &&
+                !dto.getName().equalsIgnoreCase(type.getName()) &&
+                typeRepository.existsByNameIgnoreCase(dto.getName())) {
+
+            throw new BadRequestException("SERVICE_TYPE_NAME_ALREADY_EXISTS");
+        }
         if (dto.getName() != null) type.setName(dto.getName());
         if (dto.getNameAr() != null) type.setNameAr(dto.getNameAr());
         if (dto.getDescription() != null) type.setDescription(dto.getDescription());

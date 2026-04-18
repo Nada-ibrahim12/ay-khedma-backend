@@ -2,9 +2,11 @@ package com.aykhedma.service;
 
 import com.aykhedma.dto.service.ServiceCategoryDTO;
 import com.aykhedma.dto.service.ServiceTypeDTO;
+import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.repository.ServiceCategoryRepository;
+import com.aykhedma.repository.ServiceTypeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import java.util.List;
 public class ServiceCategoryService {
 
     private final ServiceCategoryRepository categoryRepository;
+    private final ServiceTypeRepository serviceTypeRepository;
 
     public List<ServiceCategoryDTO> getAllCategories() {
         return categoryRepository.findAllWithServiceTypes().stream()
@@ -32,6 +35,10 @@ public class ServiceCategoryService {
 
     public ServiceCategoryDTO createCategory(ServiceCategoryDTO dto) {
 
+        if (categoryRepository.existsByName(dto.getName())) {
+            throw new BadRequestException("Category name already exists");
+        }
+
         ServiceCategory category = ServiceCategory.builder()
                 .name(dto.getName())
                 .nameAr(dto.getNameAr())
@@ -41,6 +48,9 @@ public class ServiceCategoryService {
         if (dto.getServiceTypes() != null) {
             dto.getServiceTypes().forEach(stDto -> {
 
+                if (serviceTypeRepository.existsByName(stDto.getName())) {
+                    throw new BadRequestException("Service type name already exists: " + stDto.getName());
+                }
                 ServiceType serviceType = ServiceType.builder()
                         .name(stDto.getName())
                         .nameAr(stDto.getNameAr())
@@ -64,6 +74,12 @@ public class ServiceCategoryService {
     public ServiceCategoryDTO updateCategory(Long id, ServiceCategoryDTO dto) {
         ServiceCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Category not found"));
+        if (dto.getName() != null &&
+                categoryRepository.existsByName(dto.getName()) &&
+                !category.getName().equals(dto.getName())) {
+            throw new BadRequestException("Category name already exists");
+        }
+
         category.setName(dto.getName());
         category.setNameAr(dto.getNameAr());
         category.setDescription(dto.getDescription());

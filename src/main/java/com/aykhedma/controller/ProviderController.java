@@ -14,10 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -46,11 +43,11 @@ public class ProviderController {
         @GetMapping("/{providerId}")
         @Operation(summary = "Get provider profile")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved provider profile", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved provider profile", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<ProviderResponse> getProviderProfile(
-                        @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
+                @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
                 ProviderResponse response = providerService.getProviderProfile(providerId);
                 return ResponseEntity.ok(response);
         }
@@ -59,11 +56,11 @@ public class ProviderController {
         @GetMapping("/me")
         @Operation(summary = "Get my provider profile")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved provider profile", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved provider profile", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<ProviderResponse> getmYProviderProfile(
-                        @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId) {
+                @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId) {
                 ProviderResponse response = providerService.getProviderProfile(providerId);
                 return ResponseEntity.ok(response);
         }
@@ -72,13 +69,13 @@ public class ProviderController {
         @PutMapping("/me")
         @Operation(summary = "Update my profile")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully updated provider profile", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider not found"),
-                        @ApiResponse(responseCode = "400", description = "Invalid input data")
+                @ApiResponse(responseCode = "200", description = "Successfully updated provider profile", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider not found"),
+                @ApiResponse(responseCode = "400", description = "Invalid input data")
         })
         public ResponseEntity<ProviderResponse> updateProviderProfile(
-                        @AuthenticationPrincipal(expression = "user.id") Long providerId,
-                        @Parameter(description = "Updated provider profile data", required = true) @Valid @RequestBody ProviderProfileRequest request) {
+                @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "Updated provider profile data", required = true) @Valid @RequestBody ProviderProfileRequest request) {
                 ProviderResponse response = providerService.updateProviderProfile(providerId, request);
                 return ResponseEntity.ok(response);
         }
@@ -87,15 +84,15 @@ public class ProviderController {
         @PostMapping(value = "/me/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
         @Operation(summary = "Update my profile picture")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully updated profile picture", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider not found"),
-                        @ApiResponse(responseCode = "400", description = "Invalid file format or size")
+                @ApiResponse(responseCode = "200", description = "Successfully updated profile picture", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider not found"),
+                @ApiResponse(responseCode = "400", description = "Invalid file format or size")
         })
         public ResponseEntity<ProviderResponse> updateProfilePicture(
-                        @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @AuthenticationPrincipal(expression = "user.id") Long providerId,
 
-                        @Parameter(description = "Profile picture file (max 5MB, supported formats: JPEG, PNG, GIF)", required = true) @RequestParam("file") MultipartFile file)
-                        throws IOException {
+                @Parameter(description = "Profile picture file (max 5MB, supported formats: JPEG, PNG, GIF)", required = true) @RequestParam("file") MultipartFile file)
+                throws IOException {
                 ProviderResponse response = providerService.updateProfilePicture(providerId, file);
                 return ResponseEntity.ok(response);
         }
@@ -120,11 +117,11 @@ public class ProviderController {
         @GetMapping("/{providerId}/schedule")
         @Operation(summary = "Get provider's complete schedule with working days and time slots")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved schedule", content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved schedule", content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<ScheduleResponse> getSchedule(
-                        @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
+                @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
                 ScheduleResponse response = providerService.getSchedule(providerId);
                 return ResponseEntity.ok(response);
         }
@@ -133,13 +130,13 @@ public class ProviderController {
         @PostMapping("/me/schedule/working-days")
         @Operation(summary = "Add a working day template (recurring weekly schedule)")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "201", description = "Working day added successfully", content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
-                        @ApiResponse(responseCode = "400", description = "Invalid working day data or duplicate day"),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "201", description = "Working day added successfully", content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
+                @ApiResponse(responseCode = "400", description = "Invalid working day data or duplicate day"),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<ScheduleResponse> addWorkingDay(
-                        @AuthenticationPrincipal(expression = "user.id") Long providerId,
-                        @Parameter(description = "Working day data (day of week, start time, end time)", required = true) @Valid @RequestBody WorkingDayRequest request) {
+                @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "Working day data (day of week, start time, end time)", required = true) @Valid @RequestBody WorkingDayRequest request) {
                 ScheduleResponse response = providerService.addWorkingDay(providerId, request);
                 return ResponseEntity.status(HttpStatus.CREATED).body(response);
         }
@@ -148,14 +145,14 @@ public class ProviderController {
         @PutMapping("/me/schedule/working-days/{workingDayId}")
         @Operation(summary = "Update my existing working day template")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Working day updated successfully", content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
-                        @ApiResponse(responseCode = "400", description = "Invalid working day data"),
-                        @ApiResponse(responseCode = "404", description = "Provider or working day not found")
+                @ApiResponse(responseCode = "200", description = "Working day updated successfully", content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
+                @ApiResponse(responseCode = "400", description = "Invalid working day data"),
+                @ApiResponse(responseCode = "404", description = "Provider or working day not found")
         })
         public ResponseEntity<ScheduleResponse> updateWorkingDay(
-                        @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
-                        @Parameter(description = "ID of the working day", required = true) @PathVariable Long workingDayId,
-                        @Parameter(description = "Updated working day data", required = true) @Valid @RequestBody WorkingDayRequest request) {
+                @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "ID of the working day", required = true) @PathVariable Long workingDayId,
+                @Parameter(description = "Updated working day data", required = true) @Valid @RequestBody WorkingDayRequest request) {
                 ScheduleResponse response = providerService.updateWorkingDay(providerId, workingDayId, request);
                 return ResponseEntity.ok(response);
         }
@@ -164,12 +161,12 @@ public class ProviderController {
         @DeleteMapping("/me/schedule/working-days/{workingDayId}")
         @Operation(summary = "Remove a working day template and its future available slots")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Working day removed successfully", content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider or working day not found")
+                @ApiResponse(responseCode = "200", description = "Working day removed successfully", content = @Content(schema = @Schema(implementation = ScheduleResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider or working day not found")
         })
         public ResponseEntity<ScheduleResponse> removeWorkingDay(
-                        @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
-                        @Parameter(description = "ID of the working day to remove", required = true) @PathVariable Long workingDayId) {
+                @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "ID of the working day to remove", required = true) @PathVariable Long workingDayId) {
                 ScheduleResponse response = providerService.removeWorkingDay(providerId, workingDayId);
                 return ResponseEntity.ok(response);
         }
@@ -180,12 +177,12 @@ public class ProviderController {
         @GetMapping("/me/time-slots")
         @Operation(summary = "Get my time slots for a specific date")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved time slots"),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved time slots"),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getTimeSlotsByDate(
-                        @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
-                        @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+                @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
                 List<ScheduleResponse.TimeSlotResponse> response = providerService.getTimeSlotsByDate(providerId, date);
                 return ResponseEntity.ok(response);
         }
@@ -194,14 +191,14 @@ public class ProviderController {
         @PreAuthorize("hasRole('CONSUMER')")
         @Operation(summary = "Get ONLY available (not booked) time slots for a specific date")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved available time slots"),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved available time slots"),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getAvailableTimeSlots(
-                        @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
-                        @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+                @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
+                @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
                 List<ScheduleResponse.TimeSlotResponse> response = providerService.getAvailableTimeSlots(providerId,
-                                date);
+                        date);
                 return ResponseEntity.ok(response);
         }
 
@@ -209,14 +206,14 @@ public class ProviderController {
         @PreAuthorize("hasRole('PROVIDER')")
         @Operation(summary = "Get ONLY available (not booked) time slots for a specific date")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved available time slots"),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved available time slots"),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getMyAvailableTimeSlots(
-                        @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
-                        @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+                @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
                 List<ScheduleResponse.TimeSlotResponse> response = providerService.getAvailableTimeSlots(providerId,
-                                date);
+                        date);
                 return ResponseEntity.ok(response);
         }
 
@@ -247,12 +244,12 @@ public class ProviderController {
         @PreAuthorize("hasRole('PROVIDER')")
         @Operation(summary = "Get a specific time slot by ID")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved time slot"),
-                        @ApiResponse(responseCode = "404", description = "Time slot not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved time slot"),
+                @ApiResponse(responseCode = "404", description = "Time slot not found")
         })
         public ResponseEntity<ScheduleResponse.TimeSlotResponse> getTimeSlotById(
-                        @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
-                        @Parameter(description = "ID of the time slot", required = true) @PathVariable Long timeSlotId) {
+                @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "ID of the time slot", required = true) @PathVariable Long timeSlotId) {
                 ScheduleResponse.TimeSlotResponse response = providerService.getTimeSlot(providerId, timeSlotId);
                 return ResponseEntity.ok(response);
         }
@@ -290,12 +287,12 @@ public class ProviderController {
         @PreAuthorize("hasRole('PROVIDER')")
         @Operation(summary = "Cancel a booking and make the time slot available again")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Booking cancelled successfully"),
-                        @ApiResponse(responseCode = "400", description = "Time slot is not booked"),
-                        @ApiResponse(responseCode = "404", description = "Time slot not found")
+                @ApiResponse(responseCode = "200", description = "Booking cancelled successfully"),
+                @ApiResponse(responseCode = "400", description = "Time slot is not booked"),
+                @ApiResponse(responseCode = "404", description = "Time slot not found")
         })
         public ResponseEntity<ScheduleResponse.TimeSlotResponse> cancelBooking(
-                        @Parameter(description = "ID of the time slot", required = true) @PathVariable Long timeSlotId) {
+                @Parameter(description = "ID of the time slot", required = true) @PathVariable Long timeSlotId) {
                 ScheduleResponse.TimeSlotResponse response = providerService.cancelBooking(timeSlotId);
                 return ResponseEntity.ok(response);
         }
@@ -306,14 +303,14 @@ public class ProviderController {
         @PreAuthorize("hasRole('PROVIDER')")
         @Operation(summary = "Get upcoming available slots for the next N days")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved upcoming slots"),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved upcoming slots"),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getUpcomingAvailableSlots(
-                        @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
-                        @Parameter(description = "Number of days to look ahead", required = true) @RequestParam(defaultValue = "7") Integer days) {
+                @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "Number of days to look ahead", required = true) @RequestParam(defaultValue = "7") Integer days) {
                 List<ScheduleResponse.TimeSlotResponse> response = providerService.getUpcomingAvailableSlots(providerId,
-                                days);
+                        days);
                 return ResponseEntity.ok(response);
         }
 
@@ -324,17 +321,17 @@ public class ProviderController {
         @PostMapping(value = "/me/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
         @Operation(summary = "Upload document")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "201", description = "Successfully uploaded document", content = @Content(schema = @Schema(implementation = DocumentResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider not found"),
-                        @ApiResponse(responseCode = "400", description = "Invalid file format or size")
+                @ApiResponse(responseCode = "201", description = "Successfully uploaded document", content = @Content(schema = @Schema(implementation = DocumentResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider not found"),
+                @ApiResponse(responseCode = "400", description = "Invalid file format or size")
         })
         public ResponseEntity<DocumentResponse> uploadDocument(
-                        @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
 
-                        @Parameter(description = "Document file (max 10MB, supported formats: PDF, DOC, DOCX, XLS, XLSX, TXT)", required = true) @RequestParam("file") MultipartFile file,
+                @Parameter(description = "Document file (max 10MB, supported formats: PDF, DOC, DOCX, XLS, XLSX, TXT)", required = true) @RequestParam("file") MultipartFile file,
 
-                        @Parameter(description = "Document type (e.g., LICENSE, CERTIFICATE, ID)", required = true, example = "LICENSE") @RequestParam String documentType)
-                        throws IOException {
+                @Parameter(description = "Document type (e.g., LICENSE, CERTIFICATE, ID)", required = true, example = "LICENSE") @RequestParam String documentType)
+                throws IOException {
                 DocumentResponse response = providerService.uploadDocument(providerId, file, documentType);
                 return ResponseEntity.status(HttpStatus.CREATED).body(response);
         }
@@ -343,11 +340,11 @@ public class ProviderController {
         @GetMapping("/{providerId}/documents")
         @Operation(summary = "Get provider documents")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved documents", content = @Content(schema = @Schema(implementation = DocumentResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved documents", content = @Content(schema = @Schema(implementation = DocumentResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<List<DocumentResponse>> getProviderDocuments(
-                        @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
+                @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
                 List<DocumentResponse> response = providerService.getProviderDocuments(providerId);
                 return ResponseEntity.ok(response);
         }
@@ -356,12 +353,12 @@ public class ProviderController {
         @DeleteMapping("/me/documents/{documentId}")
         @Operation(summary = "Delete document")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully deleted document", content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider or document not found")
+                @ApiResponse(responseCode = "200", description = "Successfully deleted document", content = @Content(schema = @Schema(implementation = ProfileResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider or document not found")
         })
         public ResponseEntity<ProfileResponse> deleteDocument(
-                        @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
-                        @Parameter(description = "ID of the document", required = true) @PathVariable Long documentId) {
+                @Parameter(description = "ID of the provider", required = true) @AuthenticationPrincipal(expression = "user.id") Long providerId,
+                @Parameter(description = "ID of the document", required = true) @PathVariable Long documentId) {
                 ProfileResponse response = providerService.deleteDocument(providerId, documentId);
                 return ResponseEntity.ok(response);
         }
@@ -369,7 +366,7 @@ public class ProviderController {
         @GetMapping("/all")
         @Operation(summary = "all providers")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully found providers", content = @Content(schema = @Schema(implementation = ProviderSummaryResponse.class)))
+                @ApiResponse(responseCode = "200", description = "Successfully found providers", content = @Content(schema = @Schema(implementation = ProviderSummaryResponse.class)))
         })
         public ResponseEntity<List<ProviderSummaryResponse>> allProviders() {
                 List<ProviderSummaryResponse> response = providerService.allProviders();
@@ -381,11 +378,11 @@ public class ProviderController {
         @GetMapping("/{providerId}/verification-status")
         @Operation(summary = "Get verification status")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Successfully retrieved status", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
-                        @ApiResponse(responseCode = "404", description = "Provider not found")
+                @ApiResponse(responseCode = "200", description = "Successfully retrieved status", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<VerificationStatus> getVerificationStatus(
-                        @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
+                @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
                 VerificationStatus response = providerService.getVerificationStatus(providerId);
                 return ResponseEntity.ok(response);
         }
@@ -394,11 +391,11 @@ public class ProviderController {
         @GetMapping("/{providerId}/exists")
         @Operation(summary = "Check if provider exists")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Provider exists"),
-                        @ApiResponse(responseCode = "404", description = "Provider does not exist")
+                @ApiResponse(responseCode = "200", description = "Provider exists"),
+                @ApiResponse(responseCode = "404", description = "Provider does not exist")
         })
         public ResponseEntity<Void> checkProviderExists(
-                        @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
+                @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
                 try {
                         providerService.getProviderProfile(providerId);
                         return ResponseEntity.ok().build();
@@ -410,26 +407,51 @@ public class ProviderController {
         @GetMapping("/search")
         @Operation(summary = "Search providers with filters and location-based sorting")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Search completed successfully"),
-                        @ApiResponse(responseCode = "404", description = "Consumer not found")
+                @ApiResponse(responseCode = "200", description = "Search completed successfully"),
+                @ApiResponse(responseCode = "404", description = "Consumer not found")
         })
         public ResponseEntity<Page<SearchResponse>> search(
-                        @Parameter(description = "Search keyword (searches in name, bio, service type)") @RequestParam(required = false) String keyword,
+                @Parameter(description = "Search keyword (searches in name, bio, service type)") @RequestParam(required = false) String keyword,
 
-                        @Parameter(description = "Filter by category ID") @RequestParam(required = false) Long categoryId,
+                @Parameter(description = "Filter by category ID") @RequestParam(required = false) Long categoryId,
 
-                        @Parameter(description = "Filter by category name") @RequestParam(required = false) String categoryName,
+                @Parameter(description = "Filter by category name") @RequestParam(required = false) String categoryName,
 
-                        @Parameter(description = "Consumer ID for location-based search") @RequestParam(required = true) Long consumerId,
+                @Parameter(description = "Consumer ID for location-based search") @RequestParam(required = true) Long consumerId,
 
-                        @Parameter(description = "Search radius in kilometers (requires consumerId)") @RequestParam(required = false, defaultValue = "5.0") Double radius,
+                @Parameter(description = "Search radius in kilometers (requires consumerId)") @RequestParam(required = false, defaultValue = "5.0") Double radius,
 
-                        @Parameter(description = "Sort by field (distance, rating, price, experience)") @RequestParam(required = false, defaultValue = "rating") String sortBy,
+                @Parameter(description = "Sort by field (distance, rating, price, experience)") @RequestParam(required = false, defaultValue = "rating") String sortBy,
 
-                        @PageableDefault(size = 20, sort = "averageRating", direction = Sort.Direction.DESC) Pageable pageable) {
+                @PageableDefault(size = 20, sort = "averageRating", direction = Sort.Direction.DESC) Pageable pageable) {
                 Page<SearchResponse> page = providerService.search(
-                                keyword, categoryId, categoryName, consumerId, radius, sortBy, pageable);
+                        keyword, categoryId, categoryName, consumerId, radius, sortBy, pageable);
 
                 return ResponseEntity.ok(page);
+        }
+        @GetMapping("/top-rated-near-me")
+        @Operation(summary = "Get top 10 top-rated providers near the consumer based on location and scoring system")
+        @PreAuthorize("hasRole('CONSUMER')")
+        @ApiResponses(value = {
+                @ApiResponse(responseCode = "200", description = "Top rated providers fetched successfully"),
+                @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+                @ApiResponse(responseCode = "404", description = "Consumer not found"),
+                @ApiResponse(responseCode = "500", description = "Internal server error")
+        })
+
+        public ResponseEntity<Page<SearchResponse>> topRatedNearMe(
+
+                @Parameter(description = "Consumer ID for location-based search", required = true)
+                @RequestParam Long consumerId,
+
+                @Parameter(description = "Search radius in kilometers (default = 10 km)")
+                @RequestParam(defaultValue = "10.0") Double radius,
+
+                @Parameter(hidden = true)
+                Pageable pageable
+        ) {
+                return ResponseEntity.ok(
+                        providerService.topRatedNearMe(consumerId, radius, PageRequest.of(0, 10))
+                );
         }
 }

@@ -22,4 +22,6 @@ public interface ServiceCategoryRepository extends JpaRepository<ServiceCategory
 
     @Query("SELECT COUNT(sc) FROM ServiceCategory sc")
     long countCategories();
+
+    boolean existsByName(String name);
 }

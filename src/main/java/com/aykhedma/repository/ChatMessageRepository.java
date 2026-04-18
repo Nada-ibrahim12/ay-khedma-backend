@@ -9,15 +9,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, String
 
     Page<ChatMessage> findByChatRoomId(String roomId, Pageable pageable);
 
-//    @Modifying
-//    @Query("""
-//        UPDATE ChatMessage m
-//        SET m.status = 'READ'
-//        WHERE m.chatRoom.id = :roomId
-//        AND m.senderId != :userId
-//        AND m.status != 'READ'
-//    """)
-//    void markMessagesAsRead(String roomId, Long userId);
 
     @Modifying
     @Query("""
@@ -39,12 +30,4 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, String
     long countUnreadMessages(@Param("roomId") String roomId,
                              @Param("userId") Long userId);
 
-//    @Query("""
-//        SELECT COUNT(m)
-//        FROM ChatMessage m
-//        WHERE m.chatRoom.id = :roomId
-//        AND m.senderId != :userId
-//        AND m.status != 'READ'
-//    """)
-//    long countUnreadMessages(String roomId, Long userId);
 }

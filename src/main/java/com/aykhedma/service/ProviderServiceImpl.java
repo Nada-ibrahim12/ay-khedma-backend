@@ -16,6 +16,7 @@ import com.aykhedma.model.booking.TimeSlotStatus;
 import com.aykhedma.model.booking.WorkingDay;
 import com.aykhedma.model.document.Document;
 import com.aykhedma.model.location.Location;
+import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
@@ -131,7 +132,7 @@ public class ProviderServiceImpl implements ProviderService {
         if (request.getLocation() != null) {
             locationService.updateProviderLocation(providerId, request.getLocation());
         }
-
+        validateHighRiskProvider(provider);
         Provider updatedProvider = providerRepository.save(provider);
         return providerMapper.toProviderResponse(updatedProvider);
     }
@@ -146,7 +147,7 @@ public class ProviderServiceImpl implements ProviderService {
         String newFileUrl = null;
 
         try {
-            newFileUrl = fileStorageService.storeFile(file, "profile-images");
+            newFileUrl = fileStorageService.storeFile(file, providerId.toString());
 
             providerRepository.updateProfileImage(providerId, newFileUrl);
 
@@ -243,12 +244,12 @@ public class ProviderServiceImpl implements ProviderService {
     @Transactional(readOnly = true)
     @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy,#pageable.pageNumber,#pageable.pageSize,#pageable.sort}")
     public Page<SearchResponse> search(String keyword,
-            Long categoryId,
-            String categoryName,
-            Long consumerId,
-            Double radius,
-            String sortBy,
-            Pageable pageable) {
+                                       Long categoryId,
+                                       String categoryName,
+                                       Long consumerId,
+                                       Double radius,
+                                       String sortBy,
+                                       Pageable pageable) {
         log.warn("CACHE MISS -> Fetching from DATABASE");
 
         Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName,
@@ -257,6 +258,7 @@ public class ProviderServiceImpl implements ProviderService {
         if (consumerId == null || radius == null) {
             List<SearchResponse> responses = providersPage.getContent()
                     .stream()
+                    .filter(provider -> provider.getVerificationStatus() == VerificationStatus.VERIFIED)
                     .map(provider -> {
                         SearchResponse response = providerMapper.toSearchResponse(provider);
                         response.setDistance(null);
@@ -277,6 +279,7 @@ public class ProviderServiceImpl implements ProviderService {
 
             List<SearchResponse> filteredList = providersPage.getContent()
                     .stream()
+                    .filter(provider -> provider.getVerificationStatus() == VerificationStatus.VERIFIED)
                     .filter(provider -> provider.getLocation() != null)
                     .map(provider -> {
                         try {
@@ -326,6 +329,37 @@ public class ProviderServiceImpl implements ProviderService {
 
             List<SearchResponse> sortedResponses = applySorting(responses, sortBy, null);
             return toPage(sortedResponses, pageable);
+        }
+    }
+
+    private void validateHighRiskProvider(Provider provider) {
+
+        if (provider.getServiceType().getRiskLevel() == RiskLevel.HIGH) {
+
+            List<Document> documents = documentRepository.findByProviderId(provider.getId());
+
+            if (documents == null || documents.isEmpty()) {
+                throw new BadRequestException("Documents are required for HIGH risk services");
+            }
+
+            boolean hasNationalId = documents.stream()
+                    .anyMatch(doc -> doc.getType().equalsIgnoreCase("NATIONAL_ID"));
+
+            if (!hasNationalId) {
+                throw new BadRequestException("NATIONAL_ID document is required");
+            }
+
+            boolean hasAdditionalDocuments = documents.stream()
+                    .anyMatch(doc -> !doc.getType().equalsIgnoreCase("NATIONAL_ID"));
+
+            if (!hasAdditionalDocuments) {
+                throw new BadRequestException("Additional documents (certificates) are required for HIGH risk services. Please upload them before updating your service type.");
+            }
+
+            provider.setVerificationStatus(VerificationStatus.PENDING);
+
+        } else {
+            provider.setVerificationStatus(VerificationStatus.VERIFIED);
         }
     }
 
@@ -379,6 +413,62 @@ public class ProviderServiceImpl implements ProviderService {
                                 Comparator.nullsLast(Comparator.reverseOrder())))
                         .collect(Collectors.toList());
         }
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
+
+        Page<Provider> providersPage =
+                providerRepository.searchProviders(null, null, null, Pageable.unpaged());
+
+        List<SearchResponse> ranked = providersPage.getContent().stream()
+                .filter(p -> p.getLocation() != null)
+                .map(provider -> {
+
+                    try {
+                        double distance = locationService
+                                .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
+                                .getDistanceKm();
+
+                        if (distance > radius) return null;
+
+                        SearchResponse res = providerMapper.toSearchResponse(provider);
+
+                        res.setDistance(distance);
+                        res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
+
+
+                        double score = calculateScore(provider, distance);
+                        res.setScore(score);
+
+                        return res;
+
+                    } catch (Exception e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
+                .toList();
+
+        return toPage(ranked, pageable);
+    }
+    private double calculateScore(Provider p, double distance) {
+
+        double ratingWeight = 0.5;
+        double distanceWeight = 0.3;
+        double experienceWeight = 0.2;
+
+        double ratingScore = (p.getAverageRating() != null ? p.getAverageRating() : 0) * 20;
+
+        double distanceScore = Math.max(0, 100 - (distance * 10));
+
+
+        double experienceScore = (p.getCompletedJobs() != null ? p.getCompletedJobs() : 0) / 10.0;
+
+        return (ratingScore * ratingWeight)
+                + (distanceScore * distanceWeight)
+                + (experienceScore * experienceWeight);
     }
 
     @Override
@@ -690,6 +780,7 @@ public class ProviderServiceImpl implements ProviderService {
             }
 
             bookingRepository.save(booking);
+            providerRepository.incrementCancelledBookings(booking.getProvider().getId());
         } else {
             timeSlot.setStatus(TimeSlotStatus.AVAILABLE);
             timeSlotRepository.save(timeSlot);
@@ -707,9 +798,9 @@ public class ProviderServiceImpl implements ProviderService {
 
     @Override
     public TimeSlot reserveTimeSlotWithBuffer(Long scheduleId,
-            LocalDate date,
-            LocalTime bookingStart,
-            LocalTime bookingEnd) {
+                                              LocalDate date,
+                                              LocalTime bookingStart,
+                                              LocalTime bookingEnd) {
         List<TimeSlot> availableSlots = timeSlotRepository
                 .findByScheduleIdAndDateAndStatus(scheduleId, date, TimeSlotStatus.AVAILABLE)
                 .stream()
@@ -925,7 +1016,7 @@ public class ProviderServiceImpl implements ProviderService {
     // }
 
     private List<ScheduleResponse.TimeSlotResponse> toDiscreteStartTimeResponses(List<TimeSlot> availableSlots,
-            LocalDate fallbackDate) {
+                                                                                 LocalDate fallbackDate) {
         if (availableSlots == null || availableSlots.isEmpty()) {
             return List.of();
         }
@@ -1019,7 +1110,7 @@ public class ProviderServiceImpl implements ProviderService {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
-        String fileUrl = fileStorageService.storeFile(file, "documents");
+        String fileUrl = fileStorageService.storeFile(file, providerId.toString());
 
         Document document = Document.builder()
                 .title(file.getOriginalFilename())
@@ -1056,7 +1147,18 @@ public class ProviderServiceImpl implements ProviderService {
 
     @Override
     public ProfileResponse deleteDocument(Long providerId, Long documentId) {
-        documentRepository.deleteByProviderIdAndId(providerId, documentId);
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+
+        if (!document.getProvider().getId().equals(providerId)) {
+            throw new BadRequestException("Document does not belong to this provider");
+        }
+
+        if (document.getFilePath() != null) {
+            fileStorageService.deleteFile(document.getFilePath());
+        }
+
+        documentRepository.delete(document);
 
         return ProfileResponse.builder()
                 .success(true)

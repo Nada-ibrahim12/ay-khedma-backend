@@ -20,7 +20,6 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, String> {
             "WHERE p1 = :user1 AND p2 = :user2")
     Optional<ChatRoom> findByParticipants(User user1, User user2);
 
-    // Optional: find all rooms for a user
     @Query("SELECT r FROM ChatRoom r JOIN r.participants p WHERE p = :user")
     List<ChatRoom> findAllByParticipant(User user);
 

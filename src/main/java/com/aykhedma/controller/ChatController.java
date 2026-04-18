@@ -2,19 +2,16 @@ package com.aykhedma.controller;
 
 import com.aykhedma.dto.request.ChatMessageRequest;
 import com.aykhedma.dto.response.ChatMessageResponse;
+import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.model.chat.MessageType;
-import com.aykhedma.model.user.User;
-import com.aykhedma.repository.UserRepository;
-import com.aykhedma.security.JwtService;
+import com.aykhedma.security.CustomUserDetails;
 import com.aykhedma.service.ChatService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,98 +24,95 @@ import java.util.List;
 public class ChatController {
 
     private final ChatService chatService;
-    private final UserRepository userRepository;
-    private final JwtService jwtService;
-
-    private User getUser(HttpServletRequest request) {
-        String token = request.getHeader("Authorization").substring(7);
-        String email = jwtService.extractUsername(token);
-        return userRepository.findByEmail(email).orElseThrow();
-    }
 
     @PostMapping("/room")
-    @Operation(summary = "Create or get chat room with another user")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Room retrieved or created successfully",
-                    content = @Content(schema = @Schema(implementation = String.class))),
-            @ApiResponse(responseCode = "404", description = "Receiver not found")
-    })
-    public ResponseEntity<String> createRoom(@RequestParam Long receiverId, HttpServletRequest req) {
-        String roomId = chatService.getOrCreateRoom(getUser(req), receiverId).getId();
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "Room created or returned"),
+            @ApiResponse(responseCode = "400", description = "Invalid request"),
+            @ApiResponse(responseCode = "404", description = "Receiver not found"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized") })
+    public ResponseEntity<String> createRoom(
+            @RequestParam(required = false) Long receiverId,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        if (receiverId == null) {
+            throw new BadRequestException("receiverId is required");
+        }
+
+        String roomId = chatService
+                .getOrCreateRoom(user.getUser(), receiverId)
+                .getId();
+
         return ResponseEntity.ok(roomId);
     }
 
-    @PostMapping(value = "/send", consumes = {"multipart/form-data"})
-    @Operation(summary = "Send message to a chat room (text or media)")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Message sent successfully",
-                    content = @Content(schema = @Schema(implementation = ChatMessageResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request")
-    })
+    @PostMapping(value = "/send", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "Message sent"),
+            @ApiResponse(responseCode = "400", description = "Invalid request"), @ApiResponse(responseCode = "403", description = "Forbidden"),
+            @ApiResponse(responseCode = "404", description = "Room not found"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized") })
     public ResponseEntity<ChatMessageResponse> send(
             @RequestPart(required = false) String content,
             @RequestPart(required = false) List<MultipartFile> mediaFiles,
             @RequestPart(required = false) MessageType type,
-            @RequestPart String roomId,
-            HttpServletRequest req
+            @RequestPart(required = false) String roomId,
+            @AuthenticationPrincipal CustomUserDetails user
     ) throws IOException {
 
-        // Build request DTO
+        if (roomId == null || roomId.isBlank()) { throw new BadRequestException("roomId is required"); }
+        if ((content == null || content.isBlank()) && (mediaFiles == null || mediaFiles.isEmpty())) {
+            throw new BadRequestException("Message must contain content or media"); }
+
         ChatMessageRequest request = new ChatMessageRequest();
         request.setContent(content);
         request.setMediaFiles(mediaFiles);
         request.setType(type != null ? type : MessageType.TEXT);
         request.setRoomId(roomId);
 
-        // Send message
-        return ResponseEntity.ok(chatService.sendMessage(getUser(req), request));
+        return ResponseEntity.ok(
+                chatService.sendMessage(user.getUser(), request)
+        );
     }
-
 
     @GetMapping("/messages")
-    @Operation(summary = "Get messages in a chat room with pagination")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Messages retrieved successfully",
-                    content = @Content(schema = @Schema(implementation = ChatMessageResponse.class))),
-            @ApiResponse(responseCode = "403", description = "Unauthorized access to room")
-    })
-    public ResponseEntity<List<ChatMessageResponse>> messages(@RequestParam String roomId,
-                                                              @RequestParam int page,
-                                                              @RequestParam int size,
-                                                              HttpServletRequest req) {
-        List<ChatMessageResponse> messages =
-                chatService.getMessages(getUser(req), roomId, page, size);
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "Messages returned"),
+            @ApiResponse(responseCode = "403", description = "Forbidden"),
+            @ApiResponse(responseCode = "400", description = "Invalid params"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized") })
+    public ResponseEntity<List<ChatMessageResponse>> messages(
+            @RequestParam String roomId,
+            @RequestParam int page,
+            @RequestParam int size,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        if (roomId == null || roomId.isBlank()) {
+            throw new BadRequestException("roomId is required"); }
+        if (page < 0 || size <= 0) {
+            throw new BadRequestException("Invalid pagination parameters"); }
 
-        return ResponseEntity.ok(messages);
+        return ResponseEntity.ok(
+                chatService.getMessages(user.getUser(), roomId, page, size)
+        );
     }
-
 
     @GetMapping("/unread")
-    @Operation(summary = "Get unread messages count in a room")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Unread count retrieved successfully")
-    })
-    public ResponseEntity<Long> unread(@RequestParam String roomId,
-                                       HttpServletRequest req) {
-        long count = chatService.getUnreadCount(roomId, getUser(req).getId());
-        return ResponseEntity.ok(count);
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "Unread count returned"), @ApiResponse(responseCode = "400", description = "Invalid request"), @ApiResponse(responseCode = "401", description = "Unauthorized") })
+    public ResponseEntity<Long> unread(
+            @RequestParam String roomId,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        if (roomId == null || roomId.isBlank()) { throw new BadRequestException("roomId is required"); }
+        return ResponseEntity.ok(
+                chatService.getUnreadCount(roomId, user.getUser().getId())
+        );
     }
-
-
 
     @DeleteMapping("/message/{id}")
-    @Operation(summary = "Delete a message")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Message deleted successfully"),
-            @ApiResponse(responseCode = "403", description = "User not owner of message"),
-            @ApiResponse(responseCode = "404", description = "Message not found")
-    })
-    public ResponseEntity<Void> delete(@PathVariable String id,
-                                       HttpServletRequest req) {
-        chatService.deleteMessage(id, getUser(req));
+    @ApiResponses({ @ApiResponse(responseCode = "204", description = "Message deleted"), @ApiResponse(responseCode = "403", description = "Forbidden"), @ApiResponse(responseCode = "404", description = "Message not found"), @ApiResponse(responseCode = "401", description = "Unauthorized") })
+    public ResponseEntity<Void> delete(
+            @PathVariable String id,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        chatService.deleteMessage(id, user.getUser());
         return ResponseEntity.noContent().build();
     }
-
-
-
 }

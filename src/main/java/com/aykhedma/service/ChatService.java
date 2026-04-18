@@ -2,6 +2,10 @@ package com.aykhedma.service;
 
 import com.aykhedma.dto.request.ChatMessageRequest;
 import com.aykhedma.dto.response.ChatMessageResponse;
+import com.aykhedma.exception.BadRequestException;
+import com.aykhedma.exception.ForbiddenException;
+import com.aykhedma.exception.ResourceNotFoundException;
+import com.aykhedma.exception.UnauthorizedException;
 import com.aykhedma.model.chat.*;
 import com.aykhedma.model.user.User;
 import com.aykhedma.repository.*;
@@ -29,11 +33,14 @@ public class ChatService {
 
     public ChatRoom getOrCreateRoom(User sender, Long receiverId) {
 
+        if (sender == null)
+            throw new UnauthorizedException("User not authenticated");
+
         User receiver = userRepository.findById(receiverId)
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Receiver not found"));
 
         if (sender.getId().equals(receiver.getId())) {
-            throw new RuntimeException("Cannot create chat with yourself");
+            throw new BadRequestException("Cannot create chat with yourself");
         }
 
         Optional<ChatRoom> existingRoom = chatRoomRepository.findRoomBetweenUsers(sender, receiver);
@@ -54,16 +61,16 @@ public class ChatService {
     public ChatMessageResponse sendMessage(User sender, ChatMessageRequest request) throws IOException {
 
         if (sender == null)
-            throw new RuntimeException("Sender is null");
+            throw new UnauthorizedException("User not authenticated");
 
         var room = chatRoomRepository.findById(request.getRoomId())
-                .orElseThrow(() -> new RuntimeException("Room not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
 
         boolean allowed = room.getParticipants().stream()
                 .anyMatch(u -> u.getId().equals(sender.getId()));
 
         if (!allowed)
-            throw new RuntimeException("Unauthorized");
+            throw new ForbiddenException("You are not allowed in this room");
 
 
         List<String> mediaUrls = new ArrayList<>();
@@ -76,14 +83,13 @@ public class ChatService {
 
                     String contentType = file.getContentType();
 
-                    // optional validation (recommended)
                     if (contentType != null &&
                             !contentType.startsWith("image/") &&
                             !contentType.startsWith("video/")) {
-                        throw new RuntimeException("Only image/video files are allowed");
+                        throw new BadRequestException("Only image/video files are allowed");
                     }
 
-                    String url = mediaStorageService.storeMedia(file);
+                    String url = mediaStorageService.storeMedia(file, room.getId());
                     mediaUrls.add(url);
                 }
             }
@@ -117,12 +123,12 @@ public class ChatService {
     public List<ChatMessageResponse> getMessages(User currentUser, String roomId, int page, int size) {
 
         var room = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new RuntimeException("Room not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
 
         boolean isParticipant = room.getParticipants().stream()
                 .anyMatch(u -> u.getId().equals(currentUser.getId()));
 
-        if (!isParticipant) throw new RuntimeException("Unauthorized");
+        if (!isParticipant) throw new ForbiddenException("You are not allowed in this room");
 
         chatMessageRepository.markMessagesAsRead(roomId, currentUser.getId());
 
@@ -136,14 +142,31 @@ public class ChatService {
                 .toList();
     }
     public long getUnreadCount(String roomId, Long userId) {
+
+        var room = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+
+        boolean isParticipant = room.getParticipants().stream()
+                .anyMatch(u -> u.getId().equals(userId));
+
+        if (!isParticipant)
+            throw new ForbiddenException("You are not allowed in this room");
+
         return chatMessageRepository.countUnreadMessages(roomId, userId);
     }
 
 
     public void deleteMessage(String id, User user) {
-        ChatMessage msg = chatMessageRepository.findById(id).orElseThrow();
+
+        if (user == null)
+            throw new UnauthorizedException("User not authenticated");
+
+        ChatMessage msg = chatMessageRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+
         if (!msg.getSenderId().equals(user.getId()))
-            throw new RuntimeException("Cannot delete");
+            throw new ForbiddenException("You cannot delete this message");
+
         chatMessageRepository.delete(msg);
     }
 }
