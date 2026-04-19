@@ -272,8 +272,22 @@ public class ProviderController {
         public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getAvailableTimeSlots(
                         @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
                         @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+                LocalDate today = LocalDate.now();
+                if (date.isBefore(today)) {
+                        throw new BadRequestException("Date must be today or a future date");
+                }
+
                 List<ScheduleResponse.TimeSlotResponse> response = providerService.getAvailableTimeSlots(providerId,
                                 date);
+
+                if (date.isEqual(today)) {
+                        LocalTime sameDayCutoff = roundUpToHalfHour(LocalTime.now());
+                        response = response.stream()
+                                        .filter(slot -> slot.getStartTime() != null)
+                                        .filter(slot -> !slot.getStartTime().isBefore(sameDayCutoff))
+                                        .collect(Collectors.toList());
+                }
+
                 return ResponseEntity.ok(response);
         }
 
