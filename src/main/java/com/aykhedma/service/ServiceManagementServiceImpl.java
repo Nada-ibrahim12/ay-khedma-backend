@@ -3,6 +3,7 @@ package com.aykhedma.service;
 import com.aykhedma.dto.response.SearchResponse;
 import com.aykhedma.dto.service.ServiceCategoryDTO;
 import com.aykhedma.dto.service.ServiceTypeDTO;
+import com.aykhedma.dto.service.ServicesResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
@@ -61,6 +62,9 @@ public class ServiceManagementServiceImpl {
         ServiceCategory category = categoryRepository.findById(dto.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 
+        if (typeRepository.existsByNameIgnoreCase(dto.getName())) {
+            throw new BadRequestException("SERVICE_TYPE_NAME_ALREADY_EXISTS");
+        }
         ServiceType type = ServiceType.builder()
                 .name(dto.getName().trim())
                 .nameAr(dto.getNameAr())

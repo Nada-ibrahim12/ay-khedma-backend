@@ -244,12 +244,12 @@ public class ProviderServiceImpl implements ProviderService {
     @Transactional(readOnly = true)
     @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy,#pageable.pageNumber,#pageable.pageSize,#pageable.sort}")
     public Page<SearchResponse> search(String keyword,
-            Long categoryId,
-            String categoryName,
-            Long consumerId,
-            Double radius,
-            String sortBy,
-            Pageable pageable) {
+                                       Long categoryId,
+                                       String categoryName,
+                                       Long consumerId,
+                                       Double radius,
+                                       String sortBy,
+                                       Pageable pageable) {
         log.warn("CACHE MISS -> Fetching from DATABASE");
 
         Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName,
@@ -804,9 +804,9 @@ private void validateHighRiskProvider(Provider provider) {
 
     @Override
     public TimeSlot reserveTimeSlotWithBuffer(Long scheduleId,
-            LocalDate date,
-            LocalTime bookingStart,
-            LocalTime bookingEnd) {
+                                              LocalDate date,
+                                              LocalTime bookingStart,
+                                              LocalTime bookingEnd) {
         List<TimeSlot> availableSlots = timeSlotRepository
                 .findByScheduleIdAndDateAndStatus(scheduleId, date, TimeSlotStatus.AVAILABLE)
                 .stream()
@@ -1022,7 +1022,7 @@ private void validateHighRiskProvider(Provider provider) {
     // }
 
     private List<ScheduleResponse.TimeSlotResponse> toDiscreteStartTimeResponses(List<TimeSlot> availableSlots,
-            LocalDate fallbackDate) {
+                                                                                 LocalDate fallbackDate) {
         if (availableSlots == null || availableSlots.isEmpty()) {
             return List.of();
         }
