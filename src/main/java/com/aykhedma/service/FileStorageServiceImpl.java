@@ -56,6 +56,14 @@ public class FileStorageServiceImpl implements FileStorageService {
             validateImageFile(file);
         } else if (directory.equals("documents")) {
             validateDocumentFile(file);
+        } else if (directory.matches("\\d+")) {
+            if (isValidImage(file)) {
+                validateImageFile(file);
+            } else if (isValidDocument(file)) {
+                validateDocumentFile(file);
+            } else {
+                throw new BadRequestException("Invalid file type. Must be a valid image or document.");
+            }
         } else {
             throw new BadRequestException("Invalid directory: " + directory);
         }
@@ -198,7 +206,8 @@ public class FileStorageServiceImpl implements FileStorageService {
 
                 if (!directory.equals("profile-images")
                         && !directory.equals("national-id-images")
-                        && !directory.equals("documents")) {
+                        && !directory.equals("documents")
+                        && !directory.matches("\\d+")) {
                     return;
                 }
 

@@ -82,6 +82,9 @@ public class BookingServiceImpl implements BookingService
                 .build();
         bookingRepository.save(booking);
 
+        providerRepository.incrementTotalRequests(provider.getId());
+        updateProviderRates(provider.getId());
+
         return bookingMapper.toBookingResponse(booking);
     }
 
@@ -154,6 +157,8 @@ public class BookingServiceImpl implements BookingService
         providerRepository.incrementTotalBookings(booking.getProvider().getId());
         consumerRepository.incrementTotalBookings(booking.getConsumer().getId());
 
+        updateProviderRates(booking.getProvider().getId());
+
         return AcceptBookingResponse.builder()
                 .status("ACCEPTED")
                 .booking(bookingMapper.toBookingResponse(booking))
@@ -183,6 +188,8 @@ public class BookingServiceImpl implements BookingService
         booking.setStatus(BookingStatus.DECLINED);
         booking.setDeclinedAt(LocalDateTime.now());
         bookingRepository.save(booking);
+
+        updateProviderRates(providerId);
 
         return bookingMapper.toBookingResponse(booking);
     }
@@ -289,5 +296,166 @@ public class BookingServiceImpl implements BookingService
             throw new ForbiddenException("User is not a provider or a consumer");
 
         return bookings.stream().map(bookingMapper::toBookingResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse submitRating(Long consumerId, com.aykhedma.dto.request.RatingRequest ratingRequest) {
+        Booking booking = bookingRepository.findById(ratingRequest.getBookingId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!consumerId.equals(booking.getConsumer().getId()))
+            throw new ForbiddenException("Booking does not belong to this consumer");
+
+        LocalDateTime serviceStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
+        if (serviceStartTime.plusMinutes(30).isAfter(LocalDateTime.now()))
+            throw new BadRequestException("Rating is allowed only 30 minutes after service start");
+
+        if (booking.getStatus() == BookingStatus.CANCELLED)
+            throw new BadRequestException("Cancelled bookings cannot be rated");
+
+        if (booking.getStatus() != BookingStatus.ACCEPTED && booking.getStatus() != BookingStatus.COMPLETED)
+            throw new BadRequestException("Only accepted or completed bookings can be rated");
+
+        if (booking.getConsumerRating() != null)
+            throw new BadRequestException("You have already rated this booking");
+
+        booking.setPunctualityRating(ratingRequest.getPunctualityRating().doubleValue());
+        booking.setCommitmentRating(ratingRequest.getCommitmentRating().doubleValue());
+        booking.setQualityOfWorkRating(ratingRequest.getQualityOfWorkRating().doubleValue());
+        
+        Double overallRating = (booking.getPunctualityRating() + booking.getCommitmentRating() + booking.getQualityOfWorkRating()) / 3.0;
+        // Keep to 1 decimal place
+        overallRating = Math.round(overallRating * 10.0) / 10.0;
+        booking.setConsumerRating(overallRating);
+        booking.setConsumerReview(ratingRequest.getReview()); // consumerReview stores the review FROM consumer TO provider
+        
+        // Mark as completed if both parties have rated
+        if (booking.getProviderRating() != null) {
+            booking.setStatus(BookingStatus.COMPLETED);
+            booking.setCompletedAt(LocalDateTime.now());
+            providerRepository.incrementCompletedJobs(booking.getProvider().getId());
+        }
+
+        bookingRepository.save(booking);
+
+        // Update provider averages
+        Provider provider = booking.getProvider();
+        // Since we are adding one more rating, we can calculate it dynamically or update using formula.
+        // Assuming completedJobs is already incremented when booking was marked COMPLETED.
+        // If not, we should probably calculate from all completed ratings.
+        long ratedBookingsCount = bookingRepository.countByProviderIdAndConsumerRatingIsNotNull(provider.getId());
+
+        if (ratedBookingsCount <= 1 || provider.getAverageRating() == null || provider.getAverageRating() == 0.0) {
+            provider.setAveragePunctualityRating(booking.getPunctualityRating());
+            provider.setAverageCommitmentRating(booking.getCommitmentRating());
+            provider.setAverageQualityOfWorkRating(booking.getQualityOfWorkRating());
+            provider.setAverageRating(overallRating);
+        } else {
+            // Because completed jobs usually include unrated ones, it's safer to use a count of rated bookings.
+            // Formula: new_avg = ((old_avg * old_count) + new_rating) / new_count
+            long oldCount = ratedBookingsCount - 1; // since this booking was already saved and is included in the count
+            // However, the count query includes this booking because we just saved it and the transaction is open.
+            if (oldCount < 1) oldCount = 1;
+
+            double oldPunctuality = provider.getAveragePunctualityRating() != null ? provider.getAveragePunctualityRating() : 0.0;
+            double oldCommitment = provider.getAverageCommitmentRating() != null ? provider.getAverageCommitmentRating() : 0.0;
+            double oldQuality = provider.getAverageQualityOfWorkRating() != null ? provider.getAverageQualityOfWorkRating() : 0.0;
+            double oldOverall = provider.getAverageRating() != null ? provider.getAverageRating() : 0.0;
+
+            provider.setAveragePunctualityRating(
+                ((oldPunctuality * oldCount) + booking.getPunctualityRating()) / ratedBookingsCount
+            );
+            provider.setAverageCommitmentRating(
+                ((oldCommitment * oldCount) + booking.getCommitmentRating()) / ratedBookingsCount
+            );
+            provider.setAverageQualityOfWorkRating(
+                ((oldQuality * oldCount) + booking.getQualityOfWorkRating()) / ratedBookingsCount
+            );
+            provider.setAverageRating(
+                ((oldOverall * oldCount) + overallRating) / ratedBookingsCount
+            );
+        }
+        providerRepository.save(provider);
+        updateProviderRates(provider.getId());
+
+        return bookingMapper.toBookingResponse(booking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse submitConsumerRating(Long providerId, com.aykhedma.dto.request.ProviderRatingRequest ratingRequest) {
+        Booking booking = bookingRepository.findById(ratingRequest.getBookingId())
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!providerId.equals(booking.getProvider().getId()))
+            throw new ForbiddenException("Booking does not belong to this provider");
+
+        LocalDateTime serviceStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
+        if (serviceStartTime.plusMinutes(30).isAfter(LocalDateTime.now()))
+            throw new BadRequestException("Rating is allowed only 30 minutes after service start");
+
+        if (booking.getStatus() == BookingStatus.CANCELLED)
+            throw new BadRequestException("Cancelled bookings cannot be rated");
+
+        if (booking.getStatus() != BookingStatus.ACCEPTED && booking.getStatus() != BookingStatus.COMPLETED)
+            throw new BadRequestException("Only accepted or completed bookings can be rated");
+
+        // providerRating stores score given BY provider TO consumer
+        if (booking.getProviderRating() != null)
+            throw new BadRequestException("You have already rated this booking");
+
+        booking.setProviderRating(ratingRequest.getRating().doubleValue());
+        booking.setProviderReview(ratingRequest.getReview());
+        
+        // Mark as completed if both parties have rated
+        if (booking.getConsumerRating() != null) {
+            booking.setStatus(BookingStatus.COMPLETED);
+            booking.setCompletedAt(LocalDateTime.now());
+            providerRepository.incrementCompletedJobs(booking.getProvider().getId());
+        }
+
+        bookingRepository.save(booking);
+        updateProviderRates(booking.getProvider().getId());
+
+        // Update consumer average
+        Consumer consumer = booking.getConsumer();
+        long ratedBookingsCount = bookingRepository.countByConsumerIdAndProviderRatingIsNotNull(consumer.getId());
+
+        if (ratedBookingsCount <= 1 || consumer.getAverageRating() == null || consumer.getAverageRating() == 0.0) {
+            consumer.setAverageRating(booking.getProviderRating());
+        } else {
+            long oldCount = ratedBookingsCount - 1;
+            if (oldCount < 1) oldCount = 1;
+
+            double oldOverall = consumer.getAverageRating() != null ? consumer.getAverageRating() : 0.0;
+            consumer.setAverageRating(
+                ((oldOverall * oldCount) + booking.getProviderRating()) / ratedBookingsCount
+            );
+        }
+        consumerRepository.save(consumer);
+
+        return bookingMapper.toBookingResponse(booking);
+    }
+
+    private void updateProviderRates(Long providerId) {
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        Integer totalRequests = provider.getTotalRequests();
+        if (totalRequests != null && totalRequests > 0) {
+            // Acceptance Rate = (Accepted Bookings / Total Requests) * 100
+            // totalBookings is used as accepted count in this system
+            Integer accepted = provider.getTotalBookings();
+            provider.setAcceptanceRate((accepted * 100) / totalRequests);
+
+            // Booking Rate = (Completed Jobs / Total Requests) * 100
+            Integer completed = provider.getCompletedJobs();
+            provider.setBookingRate((completed * 100) / totalRequests);
+        } else {
+            provider.setAcceptanceRate(100);
+            provider.setBookingRate(0);
+        }
+        providerRepository.save(provider);
     }
 }

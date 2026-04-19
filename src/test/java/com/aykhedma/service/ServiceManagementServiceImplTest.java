@@ -1,6 +1,7 @@
 package com.aykhedma.service;
 
 import com.aykhedma.dto.service.ServiceTypeDTO;
+import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.service.RiskLevel;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class ServiceManagementServiceImplTest {
@@ -124,10 +126,28 @@ class ServiceManagementServiceImplTest {
     }
 
     @Test
-    @DisplayName("deleteType should call repository deleteById")
+    @DisplayName("deleteType should delete successfully when type exists")
     void testDeleteType() {
+
+        when(typeRepository.existsById(1L)).thenReturn(true);
+        doNothing().when(typeRepository).deleteById(1L);
+
         service.deleteType(1L);
+
+        verify(typeRepository, times(1)).existsById(1L);
         verify(typeRepository, times(1)).deleteById(1L);
+    }
+    @Test
+    @DisplayName("deleteType should throw ResourceNotFoundException when type not found")
+    void testDeleteType_NotFound() {
+
+        when(typeRepository.existsById(1L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.deleteType(1L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Service type not found");
+
+        verify(typeRepository, never()).deleteById(anyLong());
     }
 
     @Test

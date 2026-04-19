@@ -332,36 +332,36 @@ public class ProviderServiceImpl implements ProviderService {
         }
     }
 
-    private void validateHighRiskProvider(Provider provider) {
+private void validateHighRiskProvider(Provider provider) {
 
-        if (provider.getServiceType().getRiskLevel() == RiskLevel.HIGH) {
+    if (provider.getServiceType().getRiskLevel() == RiskLevel.HIGH) {
 
-            List<Document> documents = documentRepository.findByProviderId(provider.getId());
+        List<Document> documents = documentRepository.findByProviderId(provider.getId());
 
-            if (documents == null || documents.isEmpty()) {
-                throw new BadRequestException("Documents are required for HIGH risk services");
-            }
-
-            boolean hasNationalId = documents.stream()
-                    .anyMatch(doc -> doc.getType().equalsIgnoreCase("NATIONAL_ID"));
-
-            if (!hasNationalId) {
-                throw new BadRequestException("NATIONAL_ID document is required");
-            }
-
-            boolean hasAdditionalDocuments = documents.stream()
-                    .anyMatch(doc -> !doc.getType().equalsIgnoreCase("NATIONAL_ID"));
-
-            if (!hasAdditionalDocuments) {
-                throw new BadRequestException("Additional documents (certificates) are required for HIGH risk services. Please upload them before updating your service type.");
-            }
-
-            provider.setVerificationStatus(VerificationStatus.PENDING);
-
-        } else {
-            provider.setVerificationStatus(VerificationStatus.VERIFIED);
+        if (documents == null || documents.isEmpty()) {
+            throw new BadRequestException("Documents are required for HIGH risk services");
         }
+
+        boolean hasNationalId = documents.stream()
+                .anyMatch(doc -> doc.getType().equalsIgnoreCase("NATIONAL_ID"));
+
+        if (!hasNationalId) {
+            throw new BadRequestException("NATIONAL_ID document is required");
+        }
+
+        boolean hasAdditionalDocuments = documents.stream()
+                .anyMatch(doc -> !doc.getType().equalsIgnoreCase("NATIONAL_ID"));
+
+        if (!hasAdditionalDocuments) {
+            throw new BadRequestException("Additional documents (certificates) are required for HIGH risk services. Please upload them before updating your service type.");
+        }
+
+        provider.setVerificationStatus(VerificationStatus.PENDING);
+
+    } else {
+        provider.setVerificationStatus(VerificationStatus.VERIFIED);
     }
+}
 
     private Page<SearchResponse> toPage(List<SearchResponse> responses, Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
@@ -418,6 +418,13 @@ public class ProviderServiceImpl implements ProviderService {
     @Transactional(readOnly = true)
     public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
 
+        if (consumerId == null) {
+            throw new BadRequestException("consumerId is required");
+        }
+        if (radius == null || radius <= 0) {
+            throw new BadRequestException("radius must be greater than 0");
+        }
+
         Page<Provider> providersPage =
                 providerRepository.searchProviders(null, null, null, Pageable.unpaged());
 
@@ -443,8 +450,7 @@ public class ProviderServiceImpl implements ProviderService {
 
                         return res;
 
-                    } catch (Exception e) {
-                        return null;
+                    } catch (Exception e) { throw new BadRequestException("Distance calculation failed");
                     }
                 })
                 .filter(Objects::nonNull)

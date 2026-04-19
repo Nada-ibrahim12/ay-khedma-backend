@@ -17,10 +17,16 @@ public class ProviderSummaryResponse {
     private String profileImage;
     private String serviceType;
     private Integer yearsOfExperience;
+    private Double averagePunctualityRating;
+    private Double averageCommitmentRating;
+    private Double averageQualityOfWorkRating;
     private Double averageRating;
     private Integer completedJobs;
     private Integer totalBookings;
     private Integer cancelledBookings;
+    private Double cancellationRate;
+    private Double averageInteractionRating;
+    private Integer interactionRatingCount;
     private Double price;
     private PriceType priceType;
     private Double distance; // in km

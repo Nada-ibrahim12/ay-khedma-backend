@@ -22,13 +22,18 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/providers")
@@ -121,9 +126,79 @@ public class ProviderController {
                 @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<ScheduleResponse> getSchedule(
-                @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId) {
+                        @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
+                        Authentication authentication) {
                 ScheduleResponse response = providerService.getSchedule(providerId);
+
+                boolean isConsumer = authentication != null && authentication.getAuthorities().stream()
+                                .anyMatch(authority -> "ROLE_CONSUMER".equals(authority.getAuthority()));
+
+                if (isConsumer && response.getTimeSlots() != null) {
+                        LocalDate nowDate = LocalDate.now();
+                        LocalTime nowTime = LocalTime.now();
+                        LocalTime sameDayCutoff = roundUpToHalfHour(nowTime);
+                        Map<String, ScheduleResponse.TimeSlotResponse> sharpSlots = new LinkedHashMap<>();
+
+                        if (response.getWorkingDays() != null) {
+                                response.setWorkingDays(response.getWorkingDays().stream()
+                                                .filter(day -> day.getDate() != null)
+                                                .filter(day -> !LocalDate.parse(day.getDate()).isBefore(nowDate))
+                                                .sorted(Comparator
+                                                                .comparing(ScheduleResponse.WorkingDayResponse::getDate)
+                                                                .thenComparing(ScheduleResponse.WorkingDayResponse::getStartTime))
+                                                .collect(Collectors.toList()));
+                        }
+
+                        for (ScheduleResponse.TimeSlotResponse slot : response.getTimeSlots()) {
+                                if (slot.getDate() == null || slot.getStartTime() == null
+                                                || slot.getEndTime() == null) {
+                                        continue;
+                                }
+
+                                LocalDate slotDate = LocalDate.parse(slot.getDate());
+                                if (slotDate.isBefore(nowDate)) {
+                                        continue;
+                                }
+
+                                LocalTime slotStart = slot.getStartTime();
+                                if (slotDate.isEqual(nowDate) && slotStart.isBefore(sameDayCutoff)) {
+                                        slotStart = sameDayCutoff;
+                                }
+
+                                LocalTime cursor = roundUpToHalfHour(slotStart);
+                                while (!cursor.plusMinutes(30).isAfter(slot.getEndTime())) {
+                                        String key = slotDate + "_" + cursor;
+                                        sharpSlots.putIfAbsent(key, ScheduleResponse.TimeSlotResponse.builder()
+                                                        .id(null)
+                                                        .date(slotDate.toString())
+                                                        .startTime(cursor)
+                                                        .endTime(cursor.plusMinutes(30))
+                                                        .isBooked(false)
+                                                        .status(slot.getStatus())
+                                                        .build());
+
+                                        cursor = cursor.plusMinutes(30);
+                                }
+                        }
+
+                        response.setTimeSlots(sharpSlots.values().stream()
+                                        .sorted(Comparator
+                                                        .comparing(ScheduleResponse.TimeSlotResponse::getDate)
+                                                        .thenComparing(ScheduleResponse.TimeSlotResponse::getStartTime))
+                                        .collect(Collectors.toList()));
+                }
+
                 return ResponseEntity.ok(response);
+        }
+
+        private LocalTime roundUpToHalfHour(LocalTime time) {
+                int minute = time.getMinute();
+                int remainder = minute % 30;
+                if (remainder == 0 && time.getSecond() == 0 && time.getNano() == 0) {
+                        return time;
+                }
+
+                return time.plusMinutes(30 - remainder).withSecond(0).withNano(0);
         }
 
         @PreAuthorize("hasRole('PROVIDER')")
@@ -195,10 +270,24 @@ public class ProviderController {
                 @ApiResponse(responseCode = "404", description = "Provider not found")
         })
         public ResponseEntity<List<ScheduleResponse.TimeSlotResponse>> getAvailableTimeSlots(
-                @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
-                @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+                        @Parameter(description = "ID of the provider", required = true) @PathVariable Long providerId,
+                        @Parameter(description = "Date (format: yyyy-MM-dd)", required = true) @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+                LocalDate today = LocalDate.now();
+                if (date.isBefore(today)) {
+                        throw new BadRequestException("Date must be today or a future date");
+                }
+
                 List<ScheduleResponse.TimeSlotResponse> response = providerService.getAvailableTimeSlots(providerId,
-                        date);
+                                date);
+
+                if (date.isEqual(today)) {
+                        LocalTime sameDayCutoff = roundUpToHalfHour(LocalTime.now());
+                        response = response.stream()
+                                        .filter(slot -> slot.getStartTime() != null)
+                                        .filter(slot -> !slot.getStartTime().isBefore(sameDayCutoff))
+                                        .collect(Collectors.toList());
+                }
+
                 return ResponseEntity.ok(response);
         }
 
@@ -429,29 +518,25 @@ public class ProviderController {
 
                 return ResponseEntity.ok(page);
         }
+
         @GetMapping("/top-rated-near-me")
         @Operation(summary = "Get top 10 top-rated providers near the consumer based on location and scoring system")
         @PreAuthorize("hasRole('CONSUMER')")
         @ApiResponses(value = {
-                @ApiResponse(responseCode = "200", description = "Top rated providers fetched successfully"),
-                @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
-                @ApiResponse(responseCode = "404", description = "Consumer not found"),
-                @ApiResponse(responseCode = "500", description = "Internal server error")
+                        @ApiResponse(responseCode = "200", description = "Top rated providers fetched successfully"),
+                        @ApiResponse(responseCode = "400", description = "Invalid request parameters"),
+                        @ApiResponse(responseCode = "404", description = "Consumer not found"),
+                        @ApiResponse(responseCode = "500", description = "Internal server error")
         })
 
         public ResponseEntity<Page<SearchResponse>> topRatedNearMe(
 
-                @Parameter(description = "Consumer ID for location-based search", required = true)
-                @RequestParam Long consumerId,
+                        @Parameter(description = "Consumer ID for location-based search", required = true) @RequestParam Long consumerId,
 
-                @Parameter(description = "Search radius in kilometers (default = 10 km)")
-                @RequestParam(defaultValue = "10.0") Double radius,
+                        @Parameter(description = "Search radius in kilometers (default = 10 km)") @RequestParam(defaultValue = "10.0") Double radius,
 
-                @Parameter(hidden = true)
-                Pageable pageable
-        ) {
+                        @Parameter(hidden = true) Pageable pageable) {
                 return ResponseEntity.ok(
-                        providerService.topRatedNearMe(consumerId, radius, PageRequest.of(0, 10))
-                );
+                                providerService.topRatedNearMe(consumerId, radius, PageRequest.of(0, 10)));
         }
 }

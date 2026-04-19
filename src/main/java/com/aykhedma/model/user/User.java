@@ -22,7 +22,7 @@ public abstract class User {
     private Long id;
 
     @NotBlank(message = "Name is required")
-    @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
+    @Size(min = 1, max = 100, message = "Name must be between 1 and 100 characters")
     @Column(nullable = false, length = 100)
     private String name;
 
@@ -38,8 +38,8 @@ public abstract class User {
     private String phoneNumber;
 
     @NotBlank(message = "Password is required")
-    @Size(min = 8, max = 60, message = "Invalid password hash")
-    @Column(nullable = false, length = 60)
+    @Size(min = 1, max = 100, message = "Password hash too long or short")
+    @Column(nullable = false, length = 100)
     private String password;
 
     @PastOrPresent(message = "Created date cannot be in the future")
@@ -52,11 +52,9 @@ public abstract class User {
     private UserType role;
 
     @Size(max = 255, message = "Profile image URL cannot exceed 255 characters")
-    @Pattern(regexp = "^(http|https|ftp)://.*$", message = "Invalid URL format")
     private String profileImage;
 
-    @Size(min = 2, max = 10, message = "Language code must be between 2 and 10 characters")
-    @Pattern(regexp = "^[a-z]{2}(-[A-Z]{2})?$", message = "Invalid language format (e.g., 'en', 'ar-EG')")
+    @Size(min = 1, max = 10, message = "Language code too long")
     private String preferredLanguage;
 
     @Builder.Default
@@ -69,7 +67,6 @@ public abstract class User {
     @Column(nullable = false)
     private boolean credentialsNonExpired = true;
 
-
     public UserType getRole() {
         return role;
     }
@@ -77,4 +74,4 @@ public abstract class User {
     public void setRole(UserType role) {
         this.role = role;
     }
-}
+}

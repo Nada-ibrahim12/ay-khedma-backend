@@ -38,6 +38,10 @@ public class RegisterRequest {
     @NotNull(message = "User type is required")
     private UserType userType;
 
+    // Admin specific fields
+    @Size(min = 2, max = 50, message = "Department must be between 2 and 50 characters")
+    private String department;
+
     // Provider specific fields
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
     private String bio;

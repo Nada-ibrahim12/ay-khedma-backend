@@ -26,5 +26,7 @@ public class ConsumerResponse {
     private Double averageRating;
     private Integer totalBookings;
     private Integer cancelledBookings;
+    private Double cancellationRate;
+    private List<CancellationResponse> cancellationHistory;
     private List<ProviderSummaryResponse> savedProviders;
 }
