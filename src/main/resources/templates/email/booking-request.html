@@ -228,24 +228,22 @@
             width="100%"
           >
             <tr>
-              <td class="detail-label">Service Type</td>
-              <td class="detail-value" th:text="${serviceType}">Service</td>
+              <td class="detail-label">Description</td>
+              <td class="detail-value" th:text="${problemDescription}">
+                Description
+              </td>
             </tr>
             <tr>
               <td class="detail-label">Requested Date</td>
-              <td class="detail-value" th:text="${bookingDate}">Date</td>
+              <td class="detail-value" th:text="${requestedDate}">Date</td>
             </tr>
             <tr>
-              <td class="detail-label">Time Slot</td>
-              <td class="detail-value" th:text="${bookingTime}">Time</td>
+              <td class="detail-label">Requested Time</td>
+              <td class="detail-value" th:text="${requestedTime}">Time</td>
             </tr>
             <tr>
               <td class="detail-label">Location</td>
               <td class="detail-value" th:text="${location}">Location</td>
-            </tr>
-            <tr>
-              <td class="detail-label">Budget</td>
-              <td class="detail-value" th:text="${budget}">Amount</td>
             </tr>
           </table>
         </div>

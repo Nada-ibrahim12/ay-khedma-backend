@@ -10,6 +10,7 @@ import com.aykhedma.exception.ForbiddenException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.BookingMapper;
 import com.aykhedma.model.booking.*;
+import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
@@ -25,13 +26,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class BookingServiceImpl implements BookingService
-{
+public class BookingServiceImpl implements BookingService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final ConsumerRepository consumerRepository;
@@ -40,11 +42,11 @@ public class BookingServiceImpl implements BookingService
     private final TimeSlotRepository timeSlotRepository;
     private final BookingMapper bookingMapper;
     private final ProviderService providerService;
+    private final NotificationFactory notificationFactory;
 
     @Override
     @Transactional
-    public BookingResponse requestBooking (Long consumerId, BookingRequest bookingRequest)
-    {
+    public BookingResponse requestBooking(Long consumerId, BookingRequest bookingRequest) {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
 
@@ -85,13 +87,32 @@ public class BookingServiceImpl implements BookingService
         providerRepository.incrementTotalRequests(provider.getId());
         updateProviderRates(provider.getId());
 
+        Map<String, Object> notificationData = new HashMap<>();
+        notificationData.put("title", "New Booking Request");
+        notificationData.put("content",
+                "You have a new booking request from " + consumer.getName() + " for " + serviceType.getName() + ".");
+        notificationData.put("message",
+                "You have a new booking request from " + consumer.getName() + " for " + serviceType.getName() + ".");
+        notificationData.put("bookingId", booking.getId());
+        notificationData.put("providerName", provider.getName());
+        notificationData.put("consumerName", consumer.getName());
+        notificationData.put("serviceType", serviceType.getName());
+        notificationData.put("requestedDate", requestedDate.toString());
+        notificationData.put("requestedTime", requestedTime.toString());
+        notificationData.put("problemDescription", problemDescription);
+        notificationData.put("location", consumer.getLocation().getAddress());
+
+        notificationFactory.send(
+                provider.getId(),
+                NotificationType.BOOKING_REQUEST,
+                notificationData);
+
         return bookingMapper.toBookingResponse(booking);
     }
 
     @Override
     @Transactional
-    public AcceptBookingResponse acceptBooking (Long providerId, AcceptBookingRequest acceptBookingRequest)
-    {
+    public AcceptBookingResponse acceptBooking(Long providerId, AcceptBookingRequest acceptBookingRequest) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -121,13 +142,11 @@ public class BookingServiceImpl implements BookingService
         else
             scheduleId = schedule.getId();
 
-        if (!acceptBookingRequest.isOverrideWorkingHours())
-        {
+        if (!acceptBookingRequest.isOverrideWorkingHours()) {
             WorkingDay workingDay = workingDayRepository.findByScheduleIdAndDate(scheduleId, date)
                     .orElseThrow(() -> new ResourceNotFoundException("Working day by the booking date is not found"));
 
-            if (endTime.isAfter(workingDay.getEndTime()))
-            {
+            if (endTime.isAfter(workingDay.getEndTime())) {
                 return AcceptBookingResponse.builder()
                         .status("WARNING")
                         .warningMessage("The booking end time will exceed the end time of the working day")
@@ -135,14 +154,14 @@ public class BookingServiceImpl implements BookingService
             }
         }
 
-        List<Booking> conflictingBookings = bookingRepository.findConflictingBookings(providerId, bookingId, date, startTime, endTime);
-        if (!conflictingBookings.isEmpty())
-        {
+        List<Booking> conflictingBookings = bookingRepository.findConflictingBookings(providerId, bookingId, date,
+                startTime, endTime);
+        if (!conflictingBookings.isEmpty()) {
             return AcceptBookingResponse.builder()
                     .status("CONFLICT")
                     .conflictingBookings(conflictingBookings.stream()
-                                                            .map(bookingMapper::toBookingResponse)
-                                                            .toList())
+                            .map(bookingMapper::toBookingResponse)
+                            .toList())
                     .build();
         }
 
@@ -159,6 +178,25 @@ public class BookingServiceImpl implements BookingService
 
         updateProviderRates(booking.getProvider().getId());
 
+        Map<String, Object> notificationData = new HashMap<>();
+        notificationData.put("title", "Booking Confirmed");
+        notificationData.put("content",
+                "Your booking for " + booking.getServiceType().getName() + " on " + booking.getRequestedDate() + " at "
+                        + booking.getRequestedStartTime() + " has been accepted by " + provider.getName() + ".");
+        notificationData.put("message",
+                "Your booking for " + booking.getServiceType().getName() + " on " + booking.getRequestedDate() + " at "
+                        + booking.getRequestedStartTime() + " has been accepted by " + provider.getName() + ".");
+        notificationData.put("bookingId", booking.getId());
+        notificationData.put("serviceName", booking.getServiceType().getName());
+        notificationData.put("bookingDate", booking.getRequestedDate().toString());
+        notificationData.put("bookingTime", booking.getRequestedStartTime().toString());
+        notificationData.put("providerName", provider.getName());
+
+        notificationFactory.send(
+                booking.getConsumer().getId(),
+                NotificationType.BOOKING_CONFIRMATION,
+                notificationData);
+
         return AcceptBookingResponse.builder()
                 .status("ACCEPTED")
                 .booking(bookingMapper.toBookingResponse(booking))
@@ -167,8 +205,7 @@ public class BookingServiceImpl implements BookingService
 
     @Override
     @Transactional
-    public BookingResponse declineBooking (Long providerId, Long bookingId)
-    {
+    public BookingResponse declineBooking(Long providerId, Long bookingId) {
         providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -189,6 +226,32 @@ public class BookingServiceImpl implements BookingService
         booking.setDeclinedAt(LocalDateTime.now());
         bookingRepository.save(booking);
 
+        Map<String, Object> declineNotificationData = new HashMap<>();
+        declineNotificationData.put("title", "Booking Request Declined");
+        declineNotificationData.put("content",
+                "Your booking request for " + booking.getServiceType().getName() + " on " + booking.getRequestedDate()
+                        + " at "
+                        + booking.getRequestedStartTime() + " was declined by " + booking.getProvider().getName()
+                        + ".");
+        declineNotificationData.put("message",
+                "Your booking request for " + booking.getServiceType().getName() + " on " + booking.getRequestedDate()
+                        + " at "
+                        + booking.getRequestedStartTime() + " was declined by " + booking.getProvider().getName()
+                        + ".");
+        declineNotificationData.put("bookingId", booking.getId());
+        declineNotificationData.put("serviceName", booking.getServiceType().getName());
+        declineNotificationData.put("bookingDate", booking.getRequestedDate().toString());
+        declineNotificationData.put("bookingTime", booking.getRequestedStartTime().toString());
+        declineNotificationData.put("providerName", booking.getProvider().getName());
+        declineNotificationData.put("cancelledBy", "P");
+        declineNotificationData.put("cancelledByName", booking.getProvider().getName());
+        declineNotificationData.put("reason", "The provider declined this booking request.");
+
+        notificationFactory.send(
+                booking.getConsumer().getId(),
+                NotificationType.BOOKING_CANCELLED,
+                declineNotificationData);
+
         updateProviderRates(providerId);
 
         return bookingMapper.toBookingResponse(booking);
@@ -196,8 +259,7 @@ public class BookingServiceImpl implements BookingService
 
     @Override
     @Transactional
-    public BookingResponse cancelBooking (Long userId, CancelBookingRequest cancelBookingRequest)
-    {
+    public BookingResponse cancelBooking(Long userId, CancelBookingRequest cancelBookingRequest) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -205,21 +267,17 @@ public class BookingServiceImpl implements BookingService
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
         boolean isConsumer;
-        if (user.getRole().equals(UserType.CONSUMER))
-        {
+        if (user.getRole().equals(UserType.CONSUMER)) {
             if (!userId.equals(booking.getConsumer().getId()))
                 throw new ForbiddenException("Booking does not belong to this consumer");
 
             isConsumer = true;
-        }
-        else if (user.getRole().equals(UserType.PROVIDER))
-        {
+        } else if (user.getRole().equals(UserType.PROVIDER)) {
             if (!userId.equals(booking.getProvider().getId()))
                 throw new ForbiddenException("Booking does not belong to this provider");
 
             isConsumer = false;
-        }
-        else
+        } else
             throw new ForbiddenException("User is not a provider or a consumer");
 
         if (!booking.getStatus().equals(BookingStatus.ACCEPTED))
@@ -245,54 +303,73 @@ public class BookingServiceImpl implements BookingService
         else
             providerRepository.incrementCancelledBookings(booking.getProvider().getId());
 
+        Long recipientId = isConsumer ? booking.getProvider().getId() : booking.getConsumer().getId();
+        String cancelledByCode = isConsumer ? "C" : "P";
+        String cancelledByName = isConsumer ? booking.getConsumer().getName() : booking.getProvider().getName();
+
+        Map<String, Object> cancellationNotificationData = new HashMap<>();
+        cancellationNotificationData.put("title", "Booking Cancelled");
+        cancellationNotificationData.put("content",
+                "The booking for " + booking.getServiceType().getName() + " on " + booking.getRequestedDate() + " at "
+                        + booking.getRequestedStartTime() + " has been cancelled.");
+        cancellationNotificationData.put("message",
+                "The booking for " + booking.getServiceType().getName() + " on " + booking.getRequestedDate() + " at "
+                        + booking.getRequestedStartTime() + " has been cancelled.");
+        cancellationNotificationData.put("bookingId", booking.getId());
+        cancellationNotificationData.put("serviceName", booking.getServiceType().getName());
+        cancellationNotificationData.put("bookingDate", booking.getRequestedDate().toString());
+        cancellationNotificationData.put("bookingTime", booking.getRequestedStartTime().toString());
+        cancellationNotificationData.put("providerName", booking.getProvider().getName());
+        cancellationNotificationData.put("cancelledBy", cancelledByCode);
+        cancellationNotificationData.put("cancelledByName", cancelledByName);
+        cancellationNotificationData.put("reason",
+                booking.getCancellationReason() != null && !booking.getCancellationReason().isBlank()
+                        ? booking.getCancellationReason()
+                        : "No reason provided");
+
+        notificationFactory.send(
+                recipientId,
+                NotificationType.BOOKING_CANCELLED,
+                cancellationNotificationData);
+
         return bookingMapper.toBookingResponse(booking);
     }
 
-    public Page<BookingResponse> getBookingsByStatus (Long userId, BookingStatus status, Pageable pageable)
-    {
+    public Page<BookingResponse> getBookingsByStatus(Long userId, BookingStatus status, Pageable pageable) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        Page<Booking>  bookings;
-        if (user.getRole().equals(UserType.CONSUMER))
-        {
+        Page<Booking> bookings;
+        if (user.getRole().equals(UserType.CONSUMER)) {
             if (status == null)
                 bookings = bookingRepository.findByConsumerId(userId, pageable);
             else
                 bookings = bookingRepository.findByConsumerIdAndStatus(userId, status, pageable);
-        }
-        else if (user.getRole().equals(UserType.PROVIDER))
-        {
+        } else if (user.getRole().equals(UserType.PROVIDER)) {
             if (status == null)
                 bookings = bookingRepository.findByProviderId(userId, pageable);
             else
                 bookings = bookingRepository.findByProviderIdAndStatus(userId, status, pageable);
-        }
-        else
+        } else
             throw new ForbiddenException("User is not a provider or a consumer");
 
         return bookings.map(bookingMapper::toBookingResponse);
     }
 
-    public List<BookingResponse> getUpcomingBookings (Long userId)
-    {
+    public List<BookingResponse> getUpcomingBookings(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        List<Booking>  bookings;
-        if (user.getRole().equals(UserType.CONSUMER))
-        {
+        List<Booking> bookings;
+        if (user.getRole().equals(UserType.CONSUMER)) {
             bookings = bookingRepository
-                    .findByConsumerIdAndStatusAndRequestedDateAndRequestedStartTimeAfter
-                            (userId, BookingStatus.ACCEPTED, LocalDate.now(), LocalTime.now());
-        }
-        else if (user.getRole().equals(UserType.PROVIDER))
-        {
+                    .findByConsumerIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(userId, BookingStatus.ACCEPTED,
+                            LocalDate.now(), LocalTime.now());
+        } else if (user.getRole().equals(UserType.PROVIDER)) {
             bookings = bookingRepository
-                    .findByProviderIdAndStatusAndRequestedDateAndRequestedStartTimeAfter
-                            (userId, BookingStatus.ACCEPTED, LocalDate.now(), LocalTime.now());
-        }
-        else
+                    .findByProviderIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(userId, BookingStatus.ACCEPTED,
+                            LocalDate.now(), LocalTime.now());
+        } else
             throw new ForbiddenException("User is not a provider or a consumer");
 
         return bookings.stream().map(bookingMapper::toBookingResponse).toList();
@@ -323,13 +400,15 @@ public class BookingServiceImpl implements BookingService
         booking.setPunctualityRating(ratingRequest.getPunctualityRating().doubleValue());
         booking.setCommitmentRating(ratingRequest.getCommitmentRating().doubleValue());
         booking.setQualityOfWorkRating(ratingRequest.getQualityOfWorkRating().doubleValue());
-        
-        Double overallRating = (booking.getPunctualityRating() + booking.getCommitmentRating() + booking.getQualityOfWorkRating()) / 3.0;
+
+        Double overallRating = (booking.getPunctualityRating() + booking.getCommitmentRating()
+                + booking.getQualityOfWorkRating()) / 3.0;
         // Keep to 1 decimal place
         overallRating = Math.round(overallRating * 10.0) / 10.0;
         booking.setConsumerRating(overallRating);
-        booking.setConsumerReview(ratingRequest.getReview()); // consumerReview stores the review FROM consumer TO provider
-        
+        booking.setConsumerReview(ratingRequest.getReview()); // consumerReview stores the review FROM consumer TO
+                                                              // provider
+
         // Mark as completed if both parties have rated
         if (booking.getProviderRating() != null) {
             booking.setStatus(BookingStatus.COMPLETED);
@@ -341,8 +420,10 @@ public class BookingServiceImpl implements BookingService
 
         // Update provider averages
         Provider provider = booking.getProvider();
-        // Since we are adding one more rating, we can calculate it dynamically or update using formula.
-        // Assuming completedJobs is already incremented when booking was marked COMPLETED.
+        // Since we are adding one more rating, we can calculate it dynamically or
+        // update using formula.
+        // Assuming completedJobs is already incremented when booking was marked
+        // COMPLETED.
         // If not, we should probably calculate from all completed ratings.
         long ratedBookingsCount = bookingRepository.countByProviderIdAndConsumerRatingIsNotNull(provider.getId());
 
@@ -352,29 +433,33 @@ public class BookingServiceImpl implements BookingService
             provider.setAverageQualityOfWorkRating(booking.getQualityOfWorkRating());
             provider.setAverageRating(overallRating);
         } else {
-            // Because completed jobs usually include unrated ones, it's safer to use a count of rated bookings.
+            // Because completed jobs usually include unrated ones, it's safer to use a
+            // count of rated bookings.
             // Formula: new_avg = ((old_avg * old_count) + new_rating) / new_count
             long oldCount = ratedBookingsCount - 1; // since this booking was already saved and is included in the count
-            // However, the count query includes this booking because we just saved it and the transaction is open.
-            if (oldCount < 1) oldCount = 1;
+            // However, the count query includes this booking because we just saved it and
+            // the transaction is open.
+            if (oldCount < 1)
+                oldCount = 1;
 
-            double oldPunctuality = provider.getAveragePunctualityRating() != null ? provider.getAveragePunctualityRating() : 0.0;
-            double oldCommitment = provider.getAverageCommitmentRating() != null ? provider.getAverageCommitmentRating() : 0.0;
-            double oldQuality = provider.getAverageQualityOfWorkRating() != null ? provider.getAverageQualityOfWorkRating() : 0.0;
+            double oldPunctuality = provider.getAveragePunctualityRating() != null
+                    ? provider.getAveragePunctualityRating()
+                    : 0.0;
+            double oldCommitment = provider.getAverageCommitmentRating() != null ? provider.getAverageCommitmentRating()
+                    : 0.0;
+            double oldQuality = provider.getAverageQualityOfWorkRating() != null
+                    ? provider.getAverageQualityOfWorkRating()
+                    : 0.0;
             double oldOverall = provider.getAverageRating() != null ? provider.getAverageRating() : 0.0;
 
             provider.setAveragePunctualityRating(
-                ((oldPunctuality * oldCount) + booking.getPunctualityRating()) / ratedBookingsCount
-            );
+                    ((oldPunctuality * oldCount) + booking.getPunctualityRating()) / ratedBookingsCount);
             provider.setAverageCommitmentRating(
-                ((oldCommitment * oldCount) + booking.getCommitmentRating()) / ratedBookingsCount
-            );
+                    ((oldCommitment * oldCount) + booking.getCommitmentRating()) / ratedBookingsCount);
             provider.setAverageQualityOfWorkRating(
-                ((oldQuality * oldCount) + booking.getQualityOfWorkRating()) / ratedBookingsCount
-            );
+                    ((oldQuality * oldCount) + booking.getQualityOfWorkRating()) / ratedBookingsCount);
             provider.setAverageRating(
-                ((oldOverall * oldCount) + overallRating) / ratedBookingsCount
-            );
+                    ((oldOverall * oldCount) + overallRating) / ratedBookingsCount);
         }
         providerRepository.save(provider);
         updateProviderRates(provider.getId());
@@ -384,7 +469,8 @@ public class BookingServiceImpl implements BookingService
 
     @Override
     @Transactional
-    public BookingResponse submitConsumerRating(Long providerId, com.aykhedma.dto.request.ProviderRatingRequest ratingRequest) {
+    public BookingResponse submitConsumerRating(Long providerId,
+            com.aykhedma.dto.request.ProviderRatingRequest ratingRequest) {
         Booking booking = bookingRepository.findById(ratingRequest.getBookingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
@@ -407,7 +493,7 @@ public class BookingServiceImpl implements BookingService
 
         booking.setProviderRating(ratingRequest.getRating().doubleValue());
         booking.setProviderReview(ratingRequest.getReview());
-        
+
         // Mark as completed if both parties have rated
         if (booking.getConsumerRating() != null) {
             booking.setStatus(BookingStatus.COMPLETED);
@@ -426,12 +512,12 @@ public class BookingServiceImpl implements BookingService
             consumer.setAverageRating(booking.getProviderRating());
         } else {
             long oldCount = ratedBookingsCount - 1;
-            if (oldCount < 1) oldCount = 1;
+            if (oldCount < 1)
+                oldCount = 1;
 
             double oldOverall = consumer.getAverageRating() != null ? consumer.getAverageRating() : 0.0;
             consumer.setAverageRating(
-                ((oldOverall * oldCount) + booking.getProviderRating()) / ratedBookingsCount
-            );
+                    ((oldOverall * oldCount) + booking.getProviderRating()) / ratedBookingsCount);
         }
         consumerRepository.save(consumer);
 
@@ -442,20 +528,28 @@ public class BookingServiceImpl implements BookingService
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
+        int acceptanceRate;
+        int bookingRate;
+
         Integer totalRequests = provider.getTotalRequests();
         if (totalRequests != null && totalRequests > 0) {
             // Acceptance Rate = (Accepted Bookings / Total Requests) * 100
             // totalBookings is used as accepted count in this system
-            Integer accepted = provider.getTotalBookings();
-            provider.setAcceptanceRate((accepted * 100) / totalRequests);
+            Integer accepted = provider.getTotalBookings() != null ? provider.getTotalBookings() : 0;
+            acceptanceRate = clampRate((accepted * 100) / totalRequests);
 
             // Booking Rate = (Completed Jobs / Total Requests) * 100
-            Integer completed = provider.getCompletedJobs();
-            provider.setBookingRate((completed * 100) / totalRequests);
+            Integer completed = provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0;
+            bookingRate = clampRate((completed * 100) / totalRequests);
         } else {
-            provider.setAcceptanceRate(100);
-            provider.setBookingRate(0);
+            acceptanceRate = 100;
+            bookingRate = 0;
         }
-        providerRepository.save(provider);
+
+        providerRepository.updateRates(providerId, acceptanceRate, bookingRate);
+    }
+
+    private int clampRate(int value) {
+        return Math.max(0, Math.min(100, value));
     }
 }

@@ -6,6 +6,9 @@ import com.aykhedma.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,6 +21,23 @@ public class NotificationFactory {
     private final UserRepository userRepository;
 
     public void send(Long userId, NotificationType type, Map<String, Object> params) {
+        Map<String, Object> immutableCopy = new HashMap<>(params);
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()
+                && TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendNow(userId, type, immutableCopy);
+                }
+            });
+            return;
+        }
+
+        sendNow(userId, type, immutableCopy);
+    }
+
+    private void sendNow(Long userId, NotificationType type, Map<String, Object> params) {
         // Ensure userName is available for email templates
         if (!params.containsKey("userName")) {
             String userName = userRepository.findById(userId)
