@@ -131,9 +131,10 @@ public class ChatService {
         if (!isParticipant) throw new ForbiddenException("You are not allowed in this room");
 
         chatMessageRepository.markMessagesAsRead(roomId, currentUser.getId());
+
         var messages = chatMessageRepository.findByChatRoomId(
                 roomId,
-                PageRequest.of(page, size, Sort.by("timestamp").descending())
+                PageRequest.of(page, size, Sort.by("timestamp").ascending())
         );
 
         return messages.stream()
