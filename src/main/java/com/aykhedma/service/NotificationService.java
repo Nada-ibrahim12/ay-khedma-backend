@@ -5,11 +5,9 @@ import com.aykhedma.dto.request.NotificationRequest;
 import com.aykhedma.model.notification.Notification;
 import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.repository.NotificationRepository;
-import com.aykhedma.repository.NotificationPreferenceRepository;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.service.notification.EmailService;
 import com.aykhedma.service.notification.FirebaseService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,10 +29,8 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
-    private final NotificationPreferenceRepository preferenceRepository;
     private final FirebaseService firebaseService;
     private final EmailService emailService;
-    // private final SmsService smsService;
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
 
@@ -63,16 +59,15 @@ public class NotificationService {
     @Async
     @Transactional
     public void sendNotification(NotificationRequest request) {
+        validateRequest(request);
         log.info("Sending notification to user: {}, type: {}", request.getUserId(), request.getType());
 
         Notification notification = saveNotification(request);
 
-        // 2. Send real-time WebSocket (if user is online)
         if (request.isSendInApp()) {
             sendWebSocketNotification(notification);
         }
 
-        // 3. Send push notification (for lock screen when app is closed)
         if (request.isSendPush() && firebaseService.isFirebaseEnabled()) {
             firebaseService.sendPushNotification(
                     request.getUserId(),
@@ -81,73 +76,47 @@ public class NotificationService {
                     request.getData());
         }
 
-        // 4. Send email
         if (request.isSendEmail()) {
-            String email = request.getEmail() != null ? request.getEmail() : getUserEmail(request.getUserId());
+            String email = request.getEmail() != null ? request.getEmail() : resolveUserEmail(request.getUserId());
             if (email != null) {
                 sendEmailNotification(email, request);
             }
         }
-
-        // // 5. Send SMS
-        // if (request.isSendSms()) {
-        // String phone = request.getPhoneNumber() != null ? request.getPhoneNumber() :
-        // getUserPhone(request.getUserId());
-        // if (phone != null) {
-        // smsService.sendSms(phone, request.getContent());
-        // }
-        // }
     }
 
     private Notification saveNotification(NotificationRequest request) {
-        try {
-            Notification notification = Notification.builder()
-                    .userId(request.getUserId())
-                    .type(request.getType())
-                    .title(request.getTitle())
-                    .body(request.getContent())
-                    .imageUrl(request.getImageUrl())
-                    .build();
+        Notification notification = Notification.builder()
+                .userId(request.getUserId())
+                .type(request.getType())
+                .title(request.getTitle())
+                .body(request.getContent())
+                .imageUrl(request.getImageUrl())
+                .build();
 
-            return notificationRepository.save(notification);
-
-        } catch (Exception e) {
-            log.error("Failed to save notification: {}", e.getMessage());
-            return null;
-        }
+        return notificationRepository.save(notification);
     }
 
     /**
      * Send real-time notification via WebSocket
      */
     private void sendWebSocketNotification(Notification notification) {
-        try {
-            if (notification == null)
-                return;
+        NotificationDTO dto = NotificationDTO.fromEntity(notification);
 
-            NotificationDTO dto = NotificationDTO.fromEntity(notification);
+        messagingTemplate.convertAndSendToUser(
+                notification.getUserId().toString(),
+                "/queue/notifications",
+                dto);
 
-            // Send to user's personal queue
-            messagingTemplate.convertAndSendToUser(
-                    notification.getUserId().toString(),
-                    "/queue/notifications",
-                    dto);
+        long unreadCount = notificationRepository.countUnreadByUserId(notification.getUserId());
 
-            // Update unread count
-            long unreadCount = notificationRepository.countUnreadByUserId(notification.getUserId());
+        messagingTemplate.convertAndSendToUser(
+                notification.getUserId().toString(),
+                "/queue/notifications/count",
+                Map.of("count", unreadCount));
 
-            messagingTemplate.convertAndSendToUser(
-                    notification.getUserId().toString(),
-                    "/queue/notifications/count",
-                    Map.of("count", unreadCount));
-
-            notification.setDelivered(true);
-            notification.setDeliveredAt(LocalDateTime.now());
-            notificationRepository.save(notification);
-
-        } catch (Exception e) {
-            log.error("Failed to send WebSocket notification: {}", e.getMessage());
-        }
+        notification.setDelivered(true);
+        notification.setDeliveredAt(LocalDateTime.now());
+        notificationRepository.save(notification);
     }
 
     private void sendEmailNotification(String email, NotificationRequest request) {
@@ -166,74 +135,33 @@ public class NotificationService {
 
     public void sendOtpEmail(String email, String otp) {
         String subject = "Your OTP Verification Code";
-        String content = "Your OTP code is " + otp + ". Do not share this code with anyone.";
-        emailService.sendSimpleEmail(email, subject, content);
-    }
-
-    public void sendProviderRejectionEmail(String email, String reason) {
-        String subject = "AyKhedma - Application Status Update";
-        String content = "Dear Provider,\n\n" +
-                "We regret to inform you that your registration application has been rejected for the following reason:\n\n" +
-                "\"" + reason + "\"\n\n" +
-                "Please address these issues and update your profile or contact support for more details.\n\n" +
-                "Best regards,\n" +
-                "AyKhedma Team";
-        emailService.sendSimpleEmail(email, subject, content);
-    }
-
-    public void sendProviderApprovalEmail(String email) {
-        String subject = "AyKhedma - Account Approved!";
-        String content = "Dear Provider,\n\n" +
-                "Congratulations! Your registration application has been reviewed and approved.\n\n" +
-                "Your account is now fully active, and you can start receiving booking requests on the platform.\n\n" +
-                "Welcome to the AyKhedma family!\n\n" +
-                "Best regards,\n" +
-                "AyKhedma Team";
-        emailService.sendSimpleEmail(email, subject, content);
-    }
-
-    public void sendProviderBlockedEmail(String email) {
-        String subject = "AyKhedma - Account Status Update";
-        String content = "Dear Provider,\n\n" +
-                "We are writing to inform you that your provider account has been blocked due to a violation of our platform rules.\n\n" +
-                "If you believe this is a mistake, please contact our support team.\n\n" +
-                "Best regards,\n" +
-                "AyKhedma Team";
-        emailService.sendSimpleEmail(email, subject, content);
+        Map<String, Object> templateVars = new HashMap<>();
+        templateVars.put("otp", otp);
+        emailService.sendHtmlEmail(email, subject, "email/otp-verification", templateVars);
     }
 
     private String getEmailTemplate(NotificationType type) {
-        switch (type) {
-            case BOOKING_CONFIRMATION:
-                return "email/booking-confirmation";
-            case BOOKING_REMINDER:
-                return "email/booking-reminder";
-            default:
-                return "email/general-notification";
-        }
+        return switch (type) {
+            case BOOKING_CONFIRMATION -> "email/booking-confirmation";
+            case BOOKING_REMINDER -> "email/booking-reminder";
+            case BOOKING_REQUEST -> "email/booking-request";
+            case BOOKING_CANCELLED -> "email/booking-cancelled";
+            case BOOKING_COMPLETED -> "email/booking-completed";
+            case PROVIDER_ACCEPTED -> "email/provider-approved";
+            case PROVIDER_REJECTED -> "email/provider-rejected";
+            case ACCOUNT_UPDATE -> "email/account-update";
+            case PASSWORD_CHANGED -> "email/password-changed";
+            case LOCATION_UPDATE -> "email/location-update";
+            case STATUS_UPDATE -> "email/status-update";
+            case SYSTEM_ALERT -> "email/system-alert";
+            default -> "email/general-notification";
+        };
     }
 
-    // send app notification (websocket + push)
-    private void sendAppNotification(NotificationRequest request) {
-        Notification notification = saveNotification(request);
-        sendWebSocketNotification(notification);
-        if (request.isSendPush() && firebaseService.isFirebaseEnabled()) {
-            firebaseService.sendPushNotification(
-                    request.getUserId(),
-                    request.getTitle(),
-                    request.getContent(),
-                    request.getData());
-        }
-    }
-
-    private String getUserEmail(Long userId) {
-        String userEmail = userRepository.findById(userId).get().getEmail();
-        return userEmail;
-    }
-
-    private String getUserPhone(Long userId) {
-        String userPhone = userRepository.findById(userId).get().getPhoneNumber();
-        return userPhone;
+    private String resolveUserEmail(Long userId) {
+        return userRepository.findById(userId)
+                .map(user -> user.getEmail())
+                .orElse(null);
     }
 
     public Page<NotificationDTO> getUserNotifications(Long userId, Pageable pageable) {
@@ -303,6 +231,21 @@ public class NotificationService {
                 .map(NotificationDTO::fromEntity)
                 .collect(Collectors.toList());
         return new PageImpl<>(notificationDTOs, pageable, notifications.size());
+    }
+
+    private void validateRequest(NotificationRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Notification request is required");
+        }
+        if (request.getUserId() == null) {
+            throw new IllegalArgumentException("User ID is required");
+        }
+        if (request.getType() == null) {
+            throw new IllegalArgumentException("Notification type is required");
+        }
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            throw new IllegalArgumentException("Notification title is required");
+        }
     }
 
 }

@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=yes"
     />
-    <title>Booking Confirmation - AyKhedma</title>
+    <title>Booking Completed - AyKhedma</title>
     <style>
       * {
         margin: 0;
@@ -121,6 +121,34 @@
         font-weight: 500;
         text-align: right;
       }
+      .next-steps {
+        margin: 28px 0 20px;
+      }
+      .next-steps h3 {
+        font-size: 17px;
+        font-weight: 700;
+        color: #1a2c3e;
+        margin-bottom: 16px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #eef2f8;
+        display: inline-block;
+      }
+      .step-list {
+        list-style: none;
+      }
+      .step-list li {
+        padding: 8px 0 8px 28px;
+        position: relative;
+        font-size: 14px;
+        color: #2c4c6c;
+      }
+      .step-list li:before {
+        content: "->";
+        position: absolute;
+        left: 0;
+        color: #1f8b4c;
+        font-weight: 600;
+      }
       .button-container {
         text-align: center;
         margin: 32px 0 24px;
@@ -134,6 +162,16 @@
         font-size: 15px;
         padding: 12px 32px;
         border-radius: 40px;
+      }
+      .support-line {
+        background-color: #fafcff;
+        border-radius: 12px;
+        padding: 14px 20px;
+        text-align: center;
+        font-size: 13px;
+        color: #4a6a85;
+        border: 1px solid #eef2f8;
+        margin: 20px 0 16px;
       }
       .signature {
         margin-top: 28px;
@@ -196,17 +234,18 @@
         <div class="logo-area">
           <div class="logo-text">AyKhedma <span>| Service Platform</span></div>
         </div>
-        <div class="header-badge">Booking Confirmation Notice</div>
+        <div class="header-badge">Booking Completion Notice</div>
       </div>
       <div class="email-content">
         <div class="greeting">
           Dear <strong th:text="${userName}">User</strong>,
         </div>
         <div class="notification-message">
-          Your booking has been confirmed successfully.
+          Your booking has been successfully completed. Thank you for using
+          AyKhedma.
         </div>
         <div class="details-card">
-          <div class="details-title">Booking Details</div>
+          <div class="details-title">Completed Booking Summary</div>
           <table
             class="details-table"
             cellpadding="0"
@@ -218,21 +257,32 @@
               <td class="detail-value" th:text="${serviceName}">Service</td>
             </tr>
             <tr>
-              <td class="detail-label">Scheduled Date</td>
-              <td class="detail-value" th:text="${bookingDate}">Date</td>
-            </tr>
-            <tr>
-              <td class="detail-label">Time Slot</td>
-              <td class="detail-value" th:text="${bookingTime}">Time</td>
-            </tr>
-            <tr>
               <td class="detail-label">Service Provider</td>
               <td class="detail-value" th:text="${providerName}">Provider</td>
             </tr>
+            <tr>
+              <td class="detail-label">Completion Date</td>
+              <td class="detail-value" th:text="${completionDate}">Date</td>
+            </tr>
+            <tr>
+              <td class="detail-label">Total Amount</td>
+              <td class="detail-value" th:text="${totalAmount}">Amount</td>
+            </tr>
           </table>
         </div>
+        <div class="next-steps">
+          <h3>Recommended next steps</h3>
+          <ul class="step-list">
+            <li>Rate and review your service experience</li>
+            <li>Save this provider for future bookings</li>
+            <li>Book your next service when needed</li>
+          </ul>
+        </div>
         <div class="button-container">
-          <a href="#" class="btn-primary">View booking details</a>
+          <a href="#" class="btn-primary">Rate and review service</a>
+        </div>
+        <div class="support-line">
+          Need assistance? Contact support@aykhedma.com
         </div>
         <div class="signature">
           <p>Best regards,</p>

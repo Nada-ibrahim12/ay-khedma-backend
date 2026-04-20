@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=yes"
     />
-    <title>Booking Confirmation - AyKhedma</title>
+    <title>Location Updated - AyKhedma</title>
     <style>
       * {
         margin: 0;
@@ -47,7 +47,7 @@
       .logo-text {
         font-size: 22px;
         font-weight: 700;
-        color: #1f8b4c;
+        color: #7c3aed;
         letter-spacing: -0.3px;
       }
       .logo-text span {
@@ -56,8 +56,8 @@
       }
       .header-badge {
         display: inline-block;
-        background-color: #eefaf2;
-        color: #1f8b4c;
+        background-color: #f5f3ff;
+        color: #6d28d9;
         font-size: 13px;
         font-weight: 600;
         padding: 6px 14px;
@@ -71,15 +71,6 @@
         font-size: 16px;
         color: #2c3e4e;
         margin-bottom: 20px;
-      }
-      .notification-message {
-        background-color: #f3fbf5;
-        border-left: 3px solid #1f8b4c;
-        padding: 16px 20px;
-        border-radius: 8px;
-        margin-bottom: 28px;
-        font-size: 14px;
-        color: #4a5b6e;
       }
       .details-card {
         background-color: #fafcff;
@@ -120,6 +111,20 @@
         color: #1a2c3e;
         font-weight: 500;
         text-align: right;
+      }
+      .info-box {
+        background-color: #f7f9fc;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin: 24px 0;
+        border: 1px solid #e6edf4;
+        font-size: 14px;
+        color: #2c4c6c;
+      }
+      .info-box strong {
+        color: #6d28d9;
+        display: block;
+        margin-bottom: 8px;
       }
       .button-container {
         text-align: center;
@@ -196,17 +201,14 @@
         <div class="logo-area">
           <div class="logo-text">AyKhedma <span>| Service Platform</span></div>
         </div>
-        <div class="header-badge">Booking Confirmation Notice</div>
+        <div class="header-badge">Location Update Notice</div>
       </div>
       <div class="email-content">
         <div class="greeting">
           Dear <strong th:text="${userName}">User</strong>,
         </div>
-        <div class="notification-message">
-          Your booking has been confirmed successfully.
-        </div>
         <div class="details-card">
-          <div class="details-title">Booking Details</div>
+          <div class="details-title">Updated Location Details</div>
           <table
             class="details-table"
             cellpadding="0"
@@ -214,29 +216,35 @@
             width="100%"
           >
             <tr>
-              <td class="detail-label">Service</td>
-              <td class="detail-value" th:text="${serviceName}">Service</td>
+              <td class="detail-label">Primary Address</td>
+              <td class="detail-value" th:text="${address}">Address</td>
+            </tr>
+            <tr th:if="${city}">
+              <td class="detail-label">City / Region</td>
+              <td class="detail-value" th:text="${city}">City</td>
+            </tr>
+            <tr th:if="${coordinates}">
+              <td class="detail-label">Coordinates</td>
+              <td class="detail-value" th:text="${coordinates}">Lat, Long</td>
             </tr>
             <tr>
-              <td class="detail-label">Scheduled Date</td>
-              <td class="detail-value" th:text="${bookingDate}">Date</td>
-            </tr>
-            <tr>
-              <td class="detail-label">Time Slot</td>
-              <td class="detail-value" th:text="${bookingTime}">Time</td>
-            </tr>
-            <tr>
-              <td class="detail-label">Service Provider</td>
-              <td class="detail-value" th:text="${providerName}">Provider</td>
+              <td class="detail-label">Update Time</td>
+              <td class="detail-value" th:text="${updateTime}">
+                Date and Time
+              </td>
             </tr>
           </table>
         </div>
+        <div class="info-box">
+          <strong>Service availability impact</strong>Your location update may
+          affect nearby providers, estimated times, and service recommendations.
+        </div>
         <div class="button-container">
-          <a href="#" class="btn-primary">View booking details</a>
+          <a href="#" class="btn-primary">View your profile</a>
         </div>
         <div class="signature">
           <p>Best regards,</p>
-          <p><strong>AyKhedma Customer Operations</strong></p>
+          <p><strong>AyKhedma Team</strong></p>
         </div>
       </div>
       <div class="email-footer">

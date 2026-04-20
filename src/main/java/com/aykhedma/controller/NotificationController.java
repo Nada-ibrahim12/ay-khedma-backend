@@ -15,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,26 +28,17 @@ public class NotificationController {
 
     @PostMapping("/send-email")
     public ResponseEntity<Map<String, Object>> sendEmailNotification(
-            @RequestParam String email, 
+            @RequestParam String email,
             @RequestBody NotificationRequest request) {
-        
         log.info("Received request to send email notification to: {}", email);
-        
-        request.setSendEmail(true);
-        request.setSendInApp(false);
-        request.setSendPush(false);
-        request.setEmail(email);
-        
+
+        request.forEmailChannel(email);
         notificationService.sendNotification(request);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Email notification sent successfully");
-        response.put("email", email);
-        response.put("userId", request.getUserId());
-        response.put("type", request.getType());
-        
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(buildSuccessResponse(
+                "Email notification sent successfully",
+                request.getUserId(),
+                request.getType(),
+                Map.of("email", email)));
     }
 
     @PostMapping("/send-push")
@@ -57,16 +47,13 @@ public class NotificationController {
             @RequestBody NotificationRequest request) {
 
         log.info("Received request to send push notification to userId: {}", userId);
-        request.setSendEmail(false);
-        request.setSendInApp(false);
-        request.setSendPush(true);
+        request.forPushChannel(userId);
         notificationService.sendNotification(request);
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Push notification sent successfully");
-        response.put("userId", userId);
-        response.put("type", request.getType());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(buildSuccessResponse(
+                "Push notification sent successfully",
+                userId,
+                request.getType(),
+                Map.of()));
 
     }
 
@@ -75,43 +62,35 @@ public class NotificationController {
             @RequestParam Long userId,
             @RequestBody NotificationRequest request) {
         log.info("Received request to send in-app notification to userId: {}", userId);
-        request.setSendEmail(false);    
-        request.setSendInApp(true);
-        request.setSendPush(false);
+        request.forInAppChannel(userId);
         notificationService.sendNotification(request);
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "In-app notification sent successfully");
-        response.put("userId", userId);
-        response.put("type", request.getType());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(buildSuccessResponse(
+                "In-app notification sent successfully",
+                userId,
+                request.getType(),
+                Map.of()));
     }
-
-
-    
     /**
      * Send a test notification (for development only)
      *
      * @param request Notification request
      * @return Success response
      */
-    @PostMapping("/test/send")
-    public ResponseEntity<Map<String, Object>> sendTestNotification(
-            @RequestBody NotificationRequest request) {
+    // @PostMapping("/test/send")
+    // public ResponseEntity<Map<String, Object>> sendTestNotification(
+    //         @RequestBody NotificationRequest request) {
 
-        log.info("Sending test notification to user: {}", request.getUserId());
+    //     log.info("Sending test notification to user: {}", request.getUserId());
 
-        notificationService.sendNotification(request);
+    //     notificationService.sendNotification(request);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Test notification sent");
-        response.put("userId", request.getUserId());
-        response.put("type", request.getType());
+    //     return ResponseEntity.ok(buildSuccessResponse(
+    //             "Test notification sent",
+    //             request.getUserId(),
+    //             request.getType(),
+    //             Map.of()));
+    // }
 
-        return ResponseEntity.ok(response);
-    }
-    
     @GetMapping
     public ResponseEntity<Page<NotificationDTO>> getUserNotifications(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -148,7 +127,6 @@ public class NotificationController {
         return ResponseEntity.ok(response);
     }
 
-
     @GetMapping("/{notificationId}")
     public ResponseEntity<NotificationDTO> getNotification(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -168,7 +146,6 @@ public class NotificationController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
-
 
     @PutMapping("/{notificationId}/read")
     public ResponseEntity<Map<String, Object>> markAsRead(
@@ -201,7 +178,6 @@ public class NotificationController {
         }
     }
 
-
     @PutMapping("/read-batch")
     public ResponseEntity<Map<String, Object>> markMultipleAsRead(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -213,7 +189,6 @@ public class NotificationController {
         if (userId == null) {
             return ResponseEntity.badRequest().build();
         }
-
 
         @SuppressWarnings("unchecked")
         java.util.List<Integer> ids = (java.util.List<Integer>) request.get("notificationIds");
@@ -236,7 +211,6 @@ public class NotificationController {
         return ResponseEntity.ok(response);
     }
 
-
     @PutMapping("/read-all")
     public ResponseEntity<Map<String, Object>> markAllAsRead(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -257,7 +231,6 @@ public class NotificationController {
 
         return ResponseEntity.ok(response);
     }
-
 
     @DeleteMapping("/{notificationId}")
     public ResponseEntity<Map<String, Object>> deleteNotification(
@@ -281,7 +254,6 @@ public class NotificationController {
         return ResponseEntity.ok(response);
     }
 
-
     @GetMapping("/filter")
     public ResponseEntity<Page<NotificationDTO>> filterNotifications(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
@@ -296,7 +268,19 @@ public class NotificationController {
             return ResponseEntity.badRequest().build();
         }
 
-        Page<NotificationDTO> filteredNotifications = notificationService.getUserNotificationsByDateRange(userId, startDate, endDate, pageable);
+        Page<NotificationDTO> filteredNotifications = notificationService.getUserNotificationsByDateRange(userId,
+                startDate, endDate, pageable);
         return ResponseEntity.ok(filteredNotifications);
+    }
+
+    private Map<String, Object> buildSuccessResponse(String message, Long userId, Object type,
+            Map<String, Object> extraFields) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", message);
+        response.put("userId", userId);
+        response.put("type", type);
+        response.putAll(extraFields);
+        return response;
     }
 }

@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=yes"
     />
-    <title>Booking Confirmation - AyKhedma</title>
+    <title>Status Update - AyKhedma</title>
     <style>
       * {
         margin: 0;
@@ -47,7 +47,7 @@
       .logo-text {
         font-size: 22px;
         font-weight: 700;
-        color: #1f8b4c;
+        color: #0f766e;
         letter-spacing: -0.3px;
       }
       .logo-text span {
@@ -56,8 +56,8 @@
       }
       .header-badge {
         display: inline-block;
-        background-color: #eefaf2;
-        color: #1f8b4c;
+        background-color: #f0fdfa;
+        color: #0f766e;
         font-size: 13px;
         font-weight: 600;
         padding: 6px 14px;
@@ -71,15 +71,6 @@
         font-size: 16px;
         color: #2c3e4e;
         margin-bottom: 20px;
-      }
-      .notification-message {
-        background-color: #f3fbf5;
-        border-left: 3px solid #1f8b4c;
-        padding: 16px 20px;
-        border-radius: 8px;
-        margin-bottom: 28px;
-        font-size: 14px;
-        color: #4a5b6e;
       }
       .details-card {
         background-color: #fafcff;
@@ -120,6 +111,20 @@
         color: #1a2c3e;
         font-weight: 500;
         text-align: right;
+      }
+      .info-box {
+        background-color: #f7f9fc;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin: 24px 0;
+        border: 1px solid #e6edf4;
+        font-size: 14px;
+        color: #2c4c6c;
+      }
+      .info-box strong {
+        color: #0f766e;
+        display: block;
+        margin-bottom: 8px;
       }
       .button-container {
         text-align: center;
@@ -194,19 +199,16 @@
     <div class="email-container">
       <div class="email-header">
         <div class="logo-area">
-          <div class="logo-text">AyKhedma <span>| Service Platform</span></div>
+          <div class="logo-text">AyKhedma <span>| Account Updates</span></div>
         </div>
-        <div class="header-badge">Booking Confirmation Notice</div>
+        <div class="header-badge" th:text="${statusTitle}">Status Update</div>
       </div>
       <div class="email-content">
         <div class="greeting">
           Dear <strong th:text="${userName}">User</strong>,
         </div>
-        <div class="notification-message">
-          Your booking has been confirmed successfully.
-        </div>
         <div class="details-card">
-          <div class="details-title">Booking Details</div>
+          <div class="details-title">Status Details</div>
           <table
             class="details-table"
             cellpadding="0"
@@ -214,29 +216,31 @@
             width="100%"
           >
             <tr>
-              <td class="detail-label">Service</td>
-              <td class="detail-value" th:text="${serviceName}">Service</td>
+              <td class="detail-label">Current Status</td>
+              <td class="detail-value" th:text="${currentStatus}">Status</td>
             </tr>
             <tr>
-              <td class="detail-label">Scheduled Date</td>
-              <td class="detail-value" th:text="${bookingDate}">Date</td>
+              <td class="detail-label">Updated Date</td>
+              <td class="detail-value" th:text="${updateDate}">Date</td>
             </tr>
             <tr>
-              <td class="detail-label">Time Slot</td>
-              <td class="detail-value" th:text="${bookingTime}">Time</td>
-            </tr>
-            <tr>
-              <td class="detail-label">Service Provider</td>
-              <td class="detail-value" th:text="${providerName}">Provider</td>
+              <td class="detail-label">Effective From</td>
+              <td class="detail-value" th:text="${effectiveDate}">Date</td>
             </tr>
           </table>
         </div>
+        <div class="info-box">
+          <strong>Details</strong
+          ><span th:text="${description}"
+            >Detailed description of the status update.</span
+          >
+        </div>
         <div class="button-container">
-          <a href="#" class="btn-primary">View booking details</a>
+          <a href="#" class="btn-primary">View your account</a>
         </div>
         <div class="signature">
           <p>Best regards,</p>
-          <p><strong>AyKhedma Customer Operations</strong></p>
+          <p><strong>AyKhedma Team</strong></p>
         </div>
       </div>
       <div class="email-footer">

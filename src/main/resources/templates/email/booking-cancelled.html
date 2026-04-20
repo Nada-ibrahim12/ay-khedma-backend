@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=yes"
     />
-    <title>Booking Confirmation - AyKhedma</title>
+    <title>Booking Cancellation - AyKhedma</title>
     <style>
       * {
         margin: 0;
@@ -47,7 +47,7 @@
       .logo-text {
         font-size: 22px;
         font-weight: 700;
-        color: #1f8b4c;
+        color: #c0392b;
         letter-spacing: -0.3px;
       }
       .logo-text span {
@@ -56,8 +56,8 @@
       }
       .header-badge {
         display: inline-block;
-        background-color: #eefaf2;
-        color: #1f8b4c;
+        background-color: #fef2f0;
+        color: #b91c1c;
         font-size: 13px;
         font-weight: 600;
         padding: 6px 14px;
@@ -72,9 +72,13 @@
         color: #2c3e4e;
         margin-bottom: 20px;
       }
+      .greeting strong {
+        color: #1a2c3e;
+        font-weight: 700;
+      }
       .notification-message {
-        background-color: #f3fbf5;
-        border-left: 3px solid #1f8b4c;
+        background-color: #fef9f7;
+        border-left: 3px solid #c0392b;
         padding: 16px 20px;
         border-radius: 8px;
         margin-bottom: 28px;
@@ -95,6 +99,7 @@
         font-weight: 700;
         font-size: 15px;
         color: #1a2c3e;
+        letter-spacing: 0.2px;
       }
       .details-table {
         width: 100%;
@@ -121,6 +126,56 @@
         font-weight: 500;
         text-align: right;
       }
+      .reason-value {
+        background-color: #fff5f3;
+        padding: 6px 12px;
+        border-radius: 20px;
+        display: inline-block;
+        font-size: 13px;
+      }
+      .info-box {
+        background-color: #f7f9fc;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin: 24px 0;
+        border: 1px solid #e6edf4;
+        font-size: 14px;
+        color: #2c4c6c;
+      }
+      .info-box strong {
+        color: #c0392b;
+        display: block;
+        margin-bottom: 8px;
+      }
+      .next-steps {
+        margin: 28px 0 20px;
+      }
+      .next-steps h3 {
+        font-size: 17px;
+        font-weight: 700;
+        color: #1a2c3e;
+        margin-bottom: 16px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #eef2f8;
+        display: inline-block;
+      }
+      .step-list {
+        list-style: none;
+        padding: 0;
+      }
+      .step-list li {
+        padding: 8px 0 8px 28px;
+        position: relative;
+        font-size: 14px;
+        color: #2c4c6c;
+      }
+      .step-list li:before {
+        content: "->";
+        position: absolute;
+        left: 0;
+        color: #c0392b;
+        font-weight: 600;
+      }
       .button-container {
         text-align: center;
         margin: 32px 0 24px;
@@ -134,6 +189,18 @@
         font-size: 15px;
         padding: 12px 32px;
         border-radius: 40px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        border: none;
+      }
+      .support-line {
+        background-color: #fafcff;
+        border-radius: 12px;
+        padding: 14px 20px;
+        text-align: center;
+        font-size: 13px;
+        color: #4a6a85;
+        border: 1px solid #eef2f8;
+        margin: 20px 0 16px;
       }
       .signature {
         margin-top: 28px;
@@ -177,11 +244,16 @@
           display: block;
           text-align: left;
         }
+        .detail-label {
+          width: 100%;
+          margin-bottom: 4px;
+        }
         .detail-value {
           text-align: left;
         }
         .details-table tr {
           display: block;
+          border-bottom: 1px solid #f0f3f9;
         }
         .btn-primary {
           width: 100%;
@@ -196,17 +268,21 @@
         <div class="logo-area">
           <div class="logo-text">AyKhedma <span>| Service Platform</span></div>
         </div>
-        <div class="header-badge">Booking Confirmation Notice</div>
+        <div class="header-badge">Booking Cancellation Notice</div>
       </div>
+
       <div class="email-content">
         <div class="greeting">
           Dear <strong th:text="${userName}">User</strong>,
         </div>
+
         <div class="notification-message">
-          Your booking has been confirmed successfully.
+          This email confirms that the booking referenced below has been
+          cancelled by either the provider or the consumer.
         </div>
+
         <div class="details-card">
-          <div class="details-title">Booking Details</div>
+          <div class="details-title">Cancelled Booking Details</div>
           <table
             class="details-table"
             cellpadding="0"
@@ -229,20 +305,45 @@
               <td class="detail-label">Service Provider</td>
               <td class="detail-value" th:text="${providerName}">Provider</td>
             </tr>
+            <tr>
+              <td class="detail-label">Cancelled By</td>
+              <td class="detail-value">
+                <span class="reason-value" th:if="${cancelledBy == 'P' and cancelledByName != null and !cancelledByName.isBlank()}">Provider - <span th:text="${cancelledByName}"></span></span>
+                <span class="reason-value" th:if="${cancelledBy == 'C' and cancelledByName != null and !cancelledByName.isBlank()}">Consumer - <span th:text="${cancelledByName}"></span></span>
+              </td>
+            </tr>
+            <tr>
+              <td class="detail-label">Cancellation Reason</td>
+              <td class="detail-value">
+                <span class="reason-value" th:text="${reason}"
+                  >Not provided</span
+                >
+              </td>
+            </tr>
           </table>
         </div>
-        <div class="button-container">
-          <a href="#" class="btn-primary">View booking details</a>
+
+        <div class="info-box">
+          <strong>Important information</strong>
+          If you believe this cancellation was made in error, please contact
+          support for assistance.
         </div>
+
+        <div class="support-line">
+          Need assistance? Contact support@aykhedma.com
+        </div>
+
         <div class="signature">
           <p>Best regards,</p>
           <p><strong>AyKhedma Customer Operations</strong></p>
         </div>
       </div>
+
       <div class="email-footer">
         <div class="footer-links">
-          <a href="#">Manage preferences</a><a href="#">Support center</a
-          ><a href="#">Privacy policy</a>
+          <a href="#">Manage preferences</a>
+          <a href="#">Support center</a>
+          <a href="#">Privacy policy</a>
         </div>
         <p>2026 AyKhedma. All rights reserved.</p>
         <p style="margin-top: 12px; font-size: 11px">

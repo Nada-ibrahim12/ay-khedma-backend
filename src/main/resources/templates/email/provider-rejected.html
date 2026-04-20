@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=yes"
     />
-    <title>Booking Confirmation - AyKhedma</title>
+    <title>Application Status Update - AyKhedma</title>
     <style>
       * {
         margin: 0;
@@ -47,7 +47,7 @@
       .logo-text {
         font-size: 22px;
         font-weight: 700;
-        color: #1f8b4c;
+        color: #b45309;
         letter-spacing: -0.3px;
       }
       .logo-text span {
@@ -56,8 +56,8 @@
       }
       .header-badge {
         display: inline-block;
-        background-color: #eefaf2;
-        color: #1f8b4c;
+        background-color: #fff7ed;
+        color: #b45309;
         font-size: 13px;
         font-weight: 600;
         padding: 6px 14px;
@@ -71,15 +71,6 @@
         font-size: 16px;
         color: #2c3e4e;
         margin-bottom: 20px;
-      }
-      .notification-message {
-        background-color: #f3fbf5;
-        border-left: 3px solid #1f8b4c;
-        padding: 16px 20px;
-        border-radius: 8px;
-        margin-bottom: 28px;
-        font-size: 14px;
-        color: #4a5b6e;
       }
       .details-card {
         background-color: #fafcff;
@@ -120,6 +111,20 @@
         color: #1a2c3e;
         font-weight: 500;
         text-align: right;
+      }
+      .info-box {
+        background-color: #fff8f5;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin: 24px 0;
+        border: 1px solid #f6e0d4;
+        font-size: 14px;
+        color: #2c4c6c;
+      }
+      .info-box strong {
+        color: #b45309;
+        display: block;
+        margin-bottom: 8px;
       }
       .button-container {
         text-align: center;
@@ -165,48 +170,22 @@
         text-decoration: none;
         font-weight: 500;
       }
-      @media (max-width: 560px) {
-        .email-content {
-          padding: 20px 20px 28px;
-        }
-        .email-header {
-          padding: 20px 20px 12px;
-        }
-        .details-table td {
-          padding: 12px 16px;
-          display: block;
-          text-align: left;
-        }
-        .detail-value {
-          text-align: left;
-        }
-        .details-table tr {
-          display: block;
-        }
-        .btn-primary {
-          width: 100%;
-          text-align: center;
-        }
-      }
     </style>
   </head>
   <body>
     <div class="email-container">
       <div class="email-header">
         <div class="logo-area">
-          <div class="logo-text">AyKhedma <span>| Service Platform</span></div>
+          <div class="logo-text">AyKhedma <span>| Provider Review</span></div>
         </div>
-        <div class="header-badge">Booking Confirmation Notice</div>
+        <div class="header-badge">Application Status: Rejected</div>
       </div>
       <div class="email-content">
         <div class="greeting">
-          Dear <strong th:text="${userName}">User</strong>,
-        </div>
-        <div class="notification-message">
-          Your booking has been confirmed successfully.
+          Dear <strong th:text="${userName}">Provider</strong>,
         </div>
         <div class="details-card">
-          <div class="details-title">Booking Details</div>
+          <div class="details-title">Review Details</div>
           <table
             class="details-table"
             cellpadding="0"
@@ -214,29 +193,27 @@
             width="100%"
           >
             <tr>
-              <td class="detail-label">Service</td>
-              <td class="detail-value" th:text="${serviceName}">Service</td>
+              <td class="detail-label">Decision</td>
+              <td class="detail-value">Rejected</td>
             </tr>
             <tr>
-              <td class="detail-label">Scheduled Date</td>
-              <td class="detail-value" th:text="${bookingDate}">Date</td>
-            </tr>
-            <tr>
-              <td class="detail-label">Time Slot</td>
-              <td class="detail-value" th:text="${bookingTime}">Time</td>
-            </tr>
-            <tr>
-              <td class="detail-label">Service Provider</td>
-              <td class="detail-value" th:text="${providerName}">Provider</td>
+              <td class="detail-label">Reason</td>
+              <td class="detail-value" th:text="${reason}">
+                Reason not provided
+              </td>
             </tr>
           </table>
         </div>
+        <div class="info-box">
+          <strong>What happens next</strong>You can update your profile details
+          and reapply after addressing the reason above.
+        </div>
         <div class="button-container">
-          <a href="#" class="btn-primary">View booking details</a>
+          <a href="#" class="btn-primary">Update your profile</a>
         </div>
         <div class="signature">
           <p>Best regards,</p>
-          <p><strong>AyKhedma Customer Operations</strong></p>
+          <p><strong>AyKhedma Review Team</strong></p>
         </div>
       </div>
       <div class="email-footer">

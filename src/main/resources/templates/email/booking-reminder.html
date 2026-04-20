@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=yes"
     />
-    <title>Booking Confirmation - AyKhedma</title>
+    <title>Booking Reminder - AyKhedma</title>
     <style>
       * {
         margin: 0;
@@ -47,7 +47,7 @@
       .logo-text {
         font-size: 22px;
         font-weight: 700;
-        color: #1f8b4c;
+        color: #b45309;
         letter-spacing: -0.3px;
       }
       .logo-text span {
@@ -56,8 +56,8 @@
       }
       .header-badge {
         display: inline-block;
-        background-color: #eefaf2;
-        color: #1f8b4c;
+        background-color: #fff7ed;
+        color: #b45309;
         font-size: 13px;
         font-weight: 600;
         padding: 6px 14px;
@@ -73,8 +73,8 @@
         margin-bottom: 20px;
       }
       .notification-message {
-        background-color: #f3fbf5;
-        border-left: 3px solid #1f8b4c;
+        background-color: #fffaf2;
+        border-left: 3px solid #b45309;
         padding: 16px 20px;
         border-radius: 8px;
         margin-bottom: 28px;
@@ -121,6 +121,48 @@
         font-weight: 500;
         text-align: right;
       }
+      .info-box {
+        background-color: #f7f9fc;
+        border-radius: 12px;
+        padding: 18px 20px;
+        margin: 24px 0;
+        border: 1px solid #e6edf4;
+        font-size: 14px;
+        color: #2c4c6c;
+      }
+      .info-box strong {
+        color: #b45309;
+        display: block;
+        margin-bottom: 8px;
+      }
+      .next-steps {
+        margin: 28px 0 20px;
+      }
+      .next-steps h3 {
+        font-size: 17px;
+        font-weight: 700;
+        color: #1a2c3e;
+        margin-bottom: 16px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #eef2f8;
+        display: inline-block;
+      }
+      .step-list {
+        list-style: none;
+      }
+      .step-list li {
+        padding: 8px 0 8px 28px;
+        position: relative;
+        font-size: 14px;
+        color: #2c4c6c;
+      }
+      .step-list li:before {
+        content: "->";
+        position: absolute;
+        left: 0;
+        color: #b45309;
+        font-weight: 600;
+      }
       .button-container {
         text-align: center;
         margin: 32px 0 24px;
@@ -134,6 +176,16 @@
         font-size: 15px;
         padding: 12px 32px;
         border-radius: 40px;
+      }
+      .support-line {
+        background-color: #fafcff;
+        border-radius: 12px;
+        padding: 14px 20px;
+        text-align: center;
+        font-size: 13px;
+        color: #4a6a85;
+        border: 1px solid #eef2f8;
+        margin: 20px 0 16px;
       }
       .signature {
         margin-top: 28px;
@@ -196,17 +248,17 @@
         <div class="logo-area">
           <div class="logo-text">AyKhedma <span>| Service Platform</span></div>
         </div>
-        <div class="header-badge">Booking Confirmation Notice</div>
+        <div class="header-badge">Booking Reminder Notice</div>
       </div>
       <div class="email-content">
         <div class="greeting">
           Dear <strong th:text="${userName}">User</strong>,
         </div>
         <div class="notification-message">
-          Your booking has been confirmed successfully.
+          This is a reminder about your upcoming booking.
         </div>
         <div class="details-card">
-          <div class="details-title">Booking Details</div>
+          <div class="details-title">Upcoming Booking Details</div>
           <table
             class="details-table"
             cellpadding="0"
@@ -229,10 +281,35 @@
               <td class="detail-label">Service Provider</td>
               <td class="detail-value" th:text="${providerName}">Provider</td>
             </tr>
+            <tr>
+              <td class="detail-label">Location</td>
+              <td class="detail-value" th:text="${location}">Address</td>
+            </tr>
+            <tr>
+              <td class="detail-label">Starts In</td>
+              <td class="detail-value" th:text="${timeUntilBooking}">
+                2 hours
+              </td>
+            </tr>
           </table>
+        </div>
+        <div class="info-box">
+          <strong>Important reminder</strong>Please be ready at least 5 minutes
+          before the scheduled time and keep your phone available.
+        </div>
+        <div class="next-steps">
+          <h3>Recommended next steps</h3>
+          <ul class="step-list">
+            <li>Confirm your location details</li>
+            <li>Prepare any special requests in advance</li>
+            <li>Reschedule early if needed</li>
+          </ul>
         </div>
         <div class="button-container">
           <a href="#" class="btn-primary">View booking details</a>
+        </div>
+        <div class="support-line">
+          Need assistance? Contact support@aykhedma.com
         </div>
         <div class="signature">
           <p>Best regards,</p>
