@@ -59,7 +59,7 @@ public class FirebaseService {
 
     @Async
     public CompletableFuture<Boolean> sendPushNotification(Long userId, String title,
-                                                           String body, Map<String, String> data) {
+            String body, Map<String, Object> data) {
         if (firebaseMessaging == null) {
             log.warn("Firebase not configured. Push notification not sent.");
             return CompletableFuture.completedFuture(false);
@@ -82,13 +82,20 @@ public class FirebaseService {
 
             // Create messages for all devices
             List<Message> messages = deviceTokens.stream()
-                    .map(token -> Message.builder()
-                            .setToken(token.getFcmToken())
-                            .setNotification(notification)
-                            .putAllData(data != null ? data : Map.of())
-                            .setAndroidConfig(getAndroidConfig())
-                            .setApnsConfig(getIosConfig())
-                            .build())
+                    .map(token -> {
+                        Message.Builder builder = Message.builder()
+                                .setToken(token.getFcmToken())
+                                .setNotification(notification)
+                                .setAndroidConfig(getAndroidConfig())
+                                .setApnsConfig(getIosConfig());
+
+                        // Convert data values to strings
+                        if (data != null) {
+                            data.forEach((key, value) -> builder.putData(key, String.valueOf(value)));
+                        }
+
+                        return builder.build();
+                    })
                     .collect(Collectors.toList());
 
             // Send in batch

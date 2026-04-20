@@ -13,15 +13,12 @@ public class NotificationRequest {
     private String title;
     private String content;
     private String imageUrl;
-    private Map<String, String> data;
+    private Map<String, Object> data;
 
-    // Channel flags
     private boolean sendPush;
     private boolean sendInApp;
     private boolean sendEmail;
     private boolean sendSms;
-
-    // Contact info (if different from user profile)
     private String email;
     private String phoneNumber;
 
