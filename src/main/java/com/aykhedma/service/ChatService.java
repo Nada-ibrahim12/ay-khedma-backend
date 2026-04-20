@@ -134,7 +134,7 @@ public class ChatService {
 
         var messages = chatMessageRepository.findByChatRoomId(
                 roomId,
-                PageRequest.of(page, size, Sort.by("timestamp").ascending())
+                PageRequest.of(page, size, Sort.by("timestamp").descending())
         );
 
         return messages.stream()
