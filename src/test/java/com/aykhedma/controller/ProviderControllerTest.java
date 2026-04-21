@@ -3,11 +3,7 @@ package com.aykhedma.controller;
 import com.aykhedma.config.TestSecurityConfig;
 import com.aykhedma.dto.request.ProviderProfileRequest;
 import com.aykhedma.dto.request.WorkingDayRequest;
-import com.aykhedma.dto.response.DocumentResponse;
-import com.aykhedma.dto.response.ProfileResponse;
-import com.aykhedma.dto.response.ProviderResponse;
-import com.aykhedma.dto.response.ProviderSummaryResponse;
-import com.aykhedma.dto.response.ScheduleResponse;
+import com.aykhedma.dto.response.*;
 import com.aykhedma.exception.GlobalExceptionHandler;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.model.user.VerificationStatus;
@@ -23,6 +19,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -35,8 +35,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -88,6 +88,20 @@ class ProviderControllerTest {
         private ProviderResponse providerResponse;
         private ProviderProfileRequest profileRequest;
         private ProfileResponse profileResponse;
+        private SearchResponse provider() {
+                return SearchResponse.builder()
+                        .id(1L)
+                        .name("Ibrahim Nasser")
+                        .serviceType("Drain Cleaning")
+                        .categoryName("Plumbing")
+                        .averageRating(4.6)
+                        .price(200.0)
+                        .distance(0.39)
+                        .estimatedArrivalTime(15)
+                        .withinServiceArea(true)
+                        .completedJobs(12)
+                        .build();
+        }
 
         private final Long PROVIDER_ID = 1L;
         private final Long TIME_SLOT_ID = 10L;
@@ -363,5 +377,159 @@ class ProviderControllerTest {
                 mockMvc.perform(get("/api/v1/providers/{id}/verification-status", PROVIDER_ID))
                                 .andExpect(status().isOk())
                                 .andExpect(content().string("\"VERIFIED\""));
+        }
+        @Test
+        @DisplayName("GET search - keyword filter")
+        void search_keyword() throws Exception {
+
+                when(providerService.search(
+                        eq("drain"),
+                        isNull(),
+                        isNull(),
+                        eq(1L),
+                        eq(5.0),
+                        eq("rating"),
+                        any(Pageable.class)
+                )).thenReturn(new PageImpl<>(List.of(provider())));
+
+                mockMvc.perform(get("/api/v1/providers/search")
+                                .param("consumerId", "1")
+                                .param("keyword", "drain")
+                                .param("page", "0")
+                                .param("size", "10"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.content[0].serviceType").value("Drain Cleaning"))
+                        .andExpect(jsonPath("$.content[0].name").value("Ibrahim Nasser"));
+        }
+        @Test
+        @DisplayName("GET search - category id")
+        void search_category_id() throws Exception {
+
+                when(providerService.search(
+                        isNull(),
+                        eq(3L),
+                        isNull(),
+                        eq(1L),
+                        eq(5.0),
+                        eq("rating"),
+                        any(Pageable.class)
+                )).thenReturn(new PageImpl<>(List.of(provider())));
+
+                mockMvc.perform(get("/api/v1/providers/search")
+                                .param("consumerId", "1")
+                                .param("categoryId", "3")
+                                .param("page", "0")
+                                .param("size", "10"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.content[0].categoryName").value("Plumbing"));
+        }
+        @Test
+        @DisplayName("GET search - category name")
+        void search_category_name() throws Exception {
+
+                when(providerService.search(
+                        isNull(),
+                        isNull(),
+                        eq("Plumbing"),
+                        eq(1L),
+                        eq(5.0),
+                        eq("rating"),
+                        any(Pageable.class)
+                )).thenReturn(new PageImpl<>(List.of(provider())));
+
+                mockMvc.perform(get("/api/v1/providers/search")
+                                .param("consumerId", "1")
+                                .param("categoryName", "Plumbing")
+                                .param("page", "0")
+                                .param("size", "10"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.content[0].categoryName").value("Plumbing"));
+        }
+        @Test
+        @DisplayName("GET search - location radius")
+        void search_location() throws Exception {
+
+                when(providerService.search(
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        eq(1L),
+                        eq(10.0),
+                        eq("distance"),
+                        any(Pageable.class)
+                )).thenReturn(new PageImpl<>(List.of(provider())));
+
+                mockMvc.perform(get("/api/v1/providers/search")
+                                .param("consumerId", "1")
+                                .param("radius", "10")
+                                .param("sortBy", "distance")
+                                .param("page", "0")
+                                .param("size", "10"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.content[0].formattedDistance").value("390 m"))
+                        .andExpect(jsonPath("$.content[0].estimatedArrivalTime").value(15));
+        }
+        @Test
+        @DisplayName("GET search - sort by price")
+        void search_sort_price() throws Exception {
+
+                when(providerService.search(
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        eq(1L),
+                        eq(5.0),
+                        eq("price_low"),
+                        any(Pageable.class)
+                )).thenReturn(new PageImpl<>(List.of(provider())));
+
+                mockMvc.perform(get("/api/v1/providers/search")
+                                .param("consumerId", "1")
+                                .param("sortBy", "price_low")
+                                .param("page", "0")
+                                .param("size", "10"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.content[0].price").value(200.0));
+        }
+
+        @Test
+        @DisplayName("GET search - all filters combined")
+        void search_all_filters() throws Exception {
+
+                when(providerService.search(
+                        eq("drain"),
+                        eq(3L),
+                        eq("Plumbing"),
+                        eq(1L),
+                        eq(10.0),
+                        eq("distance"),
+                        any(Pageable.class)
+                )).thenReturn(new PageImpl<>(List.of(provider())));
+
+                mockMvc.perform(get("/api/v1/providers/search")
+                                .param("consumerId", "1")
+                                .param("keyword", "drain")
+                                .param("categoryId", "3")
+                                .param("categoryName", "Plumbing")
+                                .param("radius", "10")
+                                .param("sortBy", "distance")
+                                .param("page", "0")
+                                .param("size", "10"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.content[0].categoryName").value("Plumbing"))
+                        .andExpect(jsonPath("$.content[0].serviceType").value("Drain Cleaning"))
+                        .andExpect(jsonPath("$.content[0].formattedDistance").value("390 m"));
+        }
+        @Test
+        @DisplayName("GET top rated near me")
+        void topRatedNearMe() throws Exception {
+
+                when(providerService.topRatedNearMe(1L, 10.0, PageRequest.of(0, 10)))
+                        .thenReturn(Page.empty());
+
+                mockMvc.perform(get("/api/v1/providers/top-rated-near-me")
+                                .param("consumerId", "1")
+                                .param("radius", "10"))
+                        .andExpect(status().isOk());
         }
 }
