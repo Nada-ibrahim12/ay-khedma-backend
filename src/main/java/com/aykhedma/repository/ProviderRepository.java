@@ -53,6 +53,7 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
         void updateProfileImage(@Param("providerId") Long providerId, @Param("profileImage") String profileImage);
 
         List<Provider> findByServiceTypeId(Long serviceTypeId);
+        boolean existsByServiceTypeId(Long serviceTypeId);
 
         @Query("SELECT p FROM Provider p " +
                         "LEFT JOIN p.serviceType s " +

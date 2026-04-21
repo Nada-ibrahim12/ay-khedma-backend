@@ -6,6 +6,7 @@ import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
+import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceCategoryRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class ServiceCategoryService {
 
     private final ServiceCategoryRepository categoryRepository;
     private final ServiceTypeRepository serviceTypeRepository;
+    private final ProviderRepository providerRepository;
 
     public List<ServiceCategoryDTO> getAllCategories() {
         return categoryRepository.findAllWithServiceTypes()
@@ -118,17 +120,33 @@ public class ServiceCategoryService {
         return mapToDTO(categoryRepository.save(category));
     }
 
+    @Transactional
     public void deleteCategory(Long id) {
 
         if (id == null) {
             throw new BadRequestException("Category id is required");
         }
 
-        if (!categoryRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Category not found");
+        ServiceCategory category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+
+        List<ServiceType> types = category.getServiceTypes();
+
+        for (ServiceType type : types) {
+
+            boolean hasProviders =
+                    providerRepository.existsByServiceTypeId(type.getId());
+
+            if (hasProviders) {
+                throw new BadRequestException(
+                        "Cannot delete category because it has providers using its services"
+                );
+            }
         }
 
-        categoryRepository.deleteById(id);
+        serviceTypeRepository.deleteAll(types);
+
+        categoryRepository.delete(category);
     }
 
 

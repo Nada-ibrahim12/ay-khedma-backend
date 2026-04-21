@@ -44,4 +44,11 @@ public interface ServiceTypeRepository extends JpaRepository<ServiceType, Long> 
     boolean existsByName(String name);
 
     boolean existsByNameIgnoreCase(String name);
+
+    @Query("""
+    SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END
+    FROM Provider p
+    WHERE p.serviceType.id = :serviceTypeId
+    """)
+    boolean hasProviders(@Param("serviceTypeId") Long serviceTypeId);
 }

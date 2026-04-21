@@ -115,6 +115,11 @@ public class ServiceManagementServiceImpl {
         if (!typeRepository.existsById(id)) {
             throw new ResourceNotFoundException("Service type not found");
         }
+        if (providerRepository.existsByServiceTypeId(id)) {
+            throw new BadRequestException(
+                    "Cannot delete service type because it is used by providers"
+            );
+        }
 
         typeRepository.deleteById(id);
     }
