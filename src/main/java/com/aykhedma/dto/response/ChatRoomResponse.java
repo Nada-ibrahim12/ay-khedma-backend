@@ -12,6 +12,7 @@ public class ChatRoomResponse {
     private String roomId;
     private Long otherUserId;
     private String otherUserName;
+    private String otherUserProfileImage;
 
     private String lastMessage;
     private LocalDateTime lastMessageTime;

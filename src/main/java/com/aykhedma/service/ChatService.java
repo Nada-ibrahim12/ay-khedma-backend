@@ -84,6 +84,9 @@ public class ChatService {
                     .roomId(room.getId())
                     .otherUserId(otherUser != null ? otherUser.getId() : null)
                     .otherUserName(otherUser != null ? otherUser.getName() : "Unknown")
+                    .otherUserProfileImage(
+                            otherUser != null ? otherUser.getProfileImage() : null
+                    )
                     .lastMessage(
                             room.getLastMessage() != null
                                     ? room.getLastMessage()

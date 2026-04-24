@@ -32,13 +32,6 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, String> {
     Optional<ChatRoom> findRoomBetweenUsers(@Param("u1") User u1,
                                             @Param("u2") User u2);
 
-    @Query("""
-    SELECT DISTINCT r FROM ChatRoom r
-    JOIN r.participants p
-    WHERE p.id = :userId
-    ORDER BY r.lastMessageAt DESC NULLS LAST
-""")
-    List<ChatRoom> findUserRooms(@Param("userId") Long userId);
 
     @Query("""
     SELECT r FROM ChatRoom r
