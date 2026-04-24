@@ -2,6 +2,7 @@ package com.aykhedma.service;
 
 import com.aykhedma.dto.request.ChatMessageRequest;
 import com.aykhedma.dto.response.ChatMessageResponse;
+import com.aykhedma.dto.response.ChatRoomResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ForbiddenException;
 import com.aykhedma.exception.ResourceNotFoundException;
@@ -57,6 +58,49 @@ public class ChatService {
 
         return chatRoomRepository.save(newRoom);
     }
+    public Page<ChatRoomResponse> getUserRooms(User user, int page, int size) {
+
+        if (user == null)
+            throw new UnauthorizedException("User not authenticated");
+
+
+        Page<ChatRoom> rooms = chatRoomRepository.findUserRooms(
+                user.getId(),
+                PageRequest.of(page, size, Sort.by("lastMessageAt").descending())
+        );
+
+        return rooms.map(room -> {
+
+            User otherUser = room.getParticipants().stream()
+                    .filter(u -> !u.getId().equals(user.getId()))
+                    .findFirst()
+                    .orElse(null);
+
+            ChatMessage lastMsg = chatMessageRepository
+                    .findTopByChatRoomIdOrderByTimestampDesc(room.getId())
+                    .orElse(null);
+
+            return ChatRoomResponse.builder()
+                    .roomId(room.getId())
+                    .otherUserId(otherUser != null ? otherUser.getId() : null)
+                    .otherUserName(otherUser != null ? otherUser.getName() : "Unknown")
+                    .lastMessage(
+                            room.getLastMessage() != null
+                                    ? room.getLastMessage()
+                                    : (lastMsg != null ? lastMsg.getContent() : "")
+                    )
+                    .lastMessageTime(
+                            room.getLastMessageAt() != null
+                                    ? room.getLastMessageAt()
+                                    : (lastMsg != null ? lastMsg.getTimestamp() : null)
+                    )
+                    .unreadCount(
+                            chatMessageRepository.countUnreadMessages(room.getId(), user.getId())
+                    )
+                    .build();
+        });
+
+    }
     @Transactional
     public ChatMessageResponse sendMessage(User sender, ChatMessageRequest request) throws IOException {
 
@@ -105,7 +149,6 @@ public class ChatService {
                 .timestamp(LocalDateTime.now())
                 .isRead(false)
                 .build();
-
         ChatMessage saved = chatMessageRepository.save(msg);
 
         ChatMessageResponse response =

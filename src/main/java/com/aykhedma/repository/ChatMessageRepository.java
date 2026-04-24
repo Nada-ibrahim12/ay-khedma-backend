@@ -5,11 +5,13 @@ import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Optional;
+
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, String> {
 
     Page<ChatMessage> findByChatRoomId(String roomId, Pageable pageable);
 
-
+    Optional<ChatMessage> findTopByChatRoomIdOrderByTimestampDesc(String roomId);
     @Modifying
     @Query("""
     UPDATE ChatMessage m

@@ -52,6 +52,8 @@ public class ChatRoom {
     @Column(nullable = false)
     private Boolean isActive = true;
 
+    private String lastMessage;
+
     @AssertTrue(message = "A direct chat room must have exactly 2 participants")
     private boolean isValidDirectChat() {
         if (roomName == null && participants.size() != 2) {

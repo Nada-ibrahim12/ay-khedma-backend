@@ -2,6 +2,7 @@ package com.aykhedma.controller;
 
 import com.aykhedma.dto.request.ChatMessageRequest;
 import com.aykhedma.dto.response.ChatMessageResponse;
+import com.aykhedma.dto.response.ChatRoomResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.model.chat.MessageType;
 import com.aykhedma.security.CustomUserDetails;
@@ -9,6 +10,8 @@ import com.aykhedma.service.ChatService;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -43,6 +46,21 @@ public class ChatController {
                 .getId();
 
         return ResponseEntity.ok(roomId);
+    }
+    @GetMapping("/rooms")
+    public ResponseEntity<Page<ChatRoomResponse>> getRooms(
+            @RequestParam int page,
+            @RequestParam int size,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        if (page < 0 || size <= 0) {
+            throw new BadRequestException("Invalid pagination parameters");
+        }
+        Page<ChatRoomResponse> rooms = chatService.getUserRooms(user.getUser(), page, size);
+        if (rooms.isEmpty()) {
+            return ResponseEntity.ok(Page.empty());
+        }
+        return ResponseEntity.ok(rooms);
     }
 
     @PostMapping(value = "/send", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
