@@ -23,6 +23,9 @@ public class MediaStorageService {
 
             "video/mp4", "video/mkv", "video/avi", "video/mov",
             "audio/mpeg", "audio/wav", "audio/ogg", "audio/webm","audio/m4a",
+            "audio/mp4",
+            "audio/x-m4a",
+            "audio/aac",
 
             // documents
             "application/pdf",
