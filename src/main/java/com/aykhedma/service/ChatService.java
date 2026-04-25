@@ -119,6 +119,11 @@ public class ChatService {
         if (!allowed)
             throw new ForbiddenException("You are not allowed in this room");
 
+        if ((request.getContent() == null || request.getContent().isBlank())
+                && (request.getMediaFiles() == null || request.getMediaFiles().isEmpty())) {
+            throw new BadRequestException("Message cannot be empty");
+        }
+
         List<String> mediaUrls = new ArrayList<>();
 
         if (request.getMediaFiles() != null) {
