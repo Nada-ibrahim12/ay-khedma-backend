@@ -22,7 +22,7 @@ public class MediaStorageService {
             "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
 
             "video/mp4", "video/mkv", "video/avi", "video/mov",
-            "audio/mpeg", "audio/wav", "audio/ogg", "audio/webm",
+            "audio/mpeg", "audio/wav", "audio/ogg", "audio/webm","audio/m4a",
 
             // documents
             "application/pdf",
