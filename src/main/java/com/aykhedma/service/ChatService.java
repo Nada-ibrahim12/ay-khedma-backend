@@ -110,7 +110,7 @@ public class ChatService {
         if (sender == null)
             throw new UnauthorizedException("User not authenticated");
 
-        var room = chatRoomRepository.findById(request.getRoomId())
+        ChatRoom room = chatRoomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
 
         boolean allowed = room.getParticipants().stream()
@@ -119,25 +119,17 @@ public class ChatService {
         if (!allowed)
             throw new ForbiddenException("You are not allowed in this room");
 
-
         List<String> mediaUrls = new ArrayList<>();
 
-        if (request.getMediaFiles() != null && !request.getMediaFiles().isEmpty()) {
+        if (request.getMediaFiles() != null) {
 
             for (MultipartFile file : request.getMediaFiles()) {
 
                 if (file != null && !file.isEmpty()) {
 
-                    String contentType = file.getContentType();
+                    var result = mediaStorageService.storeMedia(file, room.getId());
 
-                    if (contentType != null &&
-                            !contentType.startsWith("image/") &&
-                            !contentType.startsWith("video/")) {
-                        throw new BadRequestException("Only image/video files are allowed");
-                    }
-
-                    String url = mediaStorageService.storeMedia(file, room.getId());
-                    mediaUrls.add(url);
+                    mediaUrls.add(result);
                 }
             }
         }
@@ -152,6 +144,7 @@ public class ChatService {
                 .timestamp(LocalDateTime.now())
                 .isRead(false)
                 .build();
+
         ChatMessage saved = chatMessageRepository.save(msg);
 
         ChatMessageResponse response =

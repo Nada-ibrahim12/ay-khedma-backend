@@ -20,12 +20,19 @@ public class MediaStorageService {
 
     private static final List<String> ALLOWED_MEDIA_TYPES = Arrays.asList(
             "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
-            "video/mp4", "video/mkv", "video/avi", "video/mov"
+
+            "video/mp4", "video/mkv", "video/avi", "video/mov",
+            "audio/mpeg", "audio/wav", "audio/ogg", "audio/webm",
+
+            // documents
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain"
     );
 
     private static final long MAX_MEDIA_SIZE = 20 * 1024 * 1024; // 20MB
 
-    // ✅ upload to cloudinary with folder = chat-media/{roomId}
     public String storeMedia(MultipartFile file, String roomId) throws IOException {
 
         if (file == null || file.isEmpty()) {
@@ -47,15 +54,17 @@ public class MediaStorageService {
 
     private void validateMediaFile(MultipartFile file) {
 
-        if (!ALLOWED_MEDIA_TYPES.contains(file.getContentType())) {
+        String contentType = file.getContentType();
+
+        if (contentType == null || !ALLOWED_MEDIA_TYPES.contains(contentType)) {
             throw new BadRequestException(
-                    "Invalid media type. Allowed: images & videos only"
+                    "Invalid file type. Allowed: images, videos, audio, documents"
             );
         }
 
         if (file.getSize() > MAX_MEDIA_SIZE) {
             throw new BadRequestException(
-                    "Media size exceeds 20MB"
+                    "File size exceeds 20MB"
             );
         }
     }
