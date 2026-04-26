@@ -21,10 +21,13 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @NotNull(message = "Chat room is required")
     @ManyToOne
-    @JoinColumn(name = "room_id", nullable = false)
+    @JoinColumn(name = "room_id", nullable = true)
     private ChatRoom chatRoom;
+
+    @ManyToOne
+    @JoinColumn(name = "session_id", nullable = true)
+    private ChatSession chatSession;
 
     @NotNull(message = "Sender ID is required")
     private Long senderId;
