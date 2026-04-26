@@ -9,4 +9,6 @@ public interface AiAssistantService {
     ChatResponse chat(AiChatRequest request, User currentUser);
 
     ChatResponse startNewChat(User currentUser);
+
+    ChatResponse getChat(String sessionId);
 }
