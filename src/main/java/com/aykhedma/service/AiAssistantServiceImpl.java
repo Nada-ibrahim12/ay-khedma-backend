@@ -152,13 +152,14 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .detectedLanguage(StringUtils.hasText(plan.getDetectedLanguage()) ? plan.getDetectedLanguage() : "en");
 
         try {
-            switch (plan.getIntent()) {
+            Action action = resolveAction(plan);
+            switch (action) {
                 case SEARCH_PROVIDERS -> handleProviderSearch(request, currentUser, plan, response);
-                case GET_AVAILABILITY -> handleAvailability(request, plan, response);
+                case CHECK_AVAILABILITY -> handleAvailability(request, plan, response);
                 case CREATE_BOOKING -> handleBooking(request, currentUser, plan, response);
                 // case CREATE_EMERGENCY -> handleEmergency(request, currentUser, plan,
                 // response);
-                case CLARIFICATION -> response.responseType(ChatResponseType.CLARIFICATION);
+                case ASK_CLARIFICATION -> response.responseType(ChatResponseType.CLARIFICATION);
                 case GENERAL -> response.responseType(ChatResponseType.TEXT);
             }
         } catch (Exception ex) {
@@ -168,6 +169,10 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         }
 
         ChatResponse chatResponse = response.build();
+        String aiFinalReply = buildAiFinalReply(request, currentUser, plan, chatResponse, history);
+        if (StringUtils.hasText(aiFinalReply)) {
+            chatResponse.setMessage(aiFinalReply);
+        }
 
         // Persist assistant response so it becomes part of history for next turn
         ChatMessage assistantMessage = ChatMessage.builder()
@@ -394,11 +399,15 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     // }
 
     private AssistantPlan classify(AiChatRequest request, User currentUser, List<ChatMessage> history) {
+        if (!geminiClient.isEnabled()) {
+            return applyRequestOverrides(fallbackPlan(request.getMessage()), request);
+        }
+
         String prompt = buildPrompt(request, currentUser, history);
         String modelResponse = geminiClient.generateJson(prompt);
 
         AssistantPlan plan = parsePlan(modelResponse);
-        if (plan != null && plan.getIntent() != null) {
+        if (plan != null) {
             return applyRequestOverrides(plan, request);
         }
 
@@ -408,16 +417,19 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private String buildPrompt(AiChatRequest request, User currentUser, List<ChatMessage> history) {
         StringBuilder builder = new StringBuilder();
         builder.append("You are the Ay Khedma assistant for a home-services app. ");
-        builder.append("Classify the user message and extract booking or emergency fields. ");
+        builder.append("Choose the best backend action and extract needed fields. ");
         builder.append("Return ONLY valid JSON with this schema: ");
-        builder.append("{intent, reply, detectedLanguage, providerId, providerName, serviceTypeId, serviceTypeName, ");
+        builder.append(
+                "{action, intent, reply, detectedLanguage, providerId, providerName, serviceTypeId, serviceTypeName, ");
         builder.append(
                 "requestedDate, requestedTime, problemDescription, searchRadiusKm, location{latitude,longitude,address,area,city}}. ");
+        builder.append(
+                "Action must be one of GENERAL, SEARCH_PROVIDERS, CHECK_AVAILABILITY, CREATE_BOOKING, ASK_CLARIFICATION. ");
         builder.append(
                 "Intent must be one of GENERAL, SEARCH_PROVIDERS, GET_AVAILABILITY, CREATE_BOOKING, CLARIFICATION. ");
         builder.append("For requestedDate, use strictly 'yyyy-MM-dd' format or null. ");
         builder.append("For requestedTime, use strictly 'HH:mm' format or null. ");
-        builder.append("If required data is missing, choose CLARIFICATION and ask for the missing info. ");
+        builder.append("If required data is missing, choose ASK_CLARIFICATION and ask for the missing info. ");
         builder.append(
                 "If the user asks for booking or emergency creation, do not invent provider IDs or coordinates. ");
         builder.append("Current user role: ").append(currentUser != null ? currentUser.getRole() : "anonymous")
@@ -455,13 +467,33 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             JsonNode node = objectMapper.readTree(json);
             AssistantPlan.AssistantPlanBuilder builder = AssistantPlan.builder();
 
+            Action parsedAction = null;
+            String actionText = node.path("action").asText(null);
+            if (StringUtils.hasText(actionText)) {
+                try {
+                    parsedAction = Action.valueOf(actionText.trim().toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException ignored) {
+                    // Keep action null and use fallback mapping.
+                }
+            }
+            builder.action(parsedAction);
+
+            Intent parsedIntent = null;
             String intentText = node.path("intent").asText(null);
             if (StringUtils.hasText(intentText)) {
                 try {
-                    builder.intent(Intent.valueOf(intentText.trim().toUpperCase(Locale.ROOT)));
+                    parsedIntent = Intent.valueOf(intentText.trim().toUpperCase(Locale.ROOT));
                 } catch (IllegalArgumentException ignored) {
                     // Keep intent null and let fallback handling decide.
                 }
+            }
+            builder.intent(parsedIntent);
+
+            if (parsedAction == null && parsedIntent != null) {
+                builder.action(mapIntentToAction(parsedIntent));
+            }
+            if (parsedIntent == null && parsedAction != null) {
+                builder.intent(mapActionToIntent(parsedAction));
             }
 
             builder.reply(node.path("reply").asText(null));
@@ -519,35 +551,10 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     private AssistantPlan fallbackPlan(String message) {
-        String normalized = normalize(message);
-        Intent intent;
-        // if (containsAny(normalized, "emergency", "urgent", "asap", "help now",
-        // "critical")) {
-        // intent = Intent.CREATE_EMERGENCY;
-        // } else
-        if (containsAny(normalized,
-                "book", "booking", "reserve", "appointment", "schedule",
-                "احجز", "حجز", "ميعاد", "موعد", "احجزلي", "حجزلي")) {
-            intent = Intent.CREATE_BOOKING;
-        } else if (containsAny(normalized,
-                "available", "availability", "free slot", "time slot",
-                "متاح", "المواعيد", "الوقت", "اوقات", "الميعاد")) {
-            intent = Intent.GET_AVAILABILITY;
-        } else if (containsAny(normalized,
-                "find", "search", "recommend", "suggest", "provider",
-                "مزود", "مزودين", "فني", "فنيين", "عامل", "عمال", "ممكنين")) {
-            intent = Intent.SEARCH_PROVIDERS;
-        } else if (containsAny(normalized,
-                "السبت", "الاحد", "الاثنين", "الثلاثاء", "الاربعاء", "الخميس", "الجمعة",
-                "الحي", "منطقة", "شارع", "عنوان", "القادم", "بكرة", "بعد بكرة", "next", "tomorrow")) {
-            intent = Intent.CLARIFICATION;
-        } else {
-            intent = Intent.GENERAL;
-        }
-
         return AssistantPlan.builder()
-                .intent(intent)
-                .reply(defaultReply(intent))
+                .action(Action.ASK_CLARIFICATION)
+                .intent(Intent.CLARIFICATION)
+                .reply("I want to help accurately. Please share what you need (service type, provider if known, and preferred date/time).")
                 .detectedLanguage("en")
                 .searchRadiusKm(DEFAULT_SEARCH_RADIUS_KM)
                 .build();
@@ -593,6 +600,12 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         if (request.getLocation() != null) {
             plan.setLocation(request.getLocation());
         }
+        if (plan.getAction() == null) {
+            plan.setAction(mapIntentToAction(plan.getIntent()));
+        }
+        if (plan.getIntent() == null) {
+            plan.setIntent(mapActionToIntent(plan.getAction()));
+        }
         if (!StringUtils.hasText(plan.getReply())) {
             plan.setReply(defaultReply(plan.getIntent()));
         }
@@ -603,6 +616,17 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             List<ChatMessage> history) {
         if (plan == null) {
             plan = fallbackPlan(request.getMessage());
+        }
+
+        AssistantPlan aiEnriched = enrichPlanWithAiContext(request, plan, history);
+        if (aiEnriched != null) {
+            plan = mergeMissingFields(plan, aiEnriched);
+        }
+
+        // Keep deterministic extraction as a strict fallback only when AI context
+        // enrichment is not available.
+        if (!shouldUseHeuristicEnrichment(aiEnriched)) {
+            return plan;
         }
 
         if (plan.getProviderId() == null) {
@@ -635,25 +659,273 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             plan.setProblemDescription(problem);
         }
 
-        String normalized = normalize(request.getMessage());
-        if (containsAny(normalized,
-                "available", "availability", "time slot", "free slot",
-                "متاح", "المواعيد", "الوقت", "اوقات", "available time")) {
-            plan.setIntent(Intent.GET_AVAILABILITY);
-            if (!StringUtils.hasText(plan.getReply())) {
-                plan.setReply(defaultReply(Intent.GET_AVAILABILITY));
-            }
-        }
-
-        if (plan.getIntent() == Intent.CLARIFICATION && plan.getProviderId() != null
-                && plan.getRequestedDate() != null) {
-            plan.setIntent(Intent.GET_AVAILABILITY);
-            if (!StringUtils.hasText(plan.getReply())) {
-                plan.setReply(defaultReply(Intent.GET_AVAILABILITY));
-            }
-        }
-
         return plan;
+    }
+
+    private boolean shouldUseHeuristicEnrichment(AssistantPlan aiEnriched) {
+        if (!geminiClient.isEnabled()) {
+            return true;
+        }
+        return aiEnriched == null;
+    }
+
+    private AssistantPlan enrichPlanWithAiContext(AiChatRequest request, AssistantPlan currentPlan,
+            List<ChatMessage> history) {
+        if (!geminiClient.isEnabled() || currentPlan == null) {
+            return null;
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("You are improving an existing assistant plan for Ay Khedma. ");
+        builder.append(
+                "Fill missing fields using conversation context, but do not overwrite fields already provided. ");
+        builder.append("Return ONLY valid JSON with this schema: ");
+        builder.append(
+                "{action, intent, reply, detectedLanguage, providerId, providerName, serviceTypeId, serviceTypeName, ");
+        builder.append(
+                "requestedDate, requestedTime, problemDescription, searchRadiusKm, location{latitude,longitude,address,area,city}}. ");
+        builder.append("Do not invent impossible values. If unknown, keep null. ");
+        builder.append("Current plan: ").append(planSnapshot(currentPlan)).append(". ");
+
+        if (history != null && !history.isEmpty()) {
+            builder.append("Conversation history:\n");
+            for (ChatMessage msg : history) {
+                String roleLabel = msg.getSenderRole() == MessageRole.USER ? "User" : "Assistant";
+                builder.append(roleLabel).append(": ").append(msg.getContent()).append("\n");
+            }
+        }
+
+        builder.append("Latest user message: ").append(request.getMessage());
+
+        String modelResponse = geminiClient.generateJson(builder.toString());
+        return parsePlan(modelResponse);
+    }
+
+    private AssistantPlan mergeMissingFields(AssistantPlan base, AssistantPlan candidate) {
+        if (base == null) {
+            return candidate;
+        }
+        if (candidate == null) {
+            return base;
+        }
+
+        if (base.getAction() == null && candidate.getAction() != null) {
+            base.setAction(candidate.getAction());
+        }
+        if (base.getIntent() == null && candidate.getIntent() != null) {
+            base.setIntent(candidate.getIntent());
+        }
+        if (!StringUtils.hasText(base.getReply()) && StringUtils.hasText(candidate.getReply())) {
+            base.setReply(candidate.getReply());
+        }
+        if (!StringUtils.hasText(base.getDetectedLanguage()) && StringUtils.hasText(candidate.getDetectedLanguage())) {
+            base.setDetectedLanguage(candidate.getDetectedLanguage());
+        }
+        if (base.getProviderId() == null && candidate.getProviderId() != null) {
+            base.setProviderId(candidate.getProviderId());
+        }
+        if (!StringUtils.hasText(base.getProviderName()) && StringUtils.hasText(candidate.getProviderName())) {
+            base.setProviderName(candidate.getProviderName());
+        }
+        if (base.getServiceTypeId() == null && candidate.getServiceTypeId() != null) {
+            base.setServiceTypeId(candidate.getServiceTypeId());
+        }
+        if (!StringUtils.hasText(base.getServiceTypeName()) && StringUtils.hasText(candidate.getServiceTypeName())) {
+            base.setServiceTypeName(candidate.getServiceTypeName());
+        }
+        if (base.getRequestedDate() == null && candidate.getRequestedDate() != null) {
+            base.setRequestedDate(candidate.getRequestedDate());
+        }
+        if (base.getRequestedTime() == null && candidate.getRequestedTime() != null) {
+            base.setRequestedTime(candidate.getRequestedTime());
+        }
+        if (!StringUtils.hasText(base.getProblemDescription())
+                && StringUtils.hasText(candidate.getProblemDescription())) {
+            base.setProblemDescription(candidate.getProblemDescription());
+        }
+        if (base.getSearchRadiusKm() == null && candidate.getSearchRadiusKm() != null) {
+            base.setSearchRadiusKm(candidate.getSearchRadiusKm());
+        }
+        if (base.getLocation() == null && candidate.getLocation() != null) {
+            base.setLocation(candidate.getLocation());
+        }
+
+        return base;
+    }
+
+    private String planSnapshot(AssistantPlan plan) {
+        if (plan == null) {
+            return "{}";
+        }
+
+        return "{"
+                + "action:" + plan.getAction()
+                + ",intent:" + plan.getIntent()
+                + ",providerId:" + plan.getProviderId()
+                + ",providerName:" + plan.getProviderName()
+                + ",serviceTypeId:" + plan.getServiceTypeId()
+                + ",serviceTypeName:" + plan.getServiceTypeName()
+                + ",requestedDate:" + plan.getRequestedDate()
+                + ",requestedTime:" + plan.getRequestedTime()
+                + ",problemDescription:" + sanitizeForPrompt(plan.getProblemDescription())
+                + ",searchRadiusKm:" + plan.getSearchRadiusKm()
+                + "}";
+    }
+
+    private String buildAiFinalReply(AiChatRequest request,
+            User currentUser,
+            AssistantPlan plan,
+            ChatResponse chatResponse,
+            List<ChatMessage> history) {
+        if (!geminiClient.isEnabled() || chatResponse == null || !StringUtils.hasText(chatResponse.getMessage())) {
+            return chatResponse != null ? chatResponse.getMessage() : null;
+        }
+
+        try {
+            String prompt = buildFinalReplyPrompt(request, currentUser, plan, chatResponse, history);
+            String modelResponse = geminiClient.generateJson(prompt);
+            if (!StringUtils.hasText(modelResponse)) {
+                return chatResponse.getMessage();
+            }
+
+            String json = extractJson(modelResponse);
+            if (!StringUtils.hasText(json)) {
+                return chatResponse.getMessage();
+            }
+
+            String aiReply = objectMapper.readTree(json).path("reply").asText(null);
+            return StringUtils.hasText(aiReply) ? aiReply.trim() : chatResponse.getMessage();
+        } catch (Exception ex) {
+            log.debug("Failed to generate final AI reply: {}", ex.getMessage());
+            return chatResponse.getMessage();
+        }
+    }
+
+    private String buildFinalReplyPrompt(AiChatRequest request,
+            User currentUser,
+            AssistantPlan plan,
+            ChatResponse chatResponse,
+            List<ChatMessage> history) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("You are an empathetic AI assistant for Ay Khedma. ");
+        builder.append(
+                "Write the final response to the user in natural language (Arabic if user wrote Arabic, otherwise English). ");
+        builder.append("Return JSON only in this format: {\"reply\":\"...\"}. ");
+        builder.append("Do not invent data, IDs, times, or availability that are not in the provided context. ");
+        builder.append("Keep the response concise (1-3 short sentences). ");
+        builder.append("If information is missing, ask for only the missing fields. ");
+
+        builder.append("Current user role: ").append(currentUser != null ? currentUser.getRole() : "anonymous")
+                .append(". ");
+        builder.append("Detected language: ")
+                .append(plan != null && StringUtils.hasText(plan.getDetectedLanguage()) ? plan.getDetectedLanguage()
+                        : "unknown")
+                .append(". ");
+        builder.append("Action: ").append(resolveAction(plan)).append(". ");
+        builder.append("User message: ").append(request.getMessage()).append(". ");
+
+        if (history != null && !history.isEmpty()) {
+            ChatMessage lastUserMessage = null;
+            for (int i = history.size() - 1; i >= 0; i--) {
+                if (history.get(i).getSenderRole() == MessageRole.USER) {
+                    lastUserMessage = history.get(i);
+                    break;
+                }
+            }
+            if (lastUserMessage != null && StringUtils.hasText(lastUserMessage.getContent())) {
+                builder.append("Previous user message: ").append(lastUserMessage.getContent()).append(". ");
+            }
+        }
+
+        String actionSummary = summarizeActionOutcome(chatResponse, plan);
+        builder.append("Action outcome: ").append(actionSummary).append(". ");
+        builder.append("Current fallback reply: ").append(chatResponse.getMessage()).append(".");
+
+        return builder.toString();
+    }
+
+    private String summarizeActionOutcome(ChatResponse chatResponse, AssistantPlan plan) {
+        if (chatResponse == null) {
+            return "no action executed";
+        }
+
+        ChatResponseType responseType = chatResponse.getResponseType();
+        if (responseType == null) {
+            return "text response";
+        }
+
+        return switch (responseType) {
+            case PROVIDER_LIST -> {
+                int providerCount = chatResponse.getProviders() != null ? chatResponse.getProviders().size() : 0;
+                String providerNames = chatResponse.getProviders() == null ? ""
+                        : chatResponse.getProviders().stream()
+                                .limit(3)
+                                .map(ProviderSummaryResponse::getName)
+                                .filter(StringUtils::hasText)
+                                .collect(Collectors.joining(", "));
+                yield providerCount > 0
+                        ? "provider search succeeded with " + providerCount + " providers: " + providerNames
+                        : "provider search succeeded but no providers were found";
+            }
+            case AVAILABLE_SLOTS -> {
+                int slotCount = chatResponse.getAvailableTimeSlots() != null
+                        ? chatResponse.getAvailableTimeSlots().size()
+                        : 0;
+                String providerPart = plan != null && plan.getProviderId() != null
+                        ? " for provider " + plan.getProviderId()
+                        : "";
+                String datePart = plan != null && plan.getRequestedDate() != null
+                        ? " on " + DATE_FORMAT.format(plan.getRequestedDate())
+                        : "";
+                yield "availability check returned " + slotCount + " slots" + providerPart + datePart;
+            }
+            case BOOKING_CREATED -> {
+                Long bookingId = chatResponse.getBooking() != null ? chatResponse.getBooking().getId() : null;
+                yield bookingId != null ? "booking created with id " + bookingId : "booking request created";
+            }
+            case BOOKING_REDIRECT -> "booking cannot be completed yet due to missing fields";
+            case CLARIFICATION -> "clarification required from user";
+            case ERROR -> "system action failed";
+            default -> "general conversational response";
+        };
+    }
+
+    private Action resolveAction(AssistantPlan plan) {
+        if (plan == null) {
+            return Action.GENERAL;
+        }
+        if (plan.getAction() != null) {
+            return plan.getAction();
+        }
+        return mapIntentToAction(plan.getIntent());
+    }
+
+    private Action mapIntentToAction(Intent intent) {
+        if (intent == null) {
+            return Action.GENERAL;
+        }
+
+        return switch (intent) {
+            case SEARCH_PROVIDERS -> Action.SEARCH_PROVIDERS;
+            case GET_AVAILABILITY -> Action.CHECK_AVAILABILITY;
+            case CREATE_BOOKING -> Action.CREATE_BOOKING;
+            case CLARIFICATION -> Action.ASK_CLARIFICATION;
+            case GENERAL -> Action.GENERAL;
+        };
+    }
+
+    private Intent mapActionToIntent(Action action) {
+        if (action == null) {
+            return Intent.GENERAL;
+        }
+
+        return switch (action) {
+            case SEARCH_PROVIDERS -> Intent.SEARCH_PROVIDERS;
+            case CHECK_AVAILABILITY -> Intent.GET_AVAILABILITY;
+            case CREATE_BOOKING -> Intent.CREATE_BOOKING;
+            case ASK_CLARIFICATION -> Intent.CLARIFICATION;
+            case GENERAL -> Intent.GENERAL;
+        };
     }
 
     private Long resolveProviderId(AiChatRequest request, AssistantPlan plan) {
@@ -1176,6 +1448,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class AssistantPlan {
+        private Action action;
         private Intent intent;
         private String reply;
         private String detectedLanguage;
@@ -1202,5 +1475,13 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         CREATE_BOOKING,
         // CREATE_EMERGENCY,
         CLARIFICATION
+    }
+
+    enum Action {
+        GENERAL,
+        SEARCH_PROVIDERS,
+        CHECK_AVAILABILITY,
+        CREATE_BOOKING,
+        ASK_CLARIFICATION
     }
 }
