@@ -49,7 +49,7 @@ public class AuthController {
     public ResponseEntity<String> register(
             @Valid @RequestBody RegisterRequest request) {
 
-        authService.register(request, null, null, null);
+        authService.register(request, null, null, null, null);
 
         otpService.generateOtp(request.getEmail());
         return ResponseEntity.ok("Registered successfully. OTP sent to your email.");
@@ -58,12 +58,12 @@ public class AuthController {
     @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> registerWithNationalIdImages(
             @Valid @ModelAttribute RegisterRequest request,
+            @RequestParam(value = "profilePicture", required = true) MultipartFile profilePicture,
             @RequestParam(value = "nationalIdFrontImage", required = false) MultipartFile nationalIdFrontImage,
             @RequestParam(value = "nationalIdBackImage", required = false) MultipartFile nationalIdBackImage,
-            @RequestParam(value = "documents", required = false) List<MultipartFile> documents
-        ) {
+            @RequestParam(value = "documents", required = false) List<MultipartFile> documents) {
 
-        authService.register(request, nationalIdFrontImage, nationalIdBackImage, documents);
+        authService.register(request, profilePicture, nationalIdFrontImage, nationalIdBackImage, documents);
         otpService.generateOtp(request.getEmail());
         return ResponseEntity.ok("Registered successfully. OTP sent to your email.");
     }

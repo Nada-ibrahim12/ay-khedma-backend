@@ -28,7 +28,9 @@ public interface ProviderMapper {
     @Mapping(source = "totalBookings", target = "totalBookings")
     @Mapping(source = "cancelledBookings", target = "cancelledBookings")
     @Mapping(source = "serviceType.name", target = "serviceType")
+    @Mapping(source = "serviceType.category.name", target = "serviceCategory")
     @Mapping(source = "serviceType.id", target = "serviceTypeId")
+    @Mapping(source = "worksAt", target = "worksAt")
     @Mapping(source = "location", target = "location")
     @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")
     @Mapping(source = "averagePunctualityRating", target = "averagePunctualityRating")
@@ -91,13 +93,17 @@ public interface ProviderMapper {
     List<ProviderSummaryResponse> toProviderSummaryResponseList(List<Provider> providers);
 
     default List<CancellationResponse> mapCancellationHistory(List<com.aykhedma.model.booking.Booking> bookings) {
-        if (bookings == null) return null;
+        if (bookings == null)
+            return null;
         return bookings.stream()
                 .filter(b -> b.getStatus() == BookingStatus.CANCELLED)
                 .sorted((b1, b2) -> {
-                    if (b1.getCancelledAt() == null && b2.getCancelledAt() == null) return 0;
-                    if (b1.getCancelledAt() == null) return 1;
-                    if (b2.getCancelledAt() == null) return -1;
+                    if (b1.getCancelledAt() == null && b2.getCancelledAt() == null)
+                        return 0;
+                    if (b1.getCancelledAt() == null)
+                        return 1;
+                    if (b2.getCancelledAt() == null)
+                        return -1;
                     return b2.getCancelledAt().compareTo(b1.getCancelledAt());
                 })
                 .limit(10)

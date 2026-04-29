@@ -89,9 +89,12 @@ public class AuthService {
 
     @Transactional
     public void register(RegisterRequest request,
+            MultipartFile profilePicture,
             MultipartFile nationalIdFrontImage,
             MultipartFile nationalIdBackImage,
             List<MultipartFile> documents) {
+
+        String profileImageUrl = null;
 
         if (userRepository.existsByEmail(request.getEmail()))
             throw new RuntimeException("Email already exists");
@@ -123,7 +126,15 @@ public class AuthService {
                     .totalBookings(0)
                     .build();
 
-            userRepository.save(consumer);
+            Consumer savedConsumer = (Consumer) userRepository.save(consumer);
+
+            try {
+                profileImageUrl = storeProfilePicture(profilePicture, savedConsumer.getId().toString());
+                savedConsumer.setProfileImage(profileImageUrl);
+                userRepository.save(savedConsumer);
+            } catch (IOException e) {
+                throw new BadRequestException("Failed to upload profile picture");
+            }
 
         } else if (request.getUserType() == UserType.ADMIN) {
 
@@ -196,6 +207,9 @@ public class AuthService {
                 Provider savedProvider = (Provider) userRepository.save(provider);
                 String folderName = savedProvider.getId().toString();
 
+                profileImageUrl = storeProfilePicture(profilePicture, folderName);
+                savedProvider.setProfileImage(profileImageUrl);
+
                 if (nationalIdFrontImage != null && !nationalIdFrontImage.isEmpty()) {
                     frontImageUrl = fileStorageService.storeFile(nationalIdFrontImage, folderName);
                 }
@@ -231,6 +245,9 @@ public class AuthService {
                     }
                 }
             } catch (IOException e) {
+                if (profileImageUrl != null) {
+                    fileStorageService.deleteFile(profileImageUrl);
+                }
                 if (frontImageUrl != null) {
                     fileStorageService.deleteFile(frontImageUrl);
                 }
@@ -239,6 +256,9 @@ public class AuthService {
                 }
                 throw new BadRequestException("Failed to upload national ID images");
             } catch (RuntimeException e) {
+                if (profileImageUrl != null) {
+                    fileStorageService.deleteFile(profileImageUrl);
+                }
                 if (frontImageUrl != null) {
                     fileStorageService.deleteFile(frontImageUrl);
                 }
@@ -294,6 +314,14 @@ public class AuthService {
                 .build();
 
         documentRepository.save(document);
+    }
+
+    private String storeProfilePicture(MultipartFile profilePicture, String folderName) throws IOException {
+        if (profilePicture == null || profilePicture.isEmpty()) {
+            return null;
+        }
+
+        return fileStorageService.storeFile(profilePicture, folderName);
     }
 
 }

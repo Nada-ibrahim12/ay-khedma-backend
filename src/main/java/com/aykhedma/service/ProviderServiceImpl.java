@@ -79,9 +79,10 @@ public class ProviderServiceImpl implements ProviderService {
         if (request.getName() != null) {
             provider.setName(request.getName());
         }
-        if (request.getEmail() != null) {
-            provider.setEmail(request.getEmail());
+        if (request.getEmail() != null && !request.getEmail().equals(provider.getEmail())) {
+            throw new BadRequestException("Email cannot be changed");
         }
+
         if (request.getPhoneNumber() != null) {
             provider.setPhoneNumber(request.getPhoneNumber());
         }
@@ -92,11 +93,14 @@ public class ProviderServiceImpl implements ProviderService {
             provider.setYearsOfExperience(request.getYearsOfExperience());
         }
 
-        // Update service info
-        if (request.getServiceTypeId() != null) {
-            ServiceType serviceType = serviceTypeRepository.findById(request.getServiceTypeId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Service type not found"));
-            provider.setServiceType(serviceType);
+        if (request.getServiceTypeId() != null
+                && !request.getServiceTypeId().equals(provider.getServiceType().getId())) {
+            throw new BadRequestException(
+                    "Service type cannot be changed directly. Please contact support to update your service type.");
+        }
+
+        if (request.getWorksAt() != null) {
+            provider.setWorksAt(request.getWorksAt());
         }
 
         if (request.getPrice() != null) {
@@ -113,11 +117,8 @@ public class ProviderServiceImpl implements ProviderService {
             }
         }
 
-        if (request.getNationalId() != null) {
-            if (providerRepository.existsByNationalIdAndIdNot(request.getNationalId(), providerId)) {
-                throw new BadRequestException("National ID already exists");
-            }
-            provider.setNationalId(request.getNationalId());
+        if (request.getNationalId() != null && !request.getNationalId().equals(provider.getNationalId())) {
+            throw new BadRequestException("You can't update your national ID");
         }
 
         if (request.getServiceAreaRadius() != null) {
@@ -244,12 +245,12 @@ public class ProviderServiceImpl implements ProviderService {
     @Transactional(readOnly = true)
     @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy,#pageable.pageNumber,#pageable.pageSize,#pageable.sort}")
     public Page<SearchResponse> search(String keyword,
-                                       Long categoryId,
-                                       String categoryName,
-                                       Long consumerId,
-                                       Double radius,
-                                       String sortBy,
-                                       Pageable pageable) {
+            Long categoryId,
+            String categoryName,
+            Long consumerId,
+            Double radius,
+            String sortBy,
+            Pageable pageable) {
         log.warn("CACHE MISS -> Fetching from DATABASE");
 
         Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName,
@@ -332,36 +333,37 @@ public class ProviderServiceImpl implements ProviderService {
         }
     }
 
-private void validateHighRiskProvider(Provider provider) {
+    private void validateHighRiskProvider(Provider provider) {
 
-    if (provider.getServiceType().getRiskLevel() == RiskLevel.HIGH) {
+        if (provider.getServiceType().getRiskLevel() == RiskLevel.HIGH) {
 
-        List<Document> documents = documentRepository.findByProviderId(provider.getId());
+            List<Document> documents = documentRepository.findByProviderId(provider.getId());
 
-        if (documents == null || documents.isEmpty()) {
-            throw new BadRequestException("Documents are required for HIGH risk services");
+            if (documents == null || documents.isEmpty()) {
+                throw new BadRequestException("Documents are required for HIGH risk services");
+            }
+
+            boolean hasNationalId = documents.stream()
+                    .anyMatch(doc -> doc.getType().equalsIgnoreCase("NATIONAL_ID"));
+
+            if (!hasNationalId) {
+                throw new BadRequestException("NATIONAL_ID document is required");
+            }
+
+            boolean hasAdditionalDocuments = documents.stream()
+                    .anyMatch(doc -> !doc.getType().equalsIgnoreCase("NATIONAL_ID"));
+
+            if (!hasAdditionalDocuments) {
+                throw new BadRequestException(
+                        "Additional documents (certificates) are required for HIGH risk services. Please upload them before updating your service type.");
+            }
+
+            provider.setVerificationStatus(VerificationStatus.PENDING);
+
+        } else {
+            provider.setVerificationStatus(VerificationStatus.VERIFIED);
         }
-
-        boolean hasNationalId = documents.stream()
-                .anyMatch(doc -> doc.getType().equalsIgnoreCase("NATIONAL_ID"));
-
-        if (!hasNationalId) {
-            throw new BadRequestException("NATIONAL_ID document is required");
-        }
-
-        boolean hasAdditionalDocuments = documents.stream()
-                .anyMatch(doc -> !doc.getType().equalsIgnoreCase("NATIONAL_ID"));
-
-        if (!hasAdditionalDocuments) {
-            throw new BadRequestException("Additional documents (certificates) are required for HIGH risk services. Please upload them before updating your service type.");
-        }
-
-        provider.setVerificationStatus(VerificationStatus.PENDING);
-
-    } else {
-        provider.setVerificationStatus(VerificationStatus.VERIFIED);
     }
-}
 
     private Page<SearchResponse> toPage(List<SearchResponse> responses, Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
@@ -414,6 +416,7 @@ private void validateHighRiskProvider(Provider provider) {
                         .collect(Collectors.toList());
         }
     }
+
     @Override
     @Transactional(readOnly = true)
     public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
@@ -425,8 +428,7 @@ private void validateHighRiskProvider(Provider provider) {
             throw new BadRequestException("radius must be greater than 0");
         }
 
-        Page<Provider> providersPage =
-                providerRepository.searchProviders(null, null, null, Pageable.unpaged());
+        Page<Provider> providersPage = providerRepository.searchProviders(null, null, null, Pageable.unpaged());
 
         List<SearchResponse> ranked = providersPage.getContent().stream()
                 .filter(p -> p.getLocation() != null)
@@ -437,20 +439,21 @@ private void validateHighRiskProvider(Provider provider) {
                                 .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
                                 .getDistanceKm();
 
-                        if (distance > radius) return null;
+                        if (distance > radius)
+                            return null;
 
                         SearchResponse res = providerMapper.toSearchResponse(provider);
 
                         res.setDistance(distance);
                         res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
 
-
                         double score = calculateScore(provider, distance);
                         res.setScore(score);
 
                         return res;
 
-                    } catch (Exception e) { throw new BadRequestException("Distance calculation failed");
+                    } catch (Exception e) {
+                        throw new BadRequestException("Distance calculation failed");
                     }
                 })
                 .filter(Objects::nonNull)
@@ -459,6 +462,7 @@ private void validateHighRiskProvider(Provider provider) {
 
         return toPage(ranked, pageable);
     }
+
     private double calculateScore(Provider p, double distance) {
 
         double ratingWeight = 0.5;
@@ -468,7 +472,6 @@ private void validateHighRiskProvider(Provider provider) {
         double ratingScore = (p.getAverageRating() != null ? p.getAverageRating() : 0) * 20;
 
         double distanceScore = Math.max(0, 100 - (distance * 10));
-
 
         double experienceScore = (p.getCompletedJobs() != null ? p.getCompletedJobs() : 0) / 10.0;
 
@@ -804,9 +807,9 @@ private void validateHighRiskProvider(Provider provider) {
 
     @Override
     public TimeSlot reserveTimeSlotWithBuffer(Long scheduleId,
-                                              LocalDate date,
-                                              LocalTime bookingStart,
-                                              LocalTime bookingEnd) {
+            LocalDate date,
+            LocalTime bookingStart,
+            LocalTime bookingEnd) {
         List<TimeSlot> availableSlots = timeSlotRepository
                 .findByScheduleIdAndDateAndStatus(scheduleId, date, TimeSlotStatus.AVAILABLE)
                 .stream()
@@ -1022,7 +1025,7 @@ private void validateHighRiskProvider(Provider provider) {
     // }
 
     private List<ScheduleResponse.TimeSlotResponse> toDiscreteStartTimeResponses(List<TimeSlot> availableSlots,
-                                                                                 LocalDate fallbackDate) {
+            LocalDate fallbackDate) {
         if (availableSlots == null || availableSlots.isEmpty()) {
             return List.of();
         }

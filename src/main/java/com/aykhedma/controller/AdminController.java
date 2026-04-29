@@ -45,7 +45,7 @@ public class AdminController {
 
     @PutMapping("/providers/{id}/reject")
     public ResponseEntity<ProviderResponse> rejectProvider(
-            @PathVariable Long id, 
+            @PathVariable Long id,
             @Valid @RequestBody RejectProviderRequest request) {
         return ResponseEntity.ok(adminService.rejectProvider(id, request.getReason()));
     }
@@ -75,23 +75,23 @@ public class AdminController {
 
     @GetMapping("/users")
     public ResponseEntity<Page<UserResponse>> searchUsers(
-            @RequestParam(value = "role",required = false) UserType role,
-            @RequestParam(value = "status",required = false) Boolean status,
-            @RequestParam(value = "startDate",required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
-            @RequestParam(value = "endDate",required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(value = "role", required = false) UserType role,
+            @RequestParam(value = "status", required = false) Boolean status,
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             Pageable pageable) {
         return ResponseEntity.ok(adminService.searchUsers(role, status, startDate, endDate, pageable));
     }
 
     @PostMapping("/users")
     public ResponseEntity<String> addUser(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request, null, null, null);
+        authService.register(request, null, null, null, null);
         return ResponseEntity.ok("User created successfully");
     }
 
     @PutMapping("/users/{id}")
     public ResponseEntity<UserResponse> updateUser(
-            @PathVariable("id") Long id, 
+            @PathVariable("id") Long id,
             @Valid @RequestBody UpdateUserRequest request) {
         return ResponseEntity.ok(adminService.updateUser(id, request));
     }

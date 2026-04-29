@@ -47,7 +47,7 @@ public class EmergencyRequest {
 
     @DecimalMin(value = "1.0", message = "Emergency fee multiplier must be at least 1.0")
     @DecimalMax(value = "3.0", message = "Emergency fee multiplier cannot exceed 3.0")
-    @Column(nullable = false)
+    @Column(nullable = true)
     private Double emergencyFeeMultiplier = 1.5;
 
     @OneToMany(mappedBy = "emergencyRequest", cascade = CascadeType.ALL)

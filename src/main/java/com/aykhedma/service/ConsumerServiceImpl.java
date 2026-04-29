@@ -189,4 +189,10 @@ public class ConsumerServiceImpl implements ConsumerService {
 
         return providerMapper.toProviderSummaryResponseList(consumer.getSavedProviders());
     }
+
+    @Override
+    public Boolean isProviderSaved(Long ProviderId, Long consumerId) {
+        return consumerRepository.isProviderSavedNative(consumerId, ProviderId);
+
+    }
 }

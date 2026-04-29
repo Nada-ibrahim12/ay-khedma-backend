@@ -30,7 +30,9 @@ public class ProviderResponse {
     private Integer totalBookings;
     private Integer cancelledBookings;
     private String serviceType;
+    private String serviceCategory;
     private Long serviceTypeId;
+    private String worksAt;
     private LocationDTO location;
     private Boolean emergencyEnabled;
     private Double averagePunctualityRating;
