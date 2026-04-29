@@ -71,9 +71,24 @@ public class NotificationFactory {
             case LOCATION_UPDATE -> createLocationUpdateNotification(userId, params);
             case EMERGENCY_ALERT -> createEmergencyAlertNotification(userId, params);
             case RATING_REMINDER -> createRatingReminderNotification(userId, params);
+            case GENERAL -> createGeneralNotification(userId, params);
         };
     }
 
+    // general 
+    private NotificationRequest createGeneralNotification(Long userId, Map<String, Object> params) {
+        return NotificationRequest.builder()
+                .userId(userId)
+                .type(NotificationType.GENERAL)
+                .title((String) params.getOrDefault("title", "Notification"))
+                .content((String) params.getOrDefault("content", "You have a new notification"))
+                .imageUrl((String) params.get("imageUrl"))
+                .data(extractDataMap(params))
+                .sendEmail(false)
+                .sendInApp(true)
+                .sendPush(true)
+                .build();
+    }
     // emergency
 
     private NotificationRequest createEmergencyOfferNotification(Long userId, Map<String, Object> params) {

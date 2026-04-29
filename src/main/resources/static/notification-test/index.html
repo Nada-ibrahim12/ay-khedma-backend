@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AyKhedma Notification Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <style>
+      :root {
+        --bg: #08111f;
+        --bg-2: #0f1b31;
+        --panel: rgba(10, 18, 34, 0.88);
+        --panel-border: rgba(145, 170, 255, 0.18);
+        --text: #e8eefc;
+        --muted: #8fa3c9;
+        --accent: #74f2ce;
+        --accent-2: #76a9ff;
+        --danger: #ff6b8b;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(
+            circle at top left,
+            rgba(118, 169, 255, 0.22),
+            transparent 30%
+          ),
+          radial-gradient(
+            circle at top right,
+            rgba(116, 242, 206, 0.18),
+            transparent 28%
+          ),
+          linear-gradient(160deg, var(--bg), var(--bg-2));
+      }
+
+      .shell {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 20px 48px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.24em;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4rem);
+        line-height: 1.02;
+        max-width: 12ch;
+      }
+
+      .subtitle {
+        margin: 0;
+        max-width: 70ch;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.65;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 20px;
+        align-items: start;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 22px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+      }
+
+      .controls {
+        padding: 20px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      label {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      input,
+      textarea,
+      button {
+        font: inherit;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--text);
+        padding: 12px 14px;
+        border-radius: 14px;
+        outline: none;
+      }
+
+      textarea {
+        min-height: 110px;
+        resize: vertical;
+      }
+
+      input:focus,
+      textarea:focus {
+        border-color: rgba(118, 169, 255, 0.5);
+        box-shadow: 0 0 0 3px rgba(118, 169, 255, 0.14);
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 11px 16px;
+        cursor: pointer;
+        font-weight: 700;
+        transition:
+          transform 140ms ease,
+          opacity 140ms ease,
+          background 140ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+      button:active {
+        transform: translateY(0);
+      }
+
+      .primary {
+        background: linear-gradient(135deg, var(--accent), #b9ffe7);
+        color: #04111b;
+      }
+      .secondary {
+        background: rgba(255, 255, 255, 0.07);
+        color: var(--text);
+      }
+      .danger {
+        background: rgba(255, 107, 139, 0.16);
+        color: #ffd7df;
+      }
+
+      .status {
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--muted);
+        line-height: 1.5;
+        min-height: 52px;
+      }
+
+      .status strong {
+        color: var(--text);
+      }
+
+      .feed {
+        padding: 20px;
+        min-height: 70vh;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        gap: 14px;
+      }
+
+      .feed-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(116, 242, 206, 0.12);
+        color: #d9fff3;
+        border: 1px solid rgba(116, 242, 206, 0.18);
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .mini {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .mini .label {
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin-bottom: 8px;
+      }
+      .mini .value {
+        font-size: 1.6rem;
+        font-weight: 800;
+      }
+
+      .log {
+        margin: 0;
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(4, 8, 16, 0.66);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        overflow: auto;
+        min-height: 360px;
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: #dbe7ff;
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        background: rgba(10, 18, 34, 0.96);
+        color: var(--text);
+        border: 1px solid rgba(116, 242, 206, 0.24);
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+        padding: 14px 16px;
+        max-width: 360px;
+        transform: translateY(24px);
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          transform 220ms ease,
+          opacity 220ms ease;
+      }
+
+      .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+
+      .toast-title {
+        font-weight: 800;
+        margin-bottom: 4px;
+      }
+
+      .toast-body {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 0.88rem;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .feed {
+          min-height: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="hero">
+        <div class="eyebrow">AyKhedma backend test client</div>
+        <h1>In-app notification lab</h1>
+        <p class="subtitle">
+          Use this page to connect to the Spring WebSocket endpoint, subscribe
+          to user notification queues, and trigger test in-app notifications
+          from the backend without building a separate frontend app.
+        </p>
+      </section>
+
+      <section class="grid">
+        <div class="card controls">
+          <div class="field">
+            <label for="userId">User ID</label>
+            <input id="userId" type="number" value="1" min="1" />
+          </div>
+
+          <div class="field">
+            <label for="jwt">JWT token (optional)</label>
+            <textarea
+              id="jwt"
+              placeholder="Paste a Bearer token here if you want to connect with Authorization instead of X-User-Id"
+            ></textarea>
+          </div>
+
+          <div class="field">
+            <label for="title">Notification title</label>
+            <input id="title" type="text" value="Real-time Notification" />
+          </div>
+
+          <div class="field">
+            <label for="message">Notification message</label>
+            <textarea id="message">
+This is a test in-app notification.</textarea
+            >
+          </div>
+
+          <div class="actions">
+            <button class="primary" id="connectBtn">Connect</button>
+            <button class="secondary" id="disconnectBtn">Disconnect</button>
+            <button class="secondary" id="sendBtn">Send Test</button>
+            <button class="danger" id="clearBtn">Clear Log</button>
+          </div>
+
+          <div class="status" id="statusBox">
+            Status: <strong>Disconnected</strong><br />
+            Open the page, connect, then send a test notification to see it
+            arrive in real time.
+          </div>
+
+          <div class="hint">
+            The page subscribes to
+            <strong>/user/queue/notifications</strong> and
+            <strong>/user/queue/notifications/count</strong>. If you paste a
+            JWT, the page will send it as
+            <code>Authorization: Bearer ...</code> during STOMP CONNECT.
+          </div>
+        </div>
+
+        <div class="card feed">
+          <div class="feed-header">
+            <div>
+              <div class="eyebrow">Live feed</div>
+              <h2 style="margin: 6px 0 0">Received events</h2>
+            </div>
+            <div class="badge" id="connectionBadge">Disconnected</div>
+          </div>
+
+          <div class="cards">
+            <div class="mini">
+              <div class="label">Messages received</div>
+              <div class="value" id="messagesCount">0</div>
+            </div>
+            <div class="mini">
+              <div class="label">Unread count</div>
+              <div class="value" id="unreadCount">0</div>
+            </div>
+            <div class="mini">
+              <div class="label">Last notification type</div>
+              <div class="value" id="lastType">-</div>
+            </div>
+          </div>
+
+          <pre class="log" id="log"></pre>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast">
+      <div class="toast-title" id="toastTitle">Notification</div>
+      <div class="toast-body" id="toastBody">Message</div>
+    </div>
+
+    <script>
+      const wsEndpoint = "/ws-notifications";
+      const testEndpoint = "/api/v1/notifications/send-inapp";
+
+      const elements = {
+        userId: document.getElementById("userId"),
+        jwt: document.getElementById("jwt"),
+        title: document.getElementById("title"),
+        message: document.getElementById("message"),
+        connectBtn: document.getElementById("connectBtn"),
+        disconnectBtn: document.getElementById("disconnectBtn"),
+        sendBtn: document.getElementById("sendBtn"),
+        clearBtn: document.getElementById("clearBtn"),
+        statusBox: document.getElementById("statusBox"),
+        connectionBadge: document.getElementById("connectionBadge"),
+        messagesCount: document.getElementById("messagesCount"),
+        unreadCount: document.getElementById("unreadCount"),
+        lastType: document.getElementById("lastType"),
+        log: document.getElementById("log"),
+        toast: document.getElementById("toast"),
+        toastTitle: document.getElementById("toastTitle"),
+        toastBody: document.getElementById("toastBody"),
+      };
+
+      let client = null;
+      let messageCount = 0;
+      let toastTimer = null;
+
+      function log(line) {
+        const stamp = new Date().toLocaleTimeString();
+        elements.log.textContent =
+          `[${stamp}] ${line}\n` + elements.log.textContent;
+      }
+
+      function setStatus(label, tone = "neutral") {
+        const colors = {
+          neutral: "var(--muted)",
+          ok: "var(--accent)",
+          warn: "#ffd27a",
+          error: "var(--danger)",
+        };
+        elements.statusBox.innerHTML = `Status: <strong style="color:${colors[tone] || colors.neutral}">${label}</strong><br />Open the page, connect, then send a test notification to see it arrive in real time.`;
+        elements.connectionBadge.textContent = label;
+      }
+
+      function showToast(title, body) {
+        elements.toastTitle.textContent = title;
+        elements.toastBody.textContent = body;
+        elements.toast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(
+          () => elements.toast.classList.remove("show"),
+          3500,
+        );
+      }
+
+      function currentHeaders() {
+        const headers = {};
+        const userId = elements.userId.value.trim();
+        const jwt = elements.jwt.value.trim();
+
+        if (userId) {
+          headers["X-User-Id"] = userId;
+        }
+        if (jwt) {
+          headers.Authorization = jwt.startsWith("Bearer ")
+            ? jwt
+            : `Bearer ${jwt}`;
+        }
+        return headers;
+      }
+
+      function connect() {
+        if (client && client.connected) {
+          log("Already connected.");
+          return;
+        }
+
+        const headers = currentHeaders();
+        const sock = new SockJS(wsEndpoint);
+
+        client = new StompJs.Client({
+          webSocketFactory: () => sock,
+          connectHeaders: headers,
+          debug: () => {},
+          reconnectDelay: 5000,
+          heartbeatIncoming: 10000,
+          heartbeatOutgoing: 10000,
+          onConnect: () => {
+            setStatus("Connected", "ok");
+            log("Connected to WebSocket endpoint.");
+
+            client.subscribe("/user/queue/notifications", (frame) => {
+              messageCount += 1;
+              elements.messagesCount.textContent = String(messageCount);
+              const payload = safeJson(frame.body);
+              elements.lastType.textContent =
+                payload.type ||
+                payload.notificationType ||
+                payload.eventType ||
+                "notification";
+              log(`Notification: ${frame.body}`);
+              showToast(
+                payload.title || "Notification",
+                payload.content || payload.body || frame.body,
+              );
+            });
+
+            client.subscribe("/user/queue/notifications/count", (frame) => {
+              const payload = safeJson(frame.body);
+              const count = payload.count ?? payload.unreadCount ?? 0;
+              elements.unreadCount.textContent = String(count);
+              log(`Unread count update: ${frame.body}`);
+            });
+
+            client.subscribe("/user/queue/notifications/status", (frame) => {
+              log(`Status update: ${frame.body}`);
+            });
+
+            client.subscribe("/user/queue/errors", (frame) => {
+              log(`Error: ${frame.body}`);
+              showToast("WebSocket error", frame.body);
+            });
+          },
+          onDisconnect: () => {
+            setStatus("Disconnected");
+            log("Disconnected from WebSocket.");
+          },
+          onStompError: (frame) => {
+            setStatus("STOMP error", "error");
+            log(
+              `STOMP error: ${frame.headers["message"] || "unknown"} :: ${frame.body}`,
+            );
+          },
+          onWebSocketClose: () => {
+            setStatus("Socket closed", "warn");
+            log("WebSocket closed.");
+          },
+          onWebSocketError: () => {
+            setStatus("WebSocket error", "error");
+            log("WebSocket transport error.");
+          },
+        });
+
+        client.activate();
+        setStatus("Connecting...", "warn");
+        log(
+          `Connecting to ${wsEndpoint} with headers ${JSON.stringify(headers)}`,
+        );
+      }
+
+      function disconnect() {
+        if (!client) {
+          log("No active client.");
+          return;
+        }
+        client.deactivate();
+        client = null;
+        setStatus("Disconnected");
+      }
+
+      async function sendTest() {
+        const userId = elements.userId.value.trim();
+        if (!userId) {
+          showToast(
+            "Missing user ID",
+            "Enter a user ID before sending a test notification.",
+          );
+          return;
+        }
+
+        const response = await fetch(`${testEndpoint}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-User-Id": userId,
+          },
+          body: JSON.stringify({
+            title: elements.title.value.trim() || "Real-time Notification",
+            message:
+              elements.message.value.trim() ||
+              "This is a test in-app notification.",
+          }),
+        });
+
+        const text = await response.text();
+        log(`Test endpoint response (${response.status}): ${text}`);
+        if (!response.ok) {
+          showToast("Request failed", text);
+        } else {
+          showToast(
+            "Test sent",
+            "Waiting for the WebSocket notification to arrive...",
+          );
+        }
+      }
+
+      function clearLog() {
+        elements.log.textContent = "";
+        messageCount = 0;
+        elements.messagesCount.textContent = "0";
+        elements.unreadCount.textContent = "0";
+        elements.lastType.textContent = "-";
+      }
+
+      function safeJson(value) {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return { content: value };
+        }
+      }
+
+      elements.connectBtn.addEventListener("click", connect);
+      elements.disconnectBtn.addEventListener("click", disconnect);
+      elements.sendBtn.addEventListener("click", () =>
+        sendTest().catch((error) => {
+          log(`Send failed: ${error.message}`);
+          showToast("Send failed", error.message);
+        }),
+      );
+      elements.clearBtn.addEventListener("click", clearLog);
+
+      setStatus("Disconnected");
+      log("Page loaded. Connect to start the notification test flow.");
+    </script>
+  </body>
+</html>

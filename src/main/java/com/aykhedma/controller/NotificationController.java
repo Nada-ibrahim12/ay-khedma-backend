@@ -1,6 +1,7 @@
 package com.aykhedma.controller;
 
 import com.aykhedma.dto.response.NotificationDTO;
+import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.dto.request.NotificationRequest;
 import com.aykhedma.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -59,15 +60,31 @@ public class NotificationController {
 
     @PostMapping("/send-inapp")
     public ResponseEntity<Map<String, Object>> sendInAppNotification(
-            @RequestParam Long userId,
+            @RequestHeader(value = "X-User-Id", required = true) Long userId,
             @RequestBody NotificationRequest request) {
         log.info("Received request to send in-app notification to userId: {}", userId);
         request.forInAppChannel(userId);
+
+        NotificationRequest notificationRequest = NotificationRequest.builder()
+                                .userId(userId)
+                                .type(request.getType() != null ? request.getType() : NotificationType.GENERAL)
+                                .title(request.getTitle() != null ? request.getTitle() : "Real-time Notification")
+                                .content(request.getContent() != null ? request.getContent()
+                                                : "This is a test WebSocket message")
+                                .sendInApp(true)
+                                .sendPush(false)
+                                .sendEmail(false)
+                                .sendSms(false)
+                                .data(Map.of(
+                                                "source", "ay khedma app",
+                                                "timestamp", String.valueOf(System.currentTimeMillis())))
+                                .build();
+
         notificationService.sendNotification(request);
         return ResponseEntity.ok(buildSuccessResponse(
                 "In-app notification sent successfully",
                 userId,
-                request.getType(),
+                request,
                 Map.of()));
     }
     /**
