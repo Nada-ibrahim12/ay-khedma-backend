@@ -399,7 +399,7 @@ This is a test in-app notification.</textarea
             </div>
             <div class="mini">
               <div class="label">Last notification type</div>
-              <div class="value" id="lastType">-</div>
+              <div class="value" id="lastType">SYSTEM_ALERT</div>
             </div>
           </div>
 
@@ -415,7 +415,7 @@ This is a test in-app notification.</textarea
 
     <script>
       const wsEndpoint = "/ws-notifications";
-      const testEndpoint = "/api/v1/notifications/send-inapp";
+      const testEndpoint = "http://localhost:8081/api/v1/notifications/send-inapp";
 
       const elements = {
         userId: document.getElementById("userId"),
@@ -574,48 +574,45 @@ This is a test in-app notification.</textarea
         setStatus("Disconnected");
       }
 
-      async function sendTest() {
-        const userId = elements.userId.value.trim();
-        if (!userId) {
-          showToast(
+    async function sendTest() {
+    const userId = elements.userId.value.trim();
+    if (!userId) {
+        showToast(
             "Missing user ID",
             "Enter a user ID before sending a test notification.",
-          );
-          return;
-        }
+        );
+        return;
+    }
 
-        const response = await fetch(`${testEndpoint}`, {
-          method: "POST",
-          headers: {
+    const response = await fetch(`${testEndpoint}`, {
+        method: "POST",
+        headers: {
             "Content-Type": "application/json",
             "X-User-Id": userId,
-          },
-          body: JSON.stringify({
+        },
+        body: JSON.stringify({
             title: elements.title.value.trim() || "Real-time Notification",
-            message:
-              elements.message.value.trim() ||
-              "This is a test in-app notification.",
-          }),
-        });
+            content: elements.message.value.trim() || "This is a test in-app notification.",  
+            type: "SYSTEM_ALERT" 
+        }),
+    });
 
-        const text = await response.text();
-        log(`Test endpoint response (${response.status}): ${text}`);
-        if (!response.ok) {
-          showToast("Request failed", text);
-        } else {
-          showToast(
+    const text = await response.text();
+    log(`Test endpoint response (${response.status}): ${text}`);
+    if (!response.ok) {
+        showToast("Request failed", text);
+    } else {
+        showToast(
             "Test sent",
             "Waiting for the WebSocket notification to arrive...",
-          );
-        }
-      }
-
-      function clearLog() {
+        );
+    }
+}      function clearLog() {
         elements.log.textContent = "";
         messageCount = 0;
         elements.messagesCount.textContent = "0";
         elements.unreadCount.textContent = "0";
-        elements.lastType.textContent = "-";
+        elements.lastType.textContent = "SYSTEM_ALERT";
       }
 
       function safeJson(value) {
