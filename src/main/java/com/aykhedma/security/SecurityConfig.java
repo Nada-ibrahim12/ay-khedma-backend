@@ -55,7 +55,9 @@ public class SecurityConfig {
                                                                 "/auth/register",
                                                                 "/auth/send-otp",
                                                                 "/auth/verify-otp",
-                                                                "/auth/refresh")
+                                                                "/auth/refresh",
+                                                                "/auth/forgot-password",
+                                                                "/auth/reset-password")
                                                 .permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/services/categories",
                                                                 "/api/services/types")

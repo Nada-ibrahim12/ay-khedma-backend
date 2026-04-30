@@ -42,6 +42,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final FileStorageService fileStorageService;
+    private final OtpService otpService;
 
     @Value("${jwt.expiration:3600000}")
     private long jwtExpirationMs;
@@ -322,6 +323,28 @@ public class AuthService {
         }
 
         return fileStorageService.storeFile(profilePicture, folderName);
+    }
+
+    public void forgotPassword(String email) {
+        if (!userRepository.existsByEmail(email)) {
+            throw new ResourceNotFoundException("User not found with email: " + email);
+        }
+
+        otpService.generatePasswordResetOtp(email);
+    }
+
+    @Transactional
+    public void resetPassword(String email, String otp, String newPassword) {
+        if (!userRepository.existsByEmail(email)) {
+            throw new ResourceNotFoundException("User not found with email: " + email);
+        }
+
+        boolean isValid = otpService.validateOtp(email, otp);
+        if (!isValid) {
+            throw new BadRequestException("Invalid or expired OTP");
+        }
+
+        userRepository.updatePassword(email, passwordEncoder.encode(newPassword));
     }
 
 }

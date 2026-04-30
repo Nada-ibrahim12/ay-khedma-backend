@@ -4,6 +4,8 @@ import com.aykhedma.security.CustomUserDetails;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
+import com.aykhedma.dto.request.ForgotPasswordRequest;
+import com.aykhedma.dto.request.ResetPasswordRequest;
 import com.aykhedma.dto.request.LoginRequest;
 import com.aykhedma.dto.request.RegisterRequest;
 import com.aykhedma.dto.response.AuthResponse;
@@ -168,6 +170,28 @@ public class AuthController {
         otpService.generateOtp(email);
 
         return ResponseEntity.ok("OTP sent to your email");
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Forgot password", description = "Request password reset by sending OTP to email")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "OTP sent successfully to email"),
+            @ApiResponse(responseCode = "404", description = "User with this email not found")
+    })
+    public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok("Password reset OTP sent to your email");
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password", description = "Reset password using OTP sent to email")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password reset successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired OTP")
+    })
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.getEmail(), request.getOtp(), request.getNewPassword());
+        return ResponseEntity.ok("Password reset successfully");
     }
 
 }

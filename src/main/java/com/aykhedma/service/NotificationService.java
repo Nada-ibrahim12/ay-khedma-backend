@@ -140,6 +140,13 @@ public class NotificationService {
         emailService.sendHtmlEmail(email, subject, "email/otp-verification", templateVars);
     }
 
+    public void sendPasswordResetEmail(String email, String otp) {
+        String subject = "Password Reset Request";
+        Map<String, Object> templateVars = new HashMap<>();
+        templateVars.put("otp", otp);
+        emailService.sendHtmlEmail(email, subject, "email/password-reset", templateVars);
+    }
+
     private String getEmailTemplate(NotificationType type) {
         return switch (type) {
             case BOOKING_CONFIRMATION -> "email/booking-confirmation";

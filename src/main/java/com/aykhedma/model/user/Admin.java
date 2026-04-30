@@ -13,6 +13,7 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 @PrimaryKeyJoinColumn(name = "id")
+@DiscriminatorValue("ADMIN")
 public class Admin extends User {
 
     @NotBlank(message = "Department is required")

@@ -22,6 +22,7 @@ import java.util.List;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 @PrimaryKeyJoinColumn(name = "id")
+@DiscriminatorValue("PROVIDER")
 public class Provider extends User {
 
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
