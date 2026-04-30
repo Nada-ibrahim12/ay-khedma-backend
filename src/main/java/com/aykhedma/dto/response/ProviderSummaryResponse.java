@@ -1,5 +1,6 @@
 package com.aykhedma.dto.response;
 
+import com.aykhedma.dto.location.LocationDTO;
 import com.aykhedma.model.service.PriceType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -32,5 +33,6 @@ public class ProviderSummaryResponse {
     private Double distance; // in km
     private Integer estimatedArrivalTime; // in minutes
     private boolean emergencyEnabled;
+    private LocationDTO location;
     private String area;
 }
