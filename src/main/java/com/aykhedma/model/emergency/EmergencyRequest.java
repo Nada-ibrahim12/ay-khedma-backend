@@ -40,15 +40,15 @@ public class EmergencyRequest {
     @JoinColumn(name = "location_id", nullable = false)
     private Location location;
 
+    @NotNull(message = "Price is required")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
+    @DecimalMax(value = "100000.0", message = "Price cannot exceed 100,000")
+    private Double price;
+
     @NotNull(message = "Emergency status is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private EmergencyStatus status = EmergencyStatus.BROADCASTING;
-
-    @DecimalMin(value = "1.0", message = "Emergency fee multiplier must be at least 1.0")
-    @DecimalMax(value = "3.0", message = "Emergency fee multiplier cannot exceed 3.0")
-    @Column(nullable = false)
-    private Double emergencyFeeMultiplier = 1.5;
+    private EmergencyRequestStatus status = EmergencyRequestStatus.BROADCASTING;
 
     @OneToMany(mappedBy = "emergencyRequest", cascade = CascadeType.ALL)
     @Builder.Default
@@ -62,16 +62,13 @@ public class EmergencyRequest {
     @CreationTimestamp
     private LocalDateTime createdAt;
 
-    @Future(message = "Expiry date must be in the future")
-    private LocalDateTime expiresAt;
-
-    @Size(max = 500, message = "Description cannot exceed 500 characters")
-    @Column(length = 500)
+    @Size(max = 1000, message = "Description cannot exceed 500 characters")
+    @Column(length = 1000)
     private String description;
 
-    @Min(value = 1, message = "Search radius must be at least 1 km")
+    @Min(value = 5, message = "Search radius must be at least 5 km")
     @Max(value = 50, message = "Search radius cannot exceed 50 km")
-    private Integer searchRadius = 10;
+    private Integer searchRadius = 5;
 
     public List<ProviderResponse> getAcceptedProviders() {
         return providerResponses.stream()

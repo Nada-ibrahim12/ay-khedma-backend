@@ -31,5 +31,5 @@ public class ChatResponse {
     private BookingResponse booking;
 
     // For emergency responses
-    private EmergencyResponse emergency;
+    private EmergencyRequestResponse emergency;
 }

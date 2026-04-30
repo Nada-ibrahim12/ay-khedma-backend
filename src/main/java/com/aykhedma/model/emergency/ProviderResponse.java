@@ -1,6 +1,5 @@
 package com.aykhedma.model.emergency;
 
-import com.aykhedma.model.location.Location;
 import com.aykhedma.model.user.Provider;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
@@ -44,7 +43,6 @@ public class ProviderResponse {
     @Column(length = 200)
     private String notes;
 
-    @NotNull(message = "Proposed price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Proposed price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Proposed price cannot exceed 100,000")
     //@Column(nullable = false, precision = 10, scale = 2)
@@ -61,29 +59,18 @@ public class ProviderResponse {
 
     private Boolean selected = false;
 
-    @AssertTrue(message = "Proposed price must be at least the base price times emergency multiplier")
-    private boolean isValidProposedPrice() {
-        if (proposedPrice == null || emergencyRequest == null ||
-                emergencyRequest.getServiceType() == null ||
-                emergencyRequest.getServiceType().getBasePrice() == null) return true;
-
-        double minPrice = emergencyRequest.getServiceType().getBasePrice() *
-                emergencyRequest.getEmergencyFeeMultiplier();
-        return proposedPrice >= minPrice;
-    }
-
     public boolean isAccepted() {
-        return responseType == ProviderResponseType.ACCEPTED_OFFER;
+        return responseType == ProviderResponseType.ACCEPTED_REQUEST;
     }
 
-    public Integer estimateArrivalTime(Location providerLocation) {
-        if (emergencyRequest.getLocation() != null && providerLocation != null) {
-            double distance = providerLocation.calculateDistance(emergencyRequest.getLocation());
-            // Assuming average speed of 30 km/h in city
-            int estimatedMinutes = (int) Math.ceil(distance / 30 * 60);
+    public void estimateArrivalTime()
+    {
+        if (this.emergencyRequest.getLocation() != null && this.provider.getLocation() != null)
+        {
+            this.distance = this.provider.getLocation().calculateDistance(this.emergencyRequest.getLocation());
+            // Assuming an average speed of 30 km/h in a city
+            int estimatedMinutes = (int) Math.ceil(this.distance / 30 * 60);
             this.estimatedArrivalTime = Math.min(estimatedMinutes, 120);
-            return this.estimatedArrivalTime;
         }
-        return estimatedArrivalTime;
     }
 }

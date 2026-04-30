@@ -1,6 +1,6 @@
 package com.aykhedma.model.emergency;
 
-public enum EmergencyStatus {
+public enum EmergencyRequestStatus {
     BROADCASTING,
     WAITING_ACCEPTANCE,
     ACCEPTED,
