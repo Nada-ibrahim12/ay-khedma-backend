@@ -84,8 +84,10 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         bookingRepository.save(booking);
 
-        providerRepository.incrementTotalRequests(provider.getId());
-        updateProviderRates(provider.getId());
+        // Update provider stats in memory
+        provider.setTotalRequests((provider.getTotalRequests() != null ? provider.getTotalRequests() : 0) + 1);
+        updateProviderRates(provider);
+        providerRepository.save(provider);
 
         Map<String, Object> notificationData = new HashMap<>();
         notificationData.put("title", "New Booking Request");
@@ -173,10 +175,13 @@ public class BookingServiceImpl implements BookingService {
         booking.setTimeSlot(reservedBookedSlot);
         bookingRepository.save(booking);
 
-        providerRepository.incrementTotalBookings(booking.getProvider().getId());
-        consumerRepository.incrementTotalBookings(booking.getConsumer().getId());
+        provider.setTotalBookings((provider.getTotalBookings() != null ? provider.getTotalBookings() : 0) + 1);
+        updateProviderRates(provider);
+        providerRepository.save(provider);
 
-        updateProviderRates(booking.getProvider().getId());
+        Consumer consumer = booking.getConsumer();
+        consumer.setTotalBookings((consumer.getTotalBookings() != null ? consumer.getTotalBookings() : 0) + 1);
+        consumerRepository.save(consumer);
 
         Map<String, Object> notificationData = new HashMap<>();
         notificationData.put("title", "Booking Confirmed");
@@ -226,6 +231,9 @@ public class BookingServiceImpl implements BookingService {
         booking.setDeclinedAt(LocalDateTime.now());
         bookingRepository.save(booking);
 
+        updateProviderRates(booking.getProvider());
+        providerRepository.save(booking.getProvider());
+
         Map<String, Object> declineNotificationData = new HashMap<>();
         declineNotificationData.put("title", "Booking Request Declined");
         declineNotificationData.put("content",
@@ -251,8 +259,6 @@ public class BookingServiceImpl implements BookingService {
                 booking.getConsumer().getId(),
                 NotificationType.BOOKING_CANCELLED,
                 declineNotificationData);
-
-        updateProviderRates(providerId);
 
         return bookingMapper.toBookingResponse(booking);
     }
@@ -298,10 +304,15 @@ public class BookingServiceImpl implements BookingService {
             booking.setCancelledBy("P");
         bookingRepository.save(booking);
 
-        if (isConsumer)
-            consumerRepository.incrementCancelledBookings(booking.getConsumer().getId());
-        else
-            providerRepository.incrementCancelledBookings(booking.getProvider().getId());
+        if (isConsumer) {
+            Consumer consumer = booking.getConsumer();
+            consumer.setCancelledBookings((consumer.getCancelledBookings() != null ? consumer.getCancelledBookings() : 0) + 1);
+            consumerRepository.save(consumer);
+        } else {
+            Provider provider = booking.getProvider();
+            provider.setCancelledBookings((provider.getCancelledBookings() != null ? provider.getCancelledBookings() : 0) + 1);
+            providerRepository.save(provider);
+        }
 
         Long recipientId = isConsumer ? booking.getProvider().getId() : booking.getConsumer().getId();
         String cancelledByCode = isConsumer ? "C" : "P";
@@ -413,7 +424,9 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getProviderRating() != null) {
             booking.setStatus(BookingStatus.COMPLETED);
             booking.setCompletedAt(LocalDateTime.now());
-            providerRepository.incrementCompletedJobs(booking.getProvider().getId());
+            Provider provider = booking.getProvider();
+            provider.setCompletedJobs((provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0) + 1);
+            // No need to call updateProviderRates here separately if we call it below anyway
         }
 
         bookingRepository.save(booking);
@@ -461,8 +474,8 @@ public class BookingServiceImpl implements BookingService {
             provider.setAverageRating(
                     ((oldOverall * oldCount) + overallRating) / ratedBookingsCount);
         }
+        updateProviderRates(provider);
         providerRepository.save(provider);
-        updateProviderRates(provider.getId());
 
         return bookingMapper.toBookingResponse(booking);
     }
@@ -498,11 +511,13 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getConsumerRating() != null) {
             booking.setStatus(BookingStatus.COMPLETED);
             booking.setCompletedAt(LocalDateTime.now());
-            providerRepository.incrementCompletedJobs(booking.getProvider().getId());
+            Provider provider = booking.getProvider();
+            provider.setCompletedJobs((provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0) + 1);
         }
 
         bookingRepository.save(booking);
-        updateProviderRates(booking.getProvider().getId());
+        updateProviderRates(booking.getProvider());
+        providerRepository.save(booking.getProvider());
 
         // Update consumer average
         Consumer consumer = booking.getConsumer();
@@ -524,10 +539,7 @@ public class BookingServiceImpl implements BookingService {
         return bookingMapper.toBookingResponse(booking);
     }
 
-    private void updateProviderRates(Long providerId) {
-        Provider provider = providerRepository.findById(providerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
-
+    private void updateProviderRates(Provider provider) {
         int acceptanceRate;
         int bookingRate;
 
@@ -546,7 +558,8 @@ public class BookingServiceImpl implements BookingService {
             bookingRate = 0;
         }
 
-        providerRepository.updateRates(providerId, acceptanceRate, bookingRate);
+        provider.setAcceptanceRate(acceptanceRate);
+        provider.setBookingRate(bookingRate);
     }
 
     private int clampRate(int value) {
