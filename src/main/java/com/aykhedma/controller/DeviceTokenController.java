@@ -1,6 +1,5 @@
 package com.aykhedma.controller;
 
-
 import com.aykhedma.dto.request.RegisterDeviceRequest;
 import com.aykhedma.model.notification.DeviceToken;
 import com.aykhedma.repository.DeviceTokenRepository;
@@ -24,6 +23,24 @@ public class DeviceTokenController {
             @RequestHeader("X-User-Id") Long userId,
             @RequestBody RegisterDeviceRequest request) {
 
+        // Validate FCM token format (must be 100+ characters)
+        if (request.getFcmToken() == null || request.getFcmToken().length() < 100) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Invalid FCM token format. Token must be at least 100 characters."));
+        }
+
+        // Validate device ID
+        if (request.getDeviceId() == null || request.getDeviceId().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Device ID is required"));
+        }
+
+        // Validate platform
+        if (request.getPlatform() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Platform (ANDROID, IOS, or WEB) is required"));
+        }
+
         // Check if device already exists
         DeviceToken deviceToken = deviceTokenRepository
                 .findByUserIdAndDeviceId(userId, request.getDeviceId())
@@ -42,8 +59,7 @@ public class DeviceTokenController {
 
         return ResponseEntity.ok(Map.of(
                 "message", "Device registered successfully",
-                "deviceId", request.getDeviceId()
-        ));
+                "deviceId", request.getDeviceId()));
     }
 
     @PostMapping("/unregister")

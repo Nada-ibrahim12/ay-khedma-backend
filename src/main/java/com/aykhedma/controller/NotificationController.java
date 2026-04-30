@@ -87,6 +87,8 @@ public class NotificationController {
                 request,
                 Map.of()));
     }
+
+    
     /**
      * Send a test notification (for development only)
      *

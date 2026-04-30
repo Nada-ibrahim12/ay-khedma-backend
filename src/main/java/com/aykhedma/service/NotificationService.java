@@ -8,6 +8,9 @@ import com.aykhedma.repository.NotificationRepository;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.service.notification.EmailService;
 import com.aykhedma.service.notification.FirebaseService;
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -60,6 +63,13 @@ public class NotificationService {
     @Transactional
     public void sendNotification(NotificationRequest request) {
         validateRequest(request);
+
+        // Validate user exists
+        if (!userRepository.existsById(request.getUserId())) {
+            log.error("User not found: {}", request.getUserId());
+            throw new RuntimeException("User not found: " + request.getUserId());
+        }
+
         log.info("Sending notification to user: {}, type: {}", request.getUserId(), request.getType());
 
         Notification notification = saveNotification(request);
@@ -68,12 +78,20 @@ public class NotificationService {
             sendWebSocketNotification(notification);
         }
 
-        if (request.isSendPush() && firebaseService.isFirebaseEnabled()) {
-            firebaseService.sendPushNotification(
+        if (request.isSendPush()) {
+            com.aykhedma.model.notification.NotificationStatus pushStatus = firebaseService.sendPushNotification(
                     request.getUserId(),
                     request.getTitle(),
                     request.getContent(),
                     request.getData());
+
+            // Update notification status in DB
+            notification.setStatus(pushStatus);
+            notificationRepository.save(notification);
+
+            if (pushStatus == com.aykhedma.model.notification.NotificationStatus.FAILED) {
+                log.warn("Failed to send push notification to user: {}", request.getUserId());
+            }
         }
 
         if (request.isSendEmail()) {
