@@ -18,5 +18,6 @@ public enum NotificationType {
     PASSWORD_CHANGED,
     LOCATION_UPDATE,
     EMERGENCY_ALERT,
-    RATING_REMINDER
+    RATING_REMINDER,
+    GENERAL
 }

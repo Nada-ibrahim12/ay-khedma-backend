@@ -150,6 +150,28 @@ public class ConsumerController {
                 return ResponseEntity.ok(responses);
         }
 
+
+        @PreAuthorize("hasRole('CONSUMER")
+        @GetMapping("/me/saved-providers/{providerId}/exists")
+        @Operation(summary = "Check if a provider is in my saved/favorites list")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Provider is saved"),
+                        @ApiResponse(responseCode = "404", description = "Consumer not found"),
+                        @ApiResponse(responseCode = "400", description = "Invalid provider ID supplied"),
+                        @ApiResponse(responseCode = "204", description = "Provider is not saved")
+                        })
+        public ResponseEntity<Void> checkIfProviderIsSaved(
+                        @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+                        @Parameter(description = "ID of the provider to check", required = true) @PathVariable Long providerId) {
+                Boolean isSaved = consumerService.isProviderSaved(providerId, consumerId);
+                if (isSaved) {
+                        return ResponseEntity.ok().build();
+                } else {
+                        return ResponseEntity.noContent().build();
+                }
+        } 
+
+
         @PreAuthorize("hasRole('ADMIN')")
         @GetMapping("/{consumerId}/exists")
         @Operation(summary = "Check if consumer exists")

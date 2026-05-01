@@ -18,6 +18,7 @@ import java.util.List;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 @PrimaryKeyJoinColumn(name = "id")
+@DiscriminatorValue("CONSUMER")
 public class Consumer extends User {
 
     @DecimalMin(value = "0.0", message = "Average rating cannot be negative")

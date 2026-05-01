@@ -16,98 +16,111 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ProviderRepository extends JpaRepository<Provider, Long>
-{
-    Optional<Provider> findByEmail(String email);
+public interface ProviderRepository extends JpaRepository<Provider, Long> {
 
-    Optional<Provider> findByPhoneNumber(String phoneNumber);
+        Optional<Provider> findByEmail(String email);
 
-    boolean existsByNationalId(String nationalId);
+        Optional<Provider> findByPhoneNumber(String phoneNumber);
 
-    boolean existsByNationalIdAndIdNot(String nationalId, Long id);
+        boolean existsByNationalId(String nationalId);
 
-    List<Provider> findByVerificationStatus(VerificationStatus status);
+        boolean existsByNationalIdAndIdNot(String nationalId, Long id);
 
-    List<Provider> findByServiceType(ServiceType serviceType);
+        List<Provider> findByVerificationStatus(VerificationStatus status);
 
-    @Query("SELECT p FROM Provider p WHERE p.serviceType = :serviceType AND p.verificationStatus = 'VERIFIED' AND p.emergencyEnabled = true")
-    List<Provider> findVerifiedEmergencyProviders(@Param("serviceType") ServiceType serviceType);
+        List<Provider> findByServiceType(ServiceType serviceType);
 
-    @Query("SELECT p FROM Provider p WHERE p.serviceType.id = :serviceTypeId AND p.verificationStatus = 'VERIFIED'")
-    List<Provider> findVerifiedByServiceType(@Param("serviceTypeId") Long serviceTypeId);
+        @Query("SELECT p FROM Provider p WHERE p.serviceType = :serviceType AND p.verificationStatus = 'VERIFIED' AND p.emergencyEnabled = true")
+        List<Provider> findVerifiedEmergencyProviders(@Param("serviceType") ServiceType serviceType);
 
-    @Query("SELECT p FROM Provider p WHERE p.verificationStatus = 'VERIFIED' AND p.emergencyEnabled = true")
-    List<Provider> findAllEmergencyProviders();
+        @Query("SELECT p FROM Provider p WHERE p.serviceType.id = :serviceTypeId AND p.verificationStatus = 'VERIFIED'")
+        List<Provider> findVerifiedByServiceType(@Param("serviceTypeId") Long serviceTypeId);
 
-    @Query(value = "SELECT p.* FROM providers p " +
-            "JOIN locations l ON p.location_id = l.id " +
-            "WHERE p.verification_status = 'VERIFIED' " +
-            "AND p.service_type_id = :serviceTypeId " +
-            "AND ST_DWithin(l.coordinates, ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326), :radius)", nativeQuery = true)
-    List<Provider> findNearbyProviders(@Param("latitude") Double latitude,
-                                       @Param("longitude") Double longitude,
-                                       @Param("radius") Double radius,
-                                       @Param("serviceTypeId") Long serviceTypeId);
+        @Query("SELECT p FROM Provider p WHERE p.verificationStatus = 'VERIFIED' AND p.emergencyEnabled = true")
+        List<Provider> findAllEmergencyProviders();
 
-    @Modifying
-    @Query("UPDATE Provider p SET p.profileImage = :profileImage WHERE p.id = :providerId")
-    void updateProfileImage(@Param("providerId") Long providerId, @Param("profileImage") String profileImage);
+        @Query(value = "SELECT p.* FROM providers p " +
+                        "JOIN locations l ON p.location_id = l.id " +
+                        "WHERE p.verification_status = 'VERIFIED' " +
+                        "AND p.service_type_id = :serviceTypeId " +
+                        "AND ST_DWithin(l.coordinates, ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326), :radius)", nativeQuery = true)
+        List<Provider> findNearbyProviders(@Param("latitude") Double latitude,
+                        @Param("longitude") Double longitude,
+                        @Param("radius") Double radius,
+                        @Param("serviceTypeId") Long serviceTypeId);
 
-    List<Provider> findByServiceTypeId(Long serviceTypeId);
+        @Modifying
+        @Query("UPDATE Provider p SET p.profileImage = :profileImage WHERE p.id = :providerId")
+        void updateProfileImage(@Param("providerId") Long providerId, @Param("profileImage") String profileImage);
 
-    @Query("SELECT p FROM Provider p " +
-            "LEFT JOIN p.serviceType s " +
-            "LEFT JOIN s.category c " +
-            "LEFT JOIN p.location l " +
-            "WHERE p.enabled = true " +
-            "AND p.verificationStatus = 'VERIFIED' " +
-            "AND (:keyword IS NULL OR :keyword = '' OR " +
-            "    LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "    LOWER(COALESCE(p.bio, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "    LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "    LOWER(COALESCE(s.nameAr, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "    LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "    LOWER(COALESCE(l.area, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
-            "AND (:categoryId IS NULL OR c.id = :categoryId) " +
-            "AND (:categoryName IS NULL OR :categoryName = '' OR " +
-            "    LOWER(c.name) = LOWER(:categoryName))")
-    Page<Provider> searchProviders(@Param("keyword") String keyword,
-                                   @Param("categoryId") Long categoryId,
-                                   @Param("categoryName") String categoryName,
-                                   Pageable pageable);
+        List<Provider> findByServiceTypeId(Long serviceTypeId);
 
-    @Modifying
-    @Query("UPDATE Provider p SET p.totalBookings = p.totalBookings + 1 WHERE p.id = :providerId")
-    void incrementTotalBookings(@Param("providerId") Long providerId);
+        boolean existsByServiceTypeId(Long serviceTypeId);
 
-    @Modifying
-    @Query("UPDATE Provider p SET p.totalRequests = p.totalRequests + 1 WHERE p.id = :providerId")
-    void incrementTotalRequests(@Param("providerId") Long providerId);
+        @Query("SELECT p FROM Provider p " +
+                        "LEFT JOIN p.serviceType s " +
+                        "LEFT JOIN s.category c " +
+                        "LEFT JOIN p.location l " +
+                        "WHERE p.enabled = true " +
+                        "AND p.verificationStatus = 'VERIFIED' " +
+                        "AND (:keyword IS NULL OR :keyword = '' OR " +
+                        "    LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "    LOWER(COALESCE(p.bio, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "    LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "    LOWER(COALESCE(s.nameAr, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "    LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "    LOWER(COALESCE(l.area, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+                        "AND (:categoryId IS NULL OR c.id = :categoryId) " +
+                        "AND (:categoryName IS NULL OR :categoryName = '' OR " +
+                        "    LOWER(c.name) = LOWER(:categoryName))")
+        Page<Provider> searchProviders(
+                        @Param("keyword") String keyword,
+                        @Param("categoryId") Long categoryId,
+                        @Param("categoryName") String categoryName,
+                        Pageable pageable);
 
-    @Modifying
-    @Query("UPDATE Provider p SET p.cancelledBookings = p.cancelledBookings + 1 WHERE p.id = :providerId")
-    void incrementCancelledBookings(@Param("providerId") Long providerId);
+        @Modifying
+        @Query("UPDATE Provider p SET p.totalBookings = p.totalBookings + 1 WHERE p.id = :providerId")
+        void incrementTotalBookings(@Param("providerId") Long providerId);
 
-    @Modifying
-    @Query("UPDATE Provider p SET p.completedJobs = p.completedJobs + 1 WHERE p.id = :providerId")
-    void incrementCompletedJobs(@Param("providerId") Long providerId);
+        @Modifying
+        @Query("UPDATE Provider p SET p.totalRequests = p.totalRequests + 1 WHERE p.id = :providerId")
+        void incrementTotalRequests(@Param("providerId") Long providerId);
 
-    @Query("SELECT p FROM Provider p " +
-            "LEFT JOIN p.serviceType s " +
-            "LEFT JOIN s.category c " +
-            "WHERE (:status IS NULL OR p.verificationStatus = :status) " +
-            "AND (:enabled IS NULL OR p.enabled = :enabled) " +
-            "AND (:keyword IS NULL OR :keyword = '' OR " +
-            "    LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "    LOWER(p.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "    LOWER(p.phoneNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "    LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    Page<Provider> findAllProvidersForAdmin(@Param("keyword") String keyword,
-                                            @Param("status") VerificationStatus status,
-                                            @Param("enabled") Boolean enabled,
-                                            Pageable pageable);
+        @Modifying
+        @Query("UPDATE Provider p SET p.cancelledBookings = p.cancelledBookings + 1 WHERE p.id = :providerId")
+        void incrementCancelledBookings(@Param("providerId") Long providerId);
 
-    @Query(value = "SELECT p.*, u.* FROM providers p " +
+        @Modifying
+        @Query("UPDATE Provider p SET p.completedJobs = p.completedJobs + 1 WHERE p.id = :providerId")
+        void incrementCompletedJobs(@Param("providerId") Long providerId);
+
+        @Modifying
+        @Query("UPDATE Provider p SET p.acceptanceRate = :acceptanceRate, p.bookingRate = :bookingRate WHERE p.id = :providerId")
+        void updateRates(@Param("providerId") Long providerId,
+                        @Param("acceptanceRate") Integer acceptanceRate,
+                        @Param("bookingRate") Integer bookingRate);
+
+        @Query("SELECT p FROM Provider p " +
+                        "LEFT JOIN p.serviceType s " +
+                        "LEFT JOIN s.category c " +
+                        "WHERE (:status IS NULL OR p.verificationStatus = :status) " +
+                        "AND (:enabled IS NULL OR p.enabled = :enabled) " +
+                        "AND (:keyword IS NULL OR :keyword = '' OR " +
+                        "    LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "    LOWER(p.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "    LOWER(p.phoneNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "    LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+        Page<Provider> findAllProvidersForAdmin(
+                        @Param("keyword") String keyword,
+                        @Param("status") VerificationStatus status,
+                        @Param("enabled") Boolean enabled,
+                        Pageable pageable);
+
+        // for AI
+        List<Provider> findByServiceTypeIdAndVerificationStatus(Long serviceTypeId, VerificationStatus status);
+  
+      @Query(value = "SELECT p.*, u.* FROM providers p " +
             "JOIN users u ON p.id = u.id " +
             "JOIN locations l ON p.location_id = l.id " +
             "WHERE p.service_type_id = :serviceTypeId " +

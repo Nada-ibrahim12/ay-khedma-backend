@@ -82,7 +82,7 @@ class NotificationServiceTest {
             notificationRequest.setSendInApp(true);
             notificationRequest.setSendPush(true);
             notificationRequest.setSendEmail(true);
-            
+
             when(notificationRepository.save(any(Notification.class)))
                     .thenReturn(notification);
             when(userRepository.findById(USER_ID))
@@ -93,7 +93,7 @@ class NotificationServiceTest {
 
             verify(notificationRepository, atLeastOnce()).save(any(Notification.class));
             verify(messagingTemplate, times(2)).convertAndSendToUser(anyString(), anyString(), any());
-            verify(firebaseService).sendPushNotification(USER_ID, 
+            verify(firebaseService).sendPushNotification(USER_ID,
                     notificationRequest.getTitle(),
                     notificationRequest.getContent(),
                     notificationRequest.getData());
@@ -106,7 +106,7 @@ class NotificationServiceTest {
             notificationRequest.setSendInApp(true);
             notificationRequest.setSendPush(false);
             notificationRequest.setSendEmail(false);
-            
+
             when(notificationRepository.save(any(Notification.class)))
                     .thenReturn(notification);
             when(notificationRepository.countUnreadByUserId(USER_ID)).thenReturn(1L);
@@ -121,11 +121,12 @@ class NotificationServiceTest {
         @Test
         @DisplayName("Should not send notification if save fails")
         void shouldNotSendIfSaveFails() {
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
             when(notificationRepository.save(any(Notification.class)))
                     .thenThrow(new RuntimeException("Database error"));
 
-            notificationService.sendNotification(notificationRequest);
+            assertThatThrownBy(() -> notificationService.sendNotification(notificationRequest))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Database error");
 
             verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
             verify(firebaseService, never()).sendPushNotification(anyLong(), anyString(), anyString(), anyMap());
@@ -247,8 +248,7 @@ class NotificationServiceTest {
             verify(messagingTemplate).convertAndSendToUser(
                     eq(USER_ID.toString()),
                     eq("/queue/notifications/count"),
-                    anyMap()
-            );
+                    anyMap());
         }
     }
 

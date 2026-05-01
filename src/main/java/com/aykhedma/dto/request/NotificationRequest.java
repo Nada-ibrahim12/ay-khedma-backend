@@ -13,15 +13,41 @@ public class NotificationRequest {
     private String title;
     private String content;
     private String imageUrl;
-    private Map<String, String> data;
+    private Map<String, Object> data;
 
-    // Channel flags
     private boolean sendPush;
     private boolean sendInApp;
     private boolean sendEmail;
     private boolean sendSms;
-
-    // Contact info (if different from user profile)
     private String email;
     private String phoneNumber;
+
+    public NotificationRequest withUserId(Long userId) {
+        this.userId = userId;
+        return this;
+    }
+
+    public NotificationRequest forEmailChannel(String email) {
+        this.email = email;
+        this.sendEmail = true;
+        this.sendInApp = false;
+        this.sendPush = false;
+        return this;
+    }
+
+    public NotificationRequest forPushChannel(Long userId) {
+        this.userId = userId;
+        this.sendEmail = false;
+        this.sendInApp = false;
+        this.sendPush = true;
+        return this;
+    }
+
+    public NotificationRequest forInAppChannel(Long userId) {
+        this.userId = userId;
+        this.sendEmail = false;
+        this.sendInApp = true;
+        this.sendPush = false;
+        return this;
+    }
 }

@@ -15,6 +15,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
 
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query(value = "UPDATE users SET password = :password WHERE email = :email", nativeQuery = true)
+    void updatePassword(@org.springframework.data.repository.query.Param("email") String email, @org.springframework.data.repository.query.Param("password") String password);
+
     Optional<User> findByPhoneNumber(String phoneNumber);
 
     boolean existsByEmail(String email);

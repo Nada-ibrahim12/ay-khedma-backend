@@ -38,3 +38,6 @@ app.env
 
 # Firebase
 src/main/resources/firebase-service-account.json
+
+# Migration
+src/main/resources/db/migration/*
