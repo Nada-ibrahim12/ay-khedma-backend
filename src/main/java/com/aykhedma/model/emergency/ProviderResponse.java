@@ -48,7 +48,7 @@ public class ProviderResponse {
     //@Column(nullable = false, precision = 10, scale = 2)
     private Double proposedPrice;
 
-    @Min(value = 1, message = "Estimated arrival time must be at least 1 minute")
+    @Min(value = 0, message = "Estimated arrival time must be at least 0 minute")
     @Max(value = 120, message = "Estimated arrival time cannot exceed 2 hours (120 minutes)")
     private Integer estimatedArrivalTime;
 

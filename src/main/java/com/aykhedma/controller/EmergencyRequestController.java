@@ -52,7 +52,7 @@ public class EmergencyRequestController
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PreAuthorize("hasRole('COSUMER')")
+    @PreAuthorize("hasRole('CONSUMER')")
     @PutMapping("/accept-provider-response/{providerResponseId}")
     @Operation(summary = "Accept a provider's response")
     @ApiResponses(value =
@@ -73,7 +73,7 @@ public class EmergencyRequestController
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
-    @PreAuthorize("hasRole('COSUMER')")
+    @PreAuthorize("hasRole('CONSUMER')")
     @PutMapping("/decline-provider-response/{providerResponseId}")
     @Operation(summary = "Decline a provider's response")
     @ApiResponses(value =
@@ -115,7 +115,7 @@ public class EmergencyRequestController
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
-    @PreAuthorize("hasRole('COSUMER')")
+    @PreAuthorize("hasRole('CONSUMER')")
     @PutMapping("/cancel-emergency-request/{emergencyRequestId}")
     @Operation(summary = "Decline a provider's response")
     @ApiResponses(value =

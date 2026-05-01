@@ -107,7 +107,8 @@ public interface ProviderRepository extends JpaRepository<Provider, Long>
                                             @Param("enabled") Boolean enabled,
                                             Pageable pageable);
 
-    @Query(value = "SELECT p.* FROM providers p " +
+    @Query(value = "SELECT p.*, u.* FROM providers p " +
+            "JOIN users u ON p.id = u.id " +
             "JOIN locations l ON p.location_id = l.id " +
             "WHERE p.service_type_id = :serviceTypeId " +
             "AND p.emergency_enabled = true " +
