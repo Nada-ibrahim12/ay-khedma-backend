@@ -1,5 +1,7 @@
 package com.aykhedma.dto.request;
 
+import com.aykhedma.dto.location.LocationDTO;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,11 +12,15 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProviderResponseDTO {
-
+public class ProviderResponseRequest
+{
     @NotNull(message = "Emergency request ID is required")
     @Positive(message = "Emergency request ID must be positive")
-    private Long emergencyRequestId;
+    private Long providerResponseId;
+
+    @NotNull(message = "Location is required")
+    @Valid
+    private LocationDTO location;
 
     @NotNull(message = "Proposed price is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Proposed price must be greater than 0")

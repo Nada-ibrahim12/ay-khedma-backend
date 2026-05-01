@@ -63,7 +63,6 @@ public interface ProviderMapper {
     @Mapping(source = "completedJobs", target = "completedJobs")
     @Mapping(source = "averageInteractionRating", target = "averageInteractionRating")
     @Mapping(source = "interactionRatingCount", target = "interactionRatingCount")
-
     @Mapping(source = "totalBookings", target = "totalBookings")
     @Mapping(source = "cancelledBookings", target = "cancelledBookings")
     @Mapping(source = "price", target = "price")
@@ -71,6 +70,7 @@ public interface ProviderMapper {
     @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")
     @Mapping(target = "distance", ignore = true)
     @Mapping(target = "estimatedArrivalTime", ignore = true)
+    @Mapping(source = "location", target = "location")
     @Mapping(source = "location.area", target = "area")
     @Mapping(target = "cancellationRate", expression = "java(provider.getCancellationRate())")
     ProviderSummaryResponse toProviderSummaryResponse(Provider provider);

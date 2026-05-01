@@ -12,8 +12,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EmergencyRequestDTO {
-
+public class EmergencyRequestRequest
+{
     @NotNull(message = "Service type ID is required")
     @Positive(message = "Service type ID must be positive")
     private Long serviceTypeId;
@@ -22,10 +22,12 @@ public class EmergencyRequestDTO {
     @Valid
     private LocationDTO location;
 
-    @Size(max = 500, message = "Description cannot exceed 500 characters")
-    private String description;
+    @NotNull(message = "Price is required")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
+    @DecimalMax(value = "100000.0", message = "Price cannot exceed 100,000")
+    private double price;
 
-    @Min(value = 1, message = "Search radius must be at least 1 km")
-    @Max(value = 50, message = "Search radius cannot exceed 50 km")
-    private Integer searchRadius = 10;
+    @NotNull(message = "Description is required")
+    @Size(max = 1000, message = "Description cannot exceed 1000 characters")
+    private String description;
 }

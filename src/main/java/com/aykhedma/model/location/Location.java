@@ -41,7 +41,8 @@ public class Location {
     @Size(max = 100, message = "City cannot exceed 100 characters")
     private String city;
 
-    @Column(columnDefinition = "geometry")
+    @NotNull(message = "Coordinates are required")
+    @Column(columnDefinition = "geometry(Point,4326)")
     private Point coordinates;
 
     public double calculateDistance(Location other) {
@@ -83,6 +84,7 @@ public class Location {
     private void calculateCoordinates() {
         if (latitude != null && longitude != null) {
             this.coordinates = geometryFactory.createPoint(new Coordinate(longitude, latitude));
+            this.coordinates.setSRID(4326);
         }
     }
 }
