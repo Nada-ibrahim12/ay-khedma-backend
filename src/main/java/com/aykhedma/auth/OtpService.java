@@ -24,6 +24,16 @@ public class OtpService {
         return otp.trim();
     }
 
+    public String generatePasswordResetOtp(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        String otp = String.valueOf((int) (Math.random() * 900000) + 100000);
+
+        otpStorage.put(normalizedEmail, otp.trim());
+        notificationService.sendPasswordResetEmail(normalizedEmail, otp.trim());
+
+        return otp.trim();
+    }
+
     public boolean validateOtp(String email, String otp) {
         if (email == null || otp == null) {
             return false;

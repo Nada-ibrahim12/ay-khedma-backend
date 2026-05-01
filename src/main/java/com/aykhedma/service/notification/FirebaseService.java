@@ -5,18 +5,18 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.messaging.*;
 import com.aykhedma.model.notification.DeviceToken;
+import com.aykhedma.model.notification.NotificationStatus;
 import com.aykhedma.repository.DeviceTokenRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,12 +57,12 @@ public class FirebaseService {
         }
     }
 
-    @Async
-    public CompletableFuture<Boolean> sendPushNotification(Long userId, String title,
-                                                           String body, Map<String, String> data) {
+    @Transactional
+    public NotificationStatus sendPushNotification(Long userId, String title,
+            String body, Map<String, Object> data) {
         if (firebaseMessaging == null) {
             log.warn("Firebase not configured. Push notification not sent.");
-            return CompletableFuture.completedFuture(false);
+            return NotificationStatus.FAILED;
         }
 
         try {
@@ -70,8 +70,8 @@ public class FirebaseService {
             List<DeviceToken> deviceTokens = deviceTokenRepository.findByUserIdAndActiveTrue(userId);
 
             if (deviceTokens.isEmpty()) {
-                log.info("No active devices for user: {}", userId);
-                return CompletableFuture.completedFuture(false);
+                log.warn("No active devices for user: {}", userId);
+                return NotificationStatus.FAILED;
             }
 
             // Build notification
@@ -82,13 +82,20 @@ public class FirebaseService {
 
             // Create messages for all devices
             List<Message> messages = deviceTokens.stream()
-                    .map(token -> Message.builder()
-                            .setToken(token.getFcmToken())
-                            .setNotification(notification)
-                            .putAllData(data != null ? data : Map.of())
-                            .setAndroidConfig(getAndroidConfig())
-                            .setApnsConfig(getIosConfig())
-                            .build())
+                    .map(token -> {
+                        Message.Builder builder = Message.builder()
+                                .setToken(token.getFcmToken())
+                                .setNotification(notification)
+                                .setAndroidConfig(getAndroidConfig())
+                                .setApnsConfig(getIosConfig());
+
+                        // Convert data values to strings
+                        if (data != null) {
+                            data.forEach((key, value) -> builder.putData(key, String.valueOf(value)));
+                        }
+
+                        return builder.build();
+                    })
                     .collect(Collectors.toList());
 
             // Send in batch
@@ -102,11 +109,16 @@ public class FirebaseService {
                 handleFailedTokens(deviceTokens, response.getResponses());
             }
 
-            return CompletableFuture.completedFuture(true);
+            // Return DELIVERED if at least one message was successful
+            if (response.getSuccessCount() > 0) {
+                return NotificationStatus.DELIVERED;
+            } else {
+                return NotificationStatus.FAILED;
+            }
 
         } catch (FirebaseMessagingException e) {
             log.error("Failed to send push notification: {}", e.getMessage());
-            return CompletableFuture.completedFuture(false);
+            return NotificationStatus.FAILED;
         }
     }
 

@@ -1,14 +1,153 @@
-<!DOCTYPE html>
+<!doctype html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <title th:text="${subject}">Email</title>
-</head>
-<body>
-<h2>Ay Khedma Test Email</h2>
-<p><strong>Message:</strong> <span th:text="${message}">message</span></p>
-<p><strong>Sent at:</strong> <span th:text="${timestamp}">timestamp</span></p>
-<hr>
-<p style="color: gray;">This is an automated test message from your notification system.</p>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=yes"
+    />
+    <title th:text="${subject}">Test Email - AyKhedma</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background-color: #eef2f5;
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        line-height: 1.5;
+        padding: 40px 16px;
+        color: #1a2c3e;
+      }
+      .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 20px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+      }
+      .email-header {
+        background-color: #ffffff;
+        padding: 28px 32px 12px 32px;
+        border-bottom: 1px solid #e9edf2;
+      }
+      .logo-area {
+        margin-bottom: 20px;
+      }
+      .logo-text {
+        font-size: 22px;
+        font-weight: 700;
+        color: #334155;
+        letter-spacing: -0.3px;
+      }
+      .logo-text span {
+        font-weight: 400;
+        color: #5a6e7c;
+      }
+      .header-badge {
+        display: inline-block;
+        background-color: #f1f5f9;
+        color: #334155;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: 40px;
+        margin-top: 8px;
+      }
+      .email-content {
+        padding: 24px 32px 32px 32px;
+      }
+      .details-card {
+        background-color: #fafcff;
+        border: 1px solid #eef2f8;
+        border-radius: 16px;
+        overflow: hidden;
+        margin-bottom: 28px;
+      }
+      .details-title {
+        background-color: #f8fafd;
+        padding: 14px 24px;
+        border-bottom: 1px solid #eef2f8;
+        font-weight: 700;
+        font-size: 15px;
+        color: #1a2c3e;
+      }
+      .details-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .details-table tr {
+        border-bottom: 1px solid #f0f3f9;
+      }
+      .details-table tr:last-child {
+        border-bottom: none;
+      }
+      .details-table td {
+        padding: 14px 24px;
+        vertical-align: top;
+        font-size: 14px;
+      }
+      .detail-label {
+        font-weight: 600;
+        color: #4a6a85;
+        width: 160px;
+      }
+      .detail-value {
+        color: #1a2c3e;
+        font-weight: 500;
+        text-align: right;
+      }
+      .email-footer {
+        background-color: #fafcff;
+        padding: 24px 32px;
+        text-align: center;
+        font-size: 12px;
+        color: #7e95ab;
+        border-top: 1px solid #eef2f8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="email-container">
+      <div class="email-header">
+        <div class="logo-area">
+          <div class="logo-text">AyKhedma <span>| Test Notification</span></div>
+        </div>
+        <div class="header-badge">Test Email</div>
+      </div>
+      <div class="email-content">
+        <div class="details-card">
+          <div class="details-title">Test Message Details</div>
+          <table
+            class="details-table"
+            cellpadding="0"
+            cellspacing="0"
+            width="100%"
+          >
+            <tr>
+              <td class="detail-label">Message</td>
+              <td class="detail-value" th:text="${message}">message</td>
+            </tr>
+            <tr>
+              <td class="detail-label">Sent At</td>
+              <td class="detail-value" th:text="${timestamp}">timestamp</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="email-footer">
+        <p>This is an automated test message from your notification system.</p>
+      </div>
+    </div>
+  </body>
 </html>

@@ -22,6 +22,7 @@ import java.util.List;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 @PrimaryKeyJoinColumn(name = "id")
+@DiscriminatorValue("PROVIDER")
 public class Provider extends User {
 
     @Size(max = 500, message = "Bio cannot exceed 500 characters")
@@ -65,6 +66,10 @@ public class Provider extends User {
     @ManyToOne
     @JoinColumn(name = "service_type_id", nullable = false)
     private ServiceType serviceType;
+
+    @Size(max = 255, message = "Works at cannot exceed 200 characters")
+    @Column(length = 255)
+    private String worksAt;
 
     @OneToMany(mappedBy = "provider", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Size(max = 20, message = "Cannot have more than 20 documents")

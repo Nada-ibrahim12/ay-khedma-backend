@@ -6,6 +6,7 @@ import com.aykhedma.dto.response.UserResponse;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
 import com.aykhedma.mapper.UserMapper;
+import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.model.user.User;
 import com.aykhedma.model.user.UserType;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -29,7 +31,7 @@ public class AdminServiceImpl implements AdminService {
     private final ProviderRepository providerRepository;
     private final ProviderMapper providerMapper;
     private final ProviderService providerService;
-    private final NotificationService notificationService;
+    private final NotificationFactory notificationFactory;
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
@@ -52,13 +54,24 @@ public class AdminServiceImpl implements AdminService {
     public ProviderResponse approveProvider(Long providerId) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
-        
+
         provider.setVerificationStatus(VerificationStatus.VERIFIED);
         provider.setRejectionReason(null);
-        
+
         Provider savedProvider = providerRepository.save(provider);
-        notificationService.sendProviderApprovalEmail(savedProvider.getEmail());
-        
+        notificationFactory.send(savedProvider.getId(),
+                NotificationType.PROVIDER_ACCEPTED,
+                Map.of(
+                        "title", "AyKhedma - Account Approved!",
+                        "status", "accepted",
+                        "statusLabel", "Accepted",
+                        "message", "Your registration application has been reviewed and approved.",
+                        "content",
+                        "Congratulations! Your registration application has been reviewed and approved.\n\n" +
+                                "Your account is now fully active, and you can start receiving booking requests on the platform.\n\n"
+                                +
+                                "Welcome to the AyKhedma family!"));
+
         return providerMapper.toProviderResponse(savedProvider);
     }
 
@@ -67,13 +80,26 @@ public class AdminServiceImpl implements AdminService {
     public ProviderResponse rejectProvider(Long providerId, String reason) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
-        
+
         provider.setVerificationStatus(VerificationStatus.REJECTED);
         provider.setRejectionReason(reason);
-        
+
         Provider savedProvider = providerRepository.save(provider);
-        notificationService.sendProviderRejectionEmail(savedProvider.getEmail(), reason);
-        
+        String rejectionReason = (reason == null || reason.isBlank()) ? "No reason provided." : reason;
+        notificationFactory.send(savedProvider.getId(),
+                NotificationType.PROVIDER_REJECTED,
+                Map.of(
+                        "title", "AyKhedma - Application Status Update",
+                        "status", "rejected",
+                        "statusLabel", "Rejected",
+                        "reason", rejectionReason,
+                        "message", "Your registration application has been rejected.",
+                        "content",
+                        "We regret to inform you that your registration application has been rejected for the following reason:\n\n"
+                                +
+                                "\"" + rejectionReason + "\"\n\n" +
+                                "Please address these issues and update your profile or contact support for more details."));
+
         return providerMapper.toProviderResponse(savedProvider);
     }
 
@@ -82,19 +108,19 @@ public class AdminServiceImpl implements AdminService {
             UserType role, Boolean status,
             LocalDateTime startDate, LocalDateTime endDate,
             Pageable pageable) {
-        
+
         Page<User> users = userRepository.searchUsers(role, status, startDate, endDate, pageable);
-        
+
         return users.map(userMapper::toUserResponse);
     }
 
     @Override
     public Page<ProviderResponse> searchProviders(
-            String keyword, VerificationStatus status, 
+            String keyword, VerificationStatus status,
             Boolean enabled, Pageable pageable) {
-        
+
         Page<Provider> providers = providerRepository.findAllProvidersForAdmin(keyword, status, enabled, pageable);
-        
+
         return providers.map(providerMapper::toProviderResponse);
     }
 
@@ -103,7 +129,7 @@ public class AdminServiceImpl implements AdminService {
     public UserResponse updateUser(Long userId, UpdateUserRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-                
+
         if (request.getName() != null && !request.getName().isBlank()) {
             user.setName(request.getName());
         }
@@ -119,7 +145,7 @@ public class AdminServiceImpl implements AdminService {
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
-        
+
         userRepository.save(user);
         return userMapper.toUserResponse(user);
     }
@@ -130,11 +156,21 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
         user.setEnabled(false);
-        
+
         if (user instanceof Provider) {
-            notificationService.sendProviderBlockedEmail(user.getEmail());
+            notificationFactory.send(userId,
+                    NotificationType.ACCOUNT_UPDATE,
+                    Map.of(
+                            "title", "AyKhedma - Account Status Update",
+                            "status", "suspended",
+                            "statusLabel", "Suspended",
+                            "message", "Your provider account has been suspended due to a violation of platform rules.",
+                            "content",
+                            "We are writing to inform you that your provider account has been suspended due to a violation of our platform rules.\n\n"
+                                    +
+                                    "If you believe this is a mistake, please contact our support team."));
         }
-        
+
         return userMapper.toUserResponse(user);
     }
 

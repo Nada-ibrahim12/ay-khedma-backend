@@ -7,6 +7,7 @@ import com.aykhedma.dto.response.ProviderSummaryResponse;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.LocationMapper;
 import com.aykhedma.model.location.Location;
+import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.repository.ConsumerRepository;
@@ -18,8 +19,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.aykhedma.mapper.ProviderMapper;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,6 +37,7 @@ public class LocationService {
     private final ProviderRepository providerRepository;
     private final LocationMapper locationMapper;
     private final ProviderMapper providerMapper;
+    private final NotificationFactory notificationFactory;
 
     // ====== CONSUMER LOCATION METHODS ======
 
@@ -59,8 +65,11 @@ public class LocationService {
 
         log.info("Location saved successfully for consumer ID: {}", consumerId);
 
-        return locationMapper.toResponseWithMessage(location, "Location saved successfully",true);
+        sendLocationUpdateNotification(consumerId, "saved", location);
+
+        return locationMapper.toResponseWithMessage(location, "Location saved successfully", true);
     }
+
     @Transactional
     public LocationResponse updateConsumerLocation(Long consumerId, LocationDTO locationDTO) {
         log.info("Updating location for consumer ID: {}", consumerId);
@@ -79,6 +88,8 @@ public class LocationService {
         location = locationRepository.save(location);
 
         log.info("Location updated successfully for consumer ID: {}", consumerId);
+
+        sendLocationUpdateNotification(consumerId, "updated", location);
 
         return locationMapper.toResponseWithMessage(location, "Location updated successfully", true);
     }
@@ -118,6 +129,8 @@ public class LocationService {
 
         log.info("Location patched successfully for consumer ID: {}", consumerId);
 
+        sendLocationUpdateNotification(consumerId, "updated", location);
+
         return locationMapper.toResponseWithMessage(location, "Location patched successfully", true);
     }
 
@@ -135,32 +148,33 @@ public class LocationService {
         return locationMapper.toDto(consumer.getLocation());
     }
 
-//    @Transactional
-//    public LocationResponse deleteConsumerLocation(Long consumerId) {
-//        log.info("Deleting location for consumer ID: {}", consumerId);
-//
-//        Consumer consumer = consumerRepository.findById(consumerId)
-//                .orElseThrow(() -> new ResourceNotFoundException("Consumer not found with id: " + consumerId));
-//
-//        if (consumer.getLocation() == null) {
-//            return LocationResponse.builder()
-//                    .success(true)
-//                    .message("No location to delete")
-//                    .build();
-//        }
-//
-//        Long locationId = consumer.getLocation().getId();
-//        consumer.setLocation(null);
-//        consumerRepository.save(consumer);
-//        locationRepository.deleteById(locationId);
-//
-//        log.info("Location deleted successfully for consumer ID: {}", consumerId);
-//
-//        return LocationResponse.builder()
-//                .success(true)
-//                .message("Location deleted successfully")
-//                .build();
-//    }
+    // @Transactional
+    // public LocationResponse deleteConsumerLocation(Long consumerId) {
+    // log.info("Deleting location for consumer ID: {}", consumerId);
+    //
+    // Consumer consumer = consumerRepository.findById(consumerId)
+    // .orElseThrow(() -> new ResourceNotFoundException("Consumer not found with id:
+    // " + consumerId));
+    //
+    // if (consumer.getLocation() == null) {
+    // return LocationResponse.builder()
+    // .success(true)
+    // .message("No location to delete")
+    // .build();
+    // }
+    //
+    // Long locationId = consumer.getLocation().getId();
+    // consumer.setLocation(null);
+    // consumerRepository.save(consumer);
+    // locationRepository.deleteById(locationId);
+    //
+    // log.info("Location deleted successfully for consumer ID: {}", consumerId);
+    //
+    // return LocationResponse.builder()
+    // .success(true)
+    // .message("Location deleted successfully")
+    // .build();
+    // }
 
     // ====== PROVIDER LOCATION METHODS ======
 
@@ -184,6 +198,8 @@ public class LocationService {
 
         log.info("Location saved successfully for provider ID: {}", providerId);
 
+        sendLocationUpdateNotification(providerId, "saved", location);
+
         return locationMapper.toResponseWithMessage(location, "Location saved successfully", true);
     }
 
@@ -205,6 +221,8 @@ public class LocationService {
         location = locationRepository.save(location);
 
         log.info("Location updated successfully for provider ID: {}", providerId);
+
+        sendLocationUpdateNotification(providerId, "updated", location);
 
         return locationMapper.toResponseWithMessage(location, "Location updated successfully", true);
     }
@@ -243,7 +261,33 @@ public class LocationService {
 
         log.info("Location patched successfully for provider ID: {}", providerId);
 
+        sendLocationUpdateNotification(providerId, "updated", location);
+
         return locationMapper.toResponseWithMessage(location, "Location patched successfully", true);
+    }
+
+    private void sendLocationUpdateNotification(Long userId, String action, Location location) {
+        Map<String, Object> notificationData = new HashMap<>();
+        String actionLabel = "saved".equalsIgnoreCase(action) ? "Saved" : "Updated";
+        String address = location.getAddress() != null && !location.getAddress().isBlank()
+                ? location.getAddress()
+                : "Not specified";
+        String city = location.getCity() != null && !location.getCity().isBlank()
+                ? location.getCity()
+                : "";
+        String coordinates = location.getLatitude() != null && location.getLongitude() != null
+                ? location.getLatitude() + ", " + location.getLongitude()
+                : "";
+
+        notificationData.put("title", "Location " + actionLabel);
+        notificationData.put("content", "Your location has been " + action + " successfully.");
+        notificationData.put("message", "Your location has been " + action + " successfully.");
+        notificationData.put("address", address);
+        notificationData.put("city", city);
+        notificationData.put("coordinates", coordinates);
+        notificationData.put("updateTime", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+
+        notificationFactory.send(userId, NotificationType.LOCATION_UPDATE, notificationData);
     }
 
     @Transactional(readOnly = true)
@@ -260,37 +304,39 @@ public class LocationService {
         return locationMapper.toDto(provider.getLocation());
     }
 
-//    @Transactional
-//    public LocationResponse deleteProviderLocation(Long providerId) {
-//        log.info("Deleting location for provider ID: {}", providerId);
-//
-//        Provider provider = providerRepository.findById(providerId)
-//                .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
-//
-//        if (provider.getLocation() == null) {
-//            return LocationResponse.builder()
-//                    .success(true)
-//                    .message("No location to delete")
-//                    .build();
-//        }
-//
-//        Long locationId = provider.getLocation().getId();
-//        provider.setLocation(null);
-//        providerRepository.save(provider);
-//        locationRepository.deleteById(locationId);
-//
-//        log.info("Location deleted successfully for provider ID: {}", providerId);
-//
-//        return LocationResponse.builder()
-//                .success(true)
-//                .message("Location deleted successfully")
-//                .build();
-//    }
+    // @Transactional
+    // public LocationResponse deleteProviderLocation(Long providerId) {
+    // log.info("Deleting location for provider ID: {}", providerId);
+    //
+    // Provider provider = providerRepository.findById(providerId)
+    // .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id:
+    // " + providerId));
+    //
+    // if (provider.getLocation() == null) {
+    // return LocationResponse.builder()
+    // .success(true)
+    // .message("No location to delete")
+    // .build();
+    // }
+    //
+    // Long locationId = provider.getLocation().getId();
+    // provider.setLocation(null);
+    // providerRepository.save(provider);
+    // locationRepository.deleteById(locationId);
+    //
+    // log.info("Location deleted successfully for provider ID: {}", providerId);
+    //
+    // return LocationResponse.builder()
+    // .success(true)
+    // .message("Location deleted successfully")
+    // .build();
+    // }
 
     // ==== CALCULATE DISTANCE BETWEEN TWO USERS (CONSUMER, PROVIDER)====
 
     /**
      * Calculate distance between a consumer and a provider
+     * 
      * @param consumerId ID of the consumer
      * @param providerId ID of the provider
      * @return DistanceResponse with distance in kilometers
@@ -320,8 +366,7 @@ public class LocationService {
                 consumerLocation.getLatitude(),
                 consumerLocation.getLongitude(),
                 providerLocation.getLatitude(),
-                providerLocation.getLongitude()
-        );
+                providerLocation.getLongitude());
 
         boolean isWithinServiceArea = false;
         if (provider.getServiceAreaRadius() != null) {
@@ -343,14 +388,16 @@ public class LocationService {
 
     /**
      * Check if a provider serves a specific location
+     * 
      * @param providerId ID of the provider
-     * @param latitude Latitude of the location
-     * @param longitude Longitude of the location
+     * @param latitude   Latitude of the location
+     * @param longitude  Longitude of the location
      * @return true if location is within provider's service area
      */
     @Transactional(readOnly = true)
     public Boolean isLocationWithinServiceArea(Long providerId, Double latitude, Double longitude) {
-        log.info("Checking if location ({}, {}) is within service area of provider ID: {}", latitude, longitude, providerId);
+        log.info("Checking if location ({}, {}) is within service area of provider ID: {}", latitude, longitude,
+                providerId);
 
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
@@ -367,14 +414,14 @@ public class LocationService {
                 provider.getLocation().getLatitude(),
                 provider.getLocation().getLongitude(),
                 latitude,
-                longitude
-        );
+                longitude);
 
         return distance <= provider.getServiceAreaRadius();
     }
 
     /**
      * Haversine formula implementation for distance calculation
+     * 
      * @param lat1 Latitude of first point
      * @param lon1 Longitude of first point
      * @param lat2 Latitude of second point
@@ -389,7 +436,7 @@ public class LocationService {
 
         double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                        * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
@@ -401,7 +448,7 @@ public class LocationService {
 
     // Add this method to your LocationService
     public List<ProviderSummaryResponse> findNearbyProviders(Double latitude, Double longitude,
-                                                             Double radius, Long serviceTypeId) {
+            Double radius, Long serviceTypeId) {
         log.info("Finding providers within {}km of ({}, {})", radius, latitude, longitude);
 
         List<Provider> allProviders;
@@ -417,16 +464,14 @@ public class LocationService {
                     double distance = calculateHaversineDistance(
                             latitude, longitude,
                             provider.getLocation().getLatitude(),
-                            provider.getLocation().getLongitude()
-                    );
+                            provider.getLocation().getLongitude());
                     return distance <= radius;
                 })
                 .map(provider -> {
                     double distance = calculateHaversineDistance(
                             latitude, longitude,
                             provider.getLocation().getLatitude(),
-                            provider.getLocation().getLongitude()
-                    );
+                            provider.getLocation().getLongitude());
                     ProviderSummaryResponse response = providerMapper.toProviderSummaryResponse(provider);
                     response.setDistance(distance);
                     return response;

@@ -1,6 +1,7 @@
 package com.aykhedma.dto.response;
 
 import com.aykhedma.model.chat.ChatResponseType;
+import com.aykhedma.dto.response.ScheduleResponse.TimeSlotResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,6 +27,9 @@ public class ChatResponse {
 
     // For provider list responses
     private List<ProviderSummaryResponse> providers;
+
+    // For schedule availability responses
+    private List<TimeSlotResponse> availableTimeSlots;
 
     // For booking responses
     private BookingResponse booking;

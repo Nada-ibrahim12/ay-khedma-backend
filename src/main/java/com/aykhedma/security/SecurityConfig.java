@@ -41,11 +41,23 @@ public class SecurityConfig {
                                 // Authorization rules
                                 .authorizeHttpRequests(auth -> auth
 
+                                                .requestMatchers("/notification-test/**", "/notification-test.html")
+                                                .permitAll()
+
+                                                // Allow websocket handshake and SockJS info endpoints
+                                                .requestMatchers("/ws-notifications/**", "/ws-chat/**")
+                                                .permitAll()
+
+                                                .requestMatchers("/api/v1/notifications/**")
+                                                .permitAll()
+
                                                 .requestMatchers("/auth/login",
                                                                 "/auth/register",
                                                                 "/auth/send-otp",
                                                                 "/auth/verify-otp",
-                                                                "/auth/refresh")
+                                                                "/auth/refresh",
+                                                                "/auth/forgot-password",
+                                                                "/auth/reset-password")
                                                 .permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/services/categories",
                                                                 "/api/services/types")

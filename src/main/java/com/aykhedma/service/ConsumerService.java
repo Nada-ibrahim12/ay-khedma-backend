@@ -18,4 +18,5 @@ public interface ConsumerService {
     ProfileResponse saveProvider(Long consumerId, Long providerId);
     ProfileResponse removeSavedProvider(Long consumerId, Long providerId);
     List<ProviderSummaryResponse> getSavedProviders(Long consumerId);
+    Boolean isProviderSaved(Long ProviderId, Long consumerId);
 }
