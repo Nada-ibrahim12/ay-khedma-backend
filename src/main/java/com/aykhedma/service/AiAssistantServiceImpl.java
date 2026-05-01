@@ -5,26 +5,21 @@ import com.aykhedma.dto.request.AiChatRequest;
 import com.aykhedma.dto.request.BookingRequest;
 import com.aykhedma.dto.response.*;
 import com.aykhedma.exception.BadRequestException;
-import com.aykhedma.model.booking.BookingStatus;
 import com.aykhedma.model.chat.*;
-import com.aykhedma.model.emergency.EmergencyRequest;
-import com.aykhedma.model.emergency.EmergencyStatus;
 import com.aykhedma.model.location.Location;
+import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.model.user.User;
 import com.aykhedma.model.user.UserType;
+import com.aykhedma.model.user.VerificationStatus;
 import com.aykhedma.mapper.LocationMapper;
 import com.aykhedma.mapper.ProviderMapper;
 import com.aykhedma.repository.*;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,19 +29,8 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.DayOfWeek;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.regex.Matcher;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -56,16 +40,13 @@ import java.util.stream.Collectors;
 @Transactional
 public class AiAssistantServiceImpl implements AiAssistantService {
 
+    private static final int MAX_HISTORY_TURNS = 6;
+    private static final int MAX_SERVICE_CANDIDATES_FOR_AI = 8;
     private static final int DEFAULT_SEARCH_RADIUS_KM = 10;
     private static final int DEFAULT_PROVIDER_LIMIT = 5;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^\\p{IsAlphabetic}\\p{IsDigit}]+");
-    private static final Pattern PROVIDER_ID_PATTERN = Pattern
-            .compile("(?i)provider\\s*(?:id\\s*)?(\\d+)|مزود\\s*(\\d+)");
-    private static final Pattern PROVIDER_NAME_PATTERN = Pattern
-            .compile("(?i)provider\\s+(?!id\\b)([\\p{L}][\\p{L}\\s]{1,50})|مزود\\s+([\\p{L}][\\p{L}\\s]{1,50})");
-    private static final Pattern TIME_PATTERN = Pattern.compile("(?i)\\b(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?\\b");
 
     private final GeminiClient geminiClient;
     private final ProviderRepository providerRepository;
@@ -74,12 +55,13 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private final BookingService bookingService;
     private final ServiceTypeRepository serviceTypeRepository;
     private final ConsumerRepository consumerRepository;
-    private final EmergencyRequestRepository emergencyRequestRepository;
     private final LocationRepository locationRepository;
     private final LocationMapper locationMapper;
+    private final LocationService locationService;
     private final ObjectMapper objectMapper;
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ServiceCategoryRepository categoryRepository;
 
     @Override
     public ChatResponse getChat(String sessionId) {
@@ -103,13 +85,11 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                         .build())
                 .collect(Collectors.toList());
 
-        String message = session.getLastMessage() != null ? session.getLastMessage().getContent() : "";
-
         return ChatResponse.builder()
                 .sessionId(session.getSessionId())
                 .messages(messages)
                 .timestamp(LocalDateTime.now())
-                .message(message)
+                .message(session.getLastMessage() != null ? session.getLastMessage().getContent() : "")
                 .detectedLanguage(session.getDetectedLanguage())
                 .responseType(ChatResponseType.TEXT)
                 .build();
@@ -122,68 +102,20 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         }
 
         Long userId = currentUser != null ? currentUser.getId() : null;
-
-        // Resolve or create chat session
         ChatSession session = resolveSession(request, userId);
 
-        // Load previous messages for context
-        List<ChatMessage> history = chatMessageRepository
+        // Load only recent history
+        List<ChatMessage> fullHistory = chatMessageRepository
                 .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId());
+        List<ChatMessage> recentHistory = getRecentHistory(fullHistory, MAX_HISTORY_TURNS);
 
-        // Persist user message
-        ChatMessage userMessage = ChatMessage.builder()
-                .chatSession(session)
-                .senderId(userId != null ? userId : 0L)
-                .senderRole(MessageRole.USER)
-                .content(request.getMessage())
-                .type(MessageType.TEXT)
-                .isRead(true)
-                .build();
-        chatMessageRepository.save(userMessage);
+        saveUserMessage(session, userId, request.getMessage());
 
-        // Classify intent with full conversation history
-        AssistantPlan plan = classify(request, currentUser, history);
-        plan = enrichPlanFromConversation(plan, request, history);
+        UnifiedAssistantResponse unifiedResponse = getUnifiedResponse(request, currentUser, recentHistory);
 
-        ChatResponse.ChatResponseBuilder response = ChatResponse.builder()
-                .sessionId(session.getSessionId())
-                .timestamp(LocalDateTime.now())
-                .message(plan.getReply())
-                .detectedLanguage(StringUtils.hasText(plan.getDetectedLanguage()) ? plan.getDetectedLanguage() : "en");
+        ChatResponse chatResponse = executeAction(request, currentUser, unifiedResponse);
 
-        try {
-            Action action = resolveAction(plan);
-            switch (action) {
-                case SEARCH_PROVIDERS -> handleProviderSearch(request, currentUser, plan, response);
-                case CHECK_AVAILABILITY -> handleAvailability(request, plan, response);
-                case CREATE_BOOKING -> handleBooking(request, currentUser, plan, response);
-                // case CREATE_EMERGENCY -> handleEmergency(request, currentUser, plan,
-                // response);
-                case ASK_CLARIFICATION -> response.responseType(ChatResponseType.CLARIFICATION);
-                case GENERAL -> response.responseType(ChatResponseType.TEXT);
-            }
-        } catch (Exception ex) {
-            log.warn("Chatbot action failed: {}", ex.getMessage());
-            response.responseType(ChatResponseType.ERROR)
-                    .message("I could not complete that request right now. Please try again with more details.");
-        }
-
-        ChatResponse chatResponse = response.build();
-        String aiFinalReply = buildAiFinalReply(request, currentUser, plan, chatResponse, history);
-        if (StringUtils.hasText(aiFinalReply)) {
-            chatResponse.setMessage(aiFinalReply);
-        }
-
-        // Persist assistant response so it becomes part of history for next turn
-        ChatMessage assistantMessage = ChatMessage.builder()
-                .chatSession(session)
-                .senderId(0L)
-                .senderRole(MessageRole.ASSISTANT)
-                .content(chatResponse.getMessage())
-                .type(MessageType.TEXT)
-                .isRead(true)
-                .build();
-        chatMessageRepository.save(assistantMessage);
+        saveAssistantMessage(session, chatResponse.getMessage());
 
         return chatResponse;
     }
@@ -192,7 +124,6 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     public ChatResponse startNewChat(User currentUser) {
         Long userId = currentUser != null ? currentUser.getId() : null;
 
-        // End any existing active session for this user
         if (userId != null) {
             chatSessionRepository.findActiveSessionByUser(userId).ifPresent(session -> {
                 session.endSession();
@@ -218,13 +149,11 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     private ChatSession resolveSession(AiChatRequest request, Long userId) {
-        // If client provides a sessionId, reuse it (must be active)
         if (StringUtils.hasText(request.getSessionId())) {
             return chatSessionRepository.findBySessionIdAndIsActiveTrue(request.getSessionId())
                     .orElseThrow(() -> new BadRequestException("Invalid or expired session ID"));
         }
 
-        // For authenticated users, try to find an existing active session
         if (userId != null) {
             Optional<ChatSession> activeSession = chatSessionRepository.findActiveSessionByUser(userId);
             if (activeSession.isPresent()) {
@@ -232,7 +161,6 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             }
         }
 
-        // Create a brand-new session
         ChatSession session = ChatSession.builder()
                 .userId(userId)
                 .isActive(true)
@@ -241,219 +169,155 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         return chatSessionRepository.save(session);
     }
 
-    private void handleProviderSearch(AiChatRequest request,
-            User currentUser,
-            AssistantPlan plan,
-            ChatResponse.ChatResponseBuilder response) {
-        ServiceType serviceType = resolveServiceType(plan, request.getMessage()).orElse(null);
-        String queryText = firstText(plan.getProblemDescription(), request.getMessage());
-        LocationDTO searchLocation = resolveSearchLocation(currentUser, request, plan);
-        List<ProviderSummaryResponse> providers = searchProviders(serviceType, queryText, searchLocation,
-                plan.getSearchRadiusKm());
-
-        response.responseType(ChatResponseType.PROVIDER_LIST)
-                .providers(providers)
-                .message(StringUtils.hasText(plan.getReply()) ? plan.getReply()
-                        : (providers.isEmpty()
-                                ? "I could not find verified providers for that request yet."
-                                : buildProviderSummaryMessage(providers, serviceType)));
+    private List<ChatMessage> getRecentHistory(List<ChatMessage> fullHistory, int maxTurns) {
+        if (fullHistory == null || fullHistory.isEmpty()) {
+            return new ArrayList<>();
+        }
+        if (fullHistory.size() <= maxTurns) {
+            return fullHistory;
+        }
+        return fullHistory.subList(fullHistory.size() - maxTurns, fullHistory.size());
     }
 
-    private LocationDTO resolveSearchLocation(User currentUser, AiChatRequest request, AssistantPlan plan) {
-        if (isConsumer(currentUser)) {
-            Optional<Consumer> consumer = consumerRepository.findById(currentUser.getId());
-            if (consumer.isPresent() && consumer.get().getLocation() != null) {
-                return locationMapper.toDto(consumer.get().getLocation());
-            }
-        }
-
-        if (request.getLocation() != null) {
-            return request.getLocation();
-        }
-
-        return plan.getLocation();
+    private List<GeminiClient.ConversationTurn> toConversationTurns(List<ChatMessage> history) {
+        return history.stream()
+                .map(msg -> new GeminiClient.ConversationTurn(
+                        msg.getSenderRole() == MessageRole.USER ? "user" : "assistant",
+                        msg.getContent()))
+                .collect(Collectors.toList());
     }
 
-    private void handleAvailability(AiChatRequest request,
-            AssistantPlan plan,
-            ChatResponse.ChatResponseBuilder response) {
-        Long providerId = resolveProviderId(request, plan);
-        LocalDate requestedDate = firstNonNull(request.getRequestedDate(), plan.getRequestedDate());
-
-        if (providerId == null || requestedDate == null) {
-            response.responseType(ChatResponseType.CLARIFICATION)
-                    .message("Please send the provider ID or name and the date so I can check availability.");
-            return;
-        }
-
-        List<ScheduleResponse.TimeSlotResponse> slots = providerService.getAvailableTimeSlots(providerId,
-                requestedDate);
-        response.responseType(ChatResponseType.AVAILABLE_SLOTS)
-                .availableTimeSlots(slots)
-                .message(StringUtils.hasText(plan.getReply()) ? plan.getReply()
-                        : formatAvailabilityMessage(providerId, requestedDate, slots));
-    }
-
-    private void handleBooking(AiChatRequest request,
-            User currentUser,
-            AssistantPlan plan,
-            ChatResponse.ChatResponseBuilder response) {
-        if (!isConsumer(currentUser)) {
-            response.responseType(ChatResponseType.CLARIFICATION)
-                    .message("You need to sign in as a consumer to create a booking request.");
-            return;
-        }
-
-        Long providerId = resolveProviderId(request, plan);
-        LocalDate requestedDate = firstNonNull(request.getRequestedDate(), plan.getRequestedDate());
-        LocalTime requestedTime = firstNonNull(request.getRequestedTime(), plan.getRequestedTime());
-        String problemDescription = firstText(plan.getProblemDescription(), request.getMessage());
-
-        if (providerId == null || requestedDate == null || requestedTime == null
-                || !StringUtils.hasText(problemDescription)) {
-            response.responseType(ChatResponseType.BOOKING_REDIRECT)
-                    .message(StringUtils.hasText(plan.getReply()) ? plan.getReply()
-                            : "To create the booking I still need the provider, the date, the time, and a short issue description.");
-            return;
-        }
-
-        BookingResponse bookingResponse = bookingService.requestBooking(currentUser.getId(), BookingRequest.builder()
-                .providerId(providerId)
-                .requestedDate(requestedDate)
-                .requestedTime(requestedTime)
-                .problemDescription(problemDescription)
-                .build());
-
-        response.responseType(ChatResponseType.BOOKING_CREATED)
-                .booking(bookingResponse)
-                .message(StringUtils.hasText(plan.getReply()) ? plan.getReply()
-                        : "Your booking request was created successfully.");
-    }
-
-    // private void handleEmergency(AiChatRequest request,
-    // User currentUser,
-    // AssistantPlan plan,
-    // ChatResponse.ChatResponseBuilder response) {
-    // if (!isConsumer(currentUser)) {
-    // response.responseType(ChatResponseType.CLARIFICATION)
-    // .message("You need to sign in as a consumer to create an emergency
-    // request.");
-    // return;
-    // }
-
-    // Optional<ServiceType> serviceType = resolveServiceType(plan,
-    // request.getMessage());
-    // LocationDTO locationDTO = firstNonNull(request.getLocation(),
-    // plan.getLocation());
-
-    // if (serviceType.isEmpty() || locationDTO == null || locationDTO.getLatitude()
-    // == null
-    // || locationDTO.getLongitude() == null) {
-    // response.responseType(ChatResponseType.CLARIFICATION)
-    // .message("For an emergency request I need the service type and your live
-    // location coordinates.");
-    // return;
-    // }
-
-    // Consumer consumer = consumerRepository.findById(currentUser.getId())
-    // .orElseThrow(() -> new BadRequestException("Consumer profile not found"));
-
-    // Location location =
-    // locationRepository.save(locationMapper.toEntity(locationDTO));
-    // Integer searchRadius = plan.getSearchRadiusKm() != null ?
-    // plan.getSearchRadiusKm() : DEFAULT_SEARCH_RADIUS_KM;
-
-    // EmergencyRequest emergencyRequest = EmergencyRequest.builder()
-    // .consumer(consumer)
-    // .serviceType(serviceType.get())
-    // .location(location)
-    // .status(EmergencyStatus.BROADCASTING)
-    // .searchRadius(searchRadius)
-    // .description(firstText(plan.getProblemDescription(), request.getMessage()))
-    // .expiresAt(LocalDateTime.now().plusMinutes(30))
-    // .build();
-
-    // EmergencyRequest savedRequest =
-    // emergencyRequestRepository.save(emergencyRequest);
-    // List<ProviderSummaryResponse> providers =
-    // findEmergencyProviders(serviceType.get(), location, searchRadius);
-
-    // EmergencyResponse emergencyResponse = EmergencyResponse.builder()
-    // .id(savedRequest.getId())
-    // .serviceType(serviceType.get().getName())
-    // .location(locationMapper.toDto(location))
-    // .status(savedRequest.getStatus())
-    // .emergencyFeeMultiplier(savedRequest.getEmergencyFeeMultiplier())
-    // .createdAt(savedRequest.getCreatedAt())
-    // .expiresAt(savedRequest.getExpiresAt())
-    // .providerResponses(new ArrayList<>())
-    // .build();
-
-    // response.responseType(ChatResponseType.EMERGENCY_CREATED)
-    // .emergency(emergencyResponse)
-    // .providers(providers)
-    // .message(providers.isEmpty()
-    // ? "Your emergency request was created, but I could not find nearby verified
-    // providers yet."
-    // : "Your emergency request was created and nearby providers were found.");
-    // }
-
-    private AssistantPlan classify(AiChatRequest request, User currentUser, List<ChatMessage> history) {
+    private UnifiedAssistantResponse getUnifiedResponse(AiChatRequest request, User currentUser,
+            List<ChatMessage> history) {
         if (!geminiClient.isEnabled()) {
-            return applyRequestOverrides(fallbackPlan(request.getMessage()), request);
+            return smartFallback(request.getMessage(), history);
         }
 
-        String prompt = buildPrompt(request, currentUser, history);
-        String modelResponse = geminiClient.generateJson(prompt);
+        String systemPrompt = buildUnifiedSystemPrompt(currentUser);
+        List<GeminiClient.ConversationTurn> turns = toConversationTurns(history);
+        turns.add(new GeminiClient.ConversationTurn("user", request.getMessage()));
 
-        AssistantPlan plan = parsePlan(modelResponse);
-        if (plan != null) {
-            return applyRequestOverrides(plan, request);
+        String modelResponse = geminiClient.generateJson(turns, systemPrompt);
+
+        UnifiedAssistantResponse parsed = parseUnifiedResponse(modelResponse);
+        if (parsed != null && parsed.isValid()) {
+            return parsed;
         }
 
-        return applyRequestOverrides(fallbackPlan(request.getMessage()), request);
+        log.warn("Failed to parse unified response from Gemini, using smart fallback");
+        return smartFallback(request.getMessage(), history);
     }
 
-    private String buildPrompt(AiChatRequest request, User currentUser, List<ChatMessage> history) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("You are the Ay Khedma assistant for a home-services app. ");
-        builder.append("Choose the best backend action and extract needed fields. ");
-        builder.append("Return ONLY valid JSON with this schema: ");
-        builder.append(
-                "{action, intent, reply, detectedLanguage, providerId, providerName, serviceTypeId, serviceTypeName, ");
-        builder.append(
-                "requestedDate, requestedTime, problemDescription, searchRadiusKm, location{latitude,longitude,address,area,city}}. ");
-        builder.append(
-                "Action must be one of GENERAL, SEARCH_PROVIDERS, CHECK_AVAILABILITY, CREATE_BOOKING, ASK_CLARIFICATION. ");
-        builder.append(
-                "Intent must be one of GENERAL, SEARCH_PROVIDERS, GET_AVAILABILITY, CREATE_BOOKING, CLARIFICATION. ");
-        builder.append("For requestedDate, use strictly 'yyyy-MM-dd' format or null. ");
-        builder.append("For requestedTime, use strictly 'HH:mm' format or null. ");
-        builder.append("If required data is missing, choose ASK_CLARIFICATION and ask for the missing info. ");
-        builder.append(
-                "If the user asks for booking or emergency creation, do not invent provider IDs or coordinates. ");
-        builder.append("Current user role: ").append(currentUser != null ? currentUser.getRole() : "anonymous")
-                .append('.').append(' ');
+    private String buildUnifiedSystemPrompt(User currentUser) {
+        String userRole = (currentUser != null && currentUser.getRole() != null)
+                ? currentUser.getRole().name()
+                : "anonymous";
 
-        // Inject conversation history so Gemini understands context
-        if (history != null && !history.isEmpty()) {
-            builder.append("Previous conversation:\n");
-            for (ChatMessage msg : history) {
-                String roleLabel = msg.getSenderRole() == MessageRole.USER ? "User" : "Assistant";
-                builder.append(roleLabel).append(": ").append(msg.getContent()).append("\n");
-            }
-        }
+        return """
+                You are Ay Khedma AI Assistant - a comprehensive service marketplace connecting consumers with ALL types of service providers across any profession or industry.
 
-        builder.append("User message: ").append(request.getMessage());
+                ## ABOUT THE APP:
+                Ay Khedma is a universal platform that includes EVERY profession and service type imaginable:
+                - MEDICAL: Doctors, Dentists, Specialists, Clinics, Hospitals
+                - ENGINEERING: Civil, Electrical, Mechanical, Architectural, Structural
+                - LEGAL: Lawyers, Legal Consultants, Document Drafting, Court Representation
+                - HOME SERVICES: Plumbers, Electricians, Painters, Cleaners, Movers, HVAC
+                - TECH: Programmers, IT Support, Web Developers, Cybersecurity Experts
+                - EDUCATION: Teachers, Tutors, Trainers, Instructors
+                - DESIGN: Graphic Designers, Interior Designers, UI/UX, Architects
+                - CONSTRUCTION: Contractors, Builders, Renovation Experts
+                - AUTOMOTIVE: Mechanics, Car Repair, Detailing
+                - BUSINESS: Consultants, Accountants, Marketing Experts
+                - CREATIVE: Photographers, Videographers, Musicians, Artists
+                - WELLNESS: Coaches, Trainers, Nutritionists, Therapists
+                - AND ANY OTHER PROFESSION the user might need!
 
-        if (request.getLocation() != null) {
-            builder.append(" Request location: ").append(request.getLocation());
-        }
+                ## YOUR TASK:
+                Analyze the user's message and return a SINGLE JSON response that captures their intent.
 
-        return builder.toString();
+                ## CRITICAL RULES:
+                1. This platform covers ALL professions - don't assume it's only "home services"
+                2. Understand the user's request by MEANING, not exact keywords
+                3. If the user describes a profession or need, map it to the appropriate service type
+                4. Never invent provider IDs or fake data
+                5. If missing critical information, set needsClarification=true and list missingFields
+                6. For unauthenticated users, prevent CREATE_BOOKING action
+                7. For urgent requests (طوارئ, emergency), set searchRadiusKm=5
+
+                ## HOW TO UNDERSTAND DIFFERENT REQUESTS:
+
+                | User says (Arabic/English) | Meaning | Expected action |
+                |---------------------------|---------|-----------------|
+                | "أنا تعبان / دكتور / عندي وجع" | Needs medical service | SEARCH_PROVIDERS with serviceTypeName="طبيب" or any medical service |
+                | "مهندس / تصميم فيلا / مخطط" | Needs architectural/engineering service | SEARCH_PROVIDERS with serviceTypeName related to engineering |
+                | "محامي / قضية / عقد" | Needs legal service | SEARCH_PROVIDERS for lawyers or legal services |
+                | "مبرمج / موقع ويب / تطبيق" | Needs tech/programming service | SEARCH_PROVIDERS for developers |
+                | "سباك / مواسير / حمام بايظ" | Needs plumbing service | SEARCH_PROVIDERS for plumbing |
+                | "كهربائي / فيشة / قطع الكهرباء" | Needs electrical service | SEARCH_PROVIDERS for electrical |
+                | "الحوض مسرب / الحنفية بتقطر" | Needs plumbing repair | SEARCH_PROVIDERS for pipe repair |
+                | "عايز أحجز مع [اسم] يوم [تاريخ]" | Wants to book appointment | CREATE_BOOKING with extracted data |
+                | "متاح دلوقتي / طوارئ" | Urgent immediate need | SEARCH_PROVIDERS with problemDescription="emergency", searchRadiusKm=5 |
+
+                ## OUTPUT FORMAT:
+                Return ONLY valid JSON. No extra text, no explanation.
+
+                {
+                  "action": "SEARCH_PROVIDERS | CHECK_AVAILABILITY | CREATE_BOOKING | ASK_CLARIFICATION | GENERAL",
+                  "intent": "SEARCH_PROVIDERS | GET_AVAILABILITY | CREATE_BOOKING | CLARIFICATION | GENERAL",
+                  "reply": "natural language response to user (Arabic if user message is Arabic, otherwise English)",
+                  "providerId": number or null,
+                  "providerName": string or null,
+                  "serviceTypeName": string or null,
+                  "requestedDate": "yyyy-MM-dd" or null,
+                  "requestedTime": "HH:mm" or null,
+                  "problemDescription": string or null,
+                  "searchRadiusKm": number or null,
+                  "needsClarification": boolean,
+                  "missingFields": ["field1", "field2"] or null
+                }
+
+                ## EXAMPLES:
+
+                ### Medical Request:
+                User: "أنا تعبان وعندي صداع"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"ممكن توصفلي الأعراض بالتفصيل عشان أقترح دكتور مناسب؟","serviceTypeName":"طبيب","needsClarification":true,"missingFields":["symptoms"]}
+
+                ### Engineering Request:
+                User: "عايز مهندس معماري يصمم فيلا"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، بدورلك على مهندسين معماريين متخصصين في تصميم الفلل. ممكن تقولي في أي منطقة؟","serviceTypeName":"مهندس معماري","searchRadiusKm":10}
+
+                ### Legal Request:
+                User: "عايز محامي للقضية بتاعتي"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"فهمت، محتاج محامي. ممكن توصف نوع القضية عشان ألاقي لك المتخصص المناسب؟","serviceTypeName":"محامي","needsClarification":true,"missingFields":["caseType"]}
+
+                ### Tech Request:
+                User: "عايز مبرمج يعمل لي تطبيق"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، هدورلك على مبرمجين متخصصين في تطوير التطبيقات. نوع التطبيق إيه؟","serviceTypeName":"مبرمج","needsClarification":true,"missingFields":["appType"]}
+
+                ### Home Service (Plumbing):
+                User: "الحوض عندي مسرب"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، سأبحث لك عن سباكين متاحين في منطقتك.","serviceTypeName":"سباك","searchRadiusKm":10}
+
+                ### Urgent:
+                User: "طوارئ كهربائي البيت وقعت الكهرباء"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"فهمت، حالة طارئة. هدورلك على كهربائي قريب منك جداً.","serviceTypeName":"كهربائي","problemDescription":"emergency","searchRadiusKm":5}
+
+                ### Booking with Provider Name:
+                User: "عايز احجز مع دكتور محمد يوم الأحد الساعة 4"
+                → {"action":"CREATE_BOOKING","intent":"CREATE_BOOKING","reply":"تمام، هحجزلك مع دكتور محمد يوم الأحد الساعة 4. محتاج وصف المشكلة","providerName":"محمد","requestedDate":"2026-05-07","requestedTime":"16:00","needsClarification":true,"missingFields":["problemDescription"]}
+
+                ### General Chat:
+                User: "السلام عليكم"
+                → {"action":"GENERAL","intent":"GENERAL","reply":"وعليكم السلام ورحمة الله! كيف أقدر أساعدك اليوم؟ ممكن تطلب أي خدمة أو تحجز مع أي مزود."}
+
+                ## CONTEXT:
+                Current user role: """
+                + userRole + """
+                        Today's date: """ + LocalDate.now() + """
+                        """;
     }
 
-    private AssistantPlan parsePlan(String modelResponse) {
+    private UnifiedAssistantResponse parseUnifiedResponse(String modelResponse) {
         if (!StringUtils.hasText(modelResponse)) {
             return null;
         }
@@ -465,877 +329,568 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             }
 
             JsonNode node = objectMapper.readTree(json);
-            AssistantPlan.AssistantPlanBuilder builder = AssistantPlan.builder();
+            UnifiedAssistantResponse response = new UnifiedAssistantResponse();
 
-            Action parsedAction = null;
             String actionText = node.path("action").asText(null);
             if (StringUtils.hasText(actionText)) {
                 try {
-                    parsedAction = Action.valueOf(actionText.trim().toUpperCase(Locale.ROOT));
+                    response.action = Action.valueOf(actionText.trim().toUpperCase(Locale.ROOT));
                 } catch (IllegalArgumentException ignored) {
-                    // Keep action null and use fallback mapping.
                 }
             }
-            builder.action(parsedAction);
 
-            Intent parsedIntent = null;
             String intentText = node.path("intent").asText(null);
             if (StringUtils.hasText(intentText)) {
                 try {
-                    parsedIntent = Intent.valueOf(intentText.trim().toUpperCase(Locale.ROOT));
+                    response.intent = Intent.valueOf(intentText.trim().toUpperCase(Locale.ROOT));
                 } catch (IllegalArgumentException ignored) {
-                    // Keep intent null and let fallback handling decide.
                 }
             }
-            builder.intent(parsedIntent);
 
-            if (parsedAction == null && parsedIntent != null) {
-                builder.action(mapIntentToAction(parsedIntent));
-            }
-            if (parsedIntent == null && parsedAction != null) {
-                builder.intent(mapActionToIntent(parsedAction));
-            }
+            response.reply = node.path("reply").asText(null);
+            response.providerId = node.hasNonNull("providerId") && node.path("providerId").canConvertToLong()
+                    ? node.path("providerId").asLong()
+                    : null;
+            response.providerName = node.path("providerName").asText(null);
+            response.serviceTypeName = node.path("serviceTypeName").asText(null);
+            response.requestedDate = parseDateSafe(node.path("requestedDate").asText(null));
+            response.requestedTime = parseTimeSafe(node.path("requestedTime").asText(null));
+            response.problemDescription = node.path("problemDescription").asText(null);
+            response.searchRadiusKm = node.hasNonNull("searchRadiusKm") && node.path("searchRadiusKm").canConvertToInt()
+                    ? node.path("searchRadiusKm").asInt()
+                    : DEFAULT_SEARCH_RADIUS_KM;
+            response.needsClarification = node.path("needsClarification").asBoolean(false);
 
-            builder.reply(node.path("reply").asText(null));
-            builder.detectedLanguage(node.path("detectedLanguage").asText(null));
-
-            if (node.hasNonNull("providerId") && node.path("providerId").canConvertToLong()) {
-                builder.providerId(node.path("providerId").asLong());
-            }
-            builder.providerName(node.path("providerName").asText(null));
-
-            if (node.hasNonNull("serviceTypeId") && node.path("serviceTypeId").canConvertToLong()) {
-                builder.serviceTypeId(node.path("serviceTypeId").asLong());
-            }
-            builder.serviceTypeName(node.path("serviceTypeName").asText(null));
-
-            builder.requestedDate(parseDateSafe(node.path("requestedDate").asText(null)));
-            builder.requestedTime(parseTimeSafe(node.path("requestedTime").asText(null)));
-            builder.problemDescription(node.path("problemDescription").asText(null));
-
-            if (node.hasNonNull("searchRadiusKm") && node.path("searchRadiusKm").canConvertToInt()) {
-                builder.searchRadiusKm(node.path("searchRadiusKm").asInt());
-            }
-
-            JsonNode locationNode = node.path("location");
-            if (!locationNode.isMissingNode() && !locationNode.isNull()) {
-                LocationDTO location = new LocationDTO();
-
-                if (locationNode.hasNonNull("latitude") && locationNode.path("latitude").isNumber()) {
-                    location.setLatitude(locationNode.path("latitude").asDouble());
+            if (node.has("missingFields") && node.path("missingFields").isArray()) {
+                response.missingFields = new ArrayList<>();
+                for (JsonNode field : node.path("missingFields")) {
+                    response.missingFields.add(field.asText());
                 }
-                if (locationNode.hasNonNull("longitude") && locationNode.path("longitude").isNumber()) {
-                    location.setLongitude(locationNode.path("longitude").asDouble());
-                }
-                location.setAddress(locationNode.path("address").asText(null));
-                location.setArea(locationNode.path("area").asText(null));
-                location.setCity(locationNode.path("city").asText(null));
-
-                builder.location(location);
             }
 
-            return builder.build();
+            if (response.action == null) {
+                response.action = Action.ASK_CLARIFICATION;
+                response.intent = Intent.CLARIFICATION;
+                if (!StringUtils.hasText(response.reply)) {
+                    response.reply = "كيف يمكنني مساعدتك؟ / How can I help you?";
+                }
+            }
+
+            return response;
         } catch (Exception ex) {
-            log.debug("Failed to parse Gemini assistant plan: {}", ex.getMessage());
+            log.debug("Failed to parse unified response: {}", ex.getMessage());
             return null;
         }
     }
 
-    private String extractJson(String text) {
-        int start = text.indexOf('{');
-        int end = text.lastIndexOf('}');
-        if (start < 0 || end <= start) {
-            return null;
+    private UnifiedAssistantResponse smartFallback(String message, List<ChatMessage> history) {
+        String normalized = normalize(message);
+        UnifiedAssistantResponse response = new UnifiedAssistantResponse();
+        response.searchRadiusKm = DEFAULT_SEARCH_RADIUS_KM;
+
+        if (containsAny(normalized, "طوارئ", "emergency", "urgent", "دلوقتي", "حالاً", "اسعاف")) {
+            response.action = Action.SEARCH_PROVIDERS;
+            response.intent = Intent.SEARCH_PROVIDERS;
+            response.problemDescription = "emergency";
+            response.searchRadiusKm = 5;
+            response.reply = "فهمت، محتاج مساعدة عاجلة. هدورلك على أقرب مقدم خدمة متاح. وصِف لي المشكلة باختصار.";
+            return response;
         }
-        return text.substring(start, end + 1);
+
+        if (containsAny(normalized, "تعبان", "مرض", "sick", "doctor", "طبيب", "دكتور", "صحتي")) {
+            response.action = Action.SEARCH_PROVIDERS;
+            response.intent = Intent.SEARCH_PROVIDERS;
+            response.serviceTypeName = "طبيب";
+            response.reply = "ممكن توصفلي الأعراض عشان أقترح دكتور مناسب؟";
+            response.needsClarification = true;
+            response.missingFields = List.of("symptoms");
+            return response;
+        }
+
+        if (containsAny(normalized, "سباك", "plumb", "مواسير", "مطبخ", "حمام", "تسريب")) {
+            response.action = Action.SEARCH_PROVIDERS;
+            response.intent = Intent.SEARCH_PROVIDERS;
+            response.serviceTypeName = "سباك";
+            response.reply = "بدورلك على سباكين موثوقين في منطقتك...";
+            return response;
+        }
+
+        if (containsAny(normalized, "حجز", "book", "موعد", "appointment")) {
+            response.action = Action.CREATE_BOOKING;
+            response.intent = Intent.CREATE_BOOKING;
+            response.reply = "تمام، هساعدك تحجز. محتاج منك: نوع الخدمة، المزود، التاريخ والوقت، ووصف المشكلة.";
+            response.needsClarification = true;
+            response.missingFields = List.of("serviceType", "provider", "date", "time", "problemDescription");
+            return response;
+        }
+
+        response.action = Action.ASK_CLARIFICATION;
+        response.intent = Intent.CLARIFICATION;
+        response.reply = "كيف يمكنني مساعدتك؟ ممكن تطلب: دكتور، سباك، كهربائي، أو حجز موعد.";
+        return response;
     }
 
-    private AssistantPlan fallbackPlan(String message) {
-        return AssistantPlan.builder()
-                .action(Action.ASK_CLARIFICATION)
-                .intent(Intent.CLARIFICATION)
-                .reply("I want to help accurately. Please share what you need (service type, provider if known, and preferred date/time).")
-                .detectedLanguage("en")
-                .searchRadiusKm(DEFAULT_SEARCH_RADIUS_KM)
+    private ChatResponse executeAction(AiChatRequest request, User currentUser, UnifiedAssistantResponse unified) {
+        ChatResponse.ChatResponseBuilder responseBuilder = ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .timestamp(LocalDateTime.now())
+                .message(unified.reply)
+                .detectedLanguage(detectLanguage(request.getMessage()));
+
+        if (unified.needsClarification || unified.action == Action.ASK_CLARIFICATION) {
+            return responseBuilder.responseType(ChatResponseType.CLARIFICATION).build();
+        }
+
+        return switch (unified.action) {
+            case SEARCH_PROVIDERS -> handleProviderSearchAction(request, currentUser, unified, responseBuilder);
+            case CHECK_AVAILABILITY -> handleAvailabilityAction(unified, responseBuilder);
+            case CREATE_BOOKING -> handleBookingAction(request, currentUser, unified, responseBuilder);
+            default -> responseBuilder.responseType(ChatResponseType.TEXT).build();
+        };
+    }
+
+    private ChatResponse handleProviderSearchAction(AiChatRequest request, User currentUser,
+            UnifiedAssistantResponse unified, ChatResponse.ChatResponseBuilder responseBuilder) {
+
+        String userMessage = request.getMessage();
+
+        ServiceType selectedService = resolveServiceTypeByMeaning(userMessage);
+
+        if (selectedService == null) {
+            return responseBuilder
+                    .responseType(ChatResponseType.CLARIFICATION)
+                    .message("ممكن توصف لي الخدمة اللي محتاجها بشكل أوضح؟")
+                    .build();
+        }
+
+        log.info("Selected service by meaning: {} ({})", selectedService.getName(), selectedService.getNameAr());
+
+        LocationDTO searchLocation = resolveSearchLocation(currentUser, request);
+        Integer radiusKm = unified.searchRadiusKm != null ? unified.searchRadiusKm : DEFAULT_SEARCH_RADIUS_KM;
+
+        List<ProviderSummaryResponse> providers = findAndSortProviders(
+                selectedService.getId(), searchLocation, radiusKm, currentUser);
+
+        log.info("Found {} providers for service: {}", providers.size(), selectedService.getName());
+
+        String replyMessage = buildSmartReply(providers, selectedService, userMessage);
+
+        return responseBuilder
+                .responseType(ChatResponseType.PROVIDER_LIST)
+                .providers(providers)
+                .message(replyMessage)
                 .build();
     }
 
-    private LocalDate parseDateSafe(String dateText) {
-        if (!StringUtils.hasText(dateText)) {
+    private ServiceType resolveServiceTypeByMeaning(String userMessage) {
+
+        List<ServiceType> allServices = serviceTypeRepository.findAll();
+
+        if (allServices.isEmpty()) {
+            log.warn("No service types in database");
             return null;
         }
 
-        try {
-            return LocalDate.parse(dateText.trim(), DATE_FORMAT);
-        } catch (Exception ex) {
-            return null;
+        if (allServices.size() <= 50 && geminiClient.isEnabled()) {
+            return resolveServiceTypeWithAiByMeaning(userMessage, allServices);
+        } else {
+            return resolveServiceTypeWithCategoriesThenAi(userMessage);
         }
     }
 
-    private LocalTime parseTimeSafe(String timeText) {
-        if (!StringUtils.hasText(timeText)) {
-            return null;
-        }
+    private ServiceType resolveServiceTypeWithAiByMeaning(String userMessage, List<ServiceType> allServices) {
 
-        try {
-            return LocalTime.parse(timeText.trim(), TIME_FORMAT);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
+        String servicesJson = allServices.stream()
+                .map(st -> String.format(
+                        "{\"id\":%d,\"name\":\"%s\",\"nameAr\":\"%s\",\"description\":\"%s\"}",
+                        st.getId(),
+                        escapeJson(st.getName()),
+                        escapeJson(st.getNameAr()),
+                        escapeJson(st.getDescription() != null ? st.getDescription() : "")))
+                .collect(Collectors.joining(","));
 
-    private AssistantPlan applyRequestOverrides(AssistantPlan plan, AiChatRequest request) {
-        if (request.getProviderId() != null) {
-            plan.setProviderId(request.getProviderId());
-        }
-        if (request.getServiceTypeId() != null) {
-            plan.setServiceTypeId(request.getServiceTypeId());
-        }
-        if (request.getRequestedDate() != null) {
-            plan.setRequestedDate(request.getRequestedDate());
-        }
-        if (request.getRequestedTime() != null) {
-            plan.setRequestedTime(request.getRequestedTime());
-        }
-        if (request.getLocation() != null) {
-            plan.setLocation(request.getLocation());
-        }
-        if (plan.getAction() == null) {
-            plan.setAction(mapIntentToAction(plan.getIntent()));
-        }
-        if (plan.getIntent() == null) {
-            plan.setIntent(mapActionToIntent(plan.getAction()));
-        }
-        if (!StringUtils.hasText(plan.getReply())) {
-            plan.setReply(defaultReply(plan.getIntent()));
-        }
-        return plan;
-    }
+        String prompt = "أنت مساعد ذكي. المستخدم بيوصف خدمة he/she محتاجها.\n"
+                + "مهمتك: اختار أنسب خدمة من القائمة حسب المعنى، مش لازم تطابق الكلمة بالضبط.\n\n"
+                + "طلب المستخدم: " + userMessage + "\n\n"
+                + "الخدمات المتاحة: [" + servicesJson + "]\n\n"
+                + "قواعد الاختيار:\n"
+                + "- \"أنا تعبان / دكتور / عندي وجع / صحتي\" -> اختار أي خدمة طبية (Doctor, Dentist, etc)\n"
+                + "- \"الحوض مسرب / سباك / مواسير\" -> اختار خدمة سباكة (Pipe Repair, Drain Cleaning, etc)\n"
+                + "- \"كهربائي / فيشة / إضاءة / قطع الكهرباء\" -> اختار خدمة كهرباء\n"
+                + "- \"محامي / قضية / عقد\" -> اختار خدمة قانونية\n"
+                + "- \"تنظيف / كناسة / بيت\" -> اختار خدمة تنظيف\n"
+                + "- \"مهندس / تصميم / بناء\" -> اختار خدمة هندسية\n\n"
+                + "Return ONLY JSON: {\"serviceTypeId\": number}\n"
+                + "إذا مش متأكد، ارجع {\"serviceTypeId\": null}";
 
-    private AssistantPlan enrichPlanFromConversation(AssistantPlan plan, AiChatRequest request,
-            List<ChatMessage> history) {
-        if (plan == null) {
-            plan = fallbackPlan(request.getMessage());
-        }
+        String response = geminiClient.generateJson(prompt);
 
-        AssistantPlan aiEnriched = enrichPlanWithAiContext(request, plan, history);
-        if (aiEnriched != null) {
-            plan = mergeMissingFields(plan, aiEnriched);
-        }
+        if (StringUtils.hasText(response)) {
+            try {
+                String json = extractJson(response);
+                Long id = objectMapper.readTree(json).path("serviceTypeId").asLong();
 
-        // Keep deterministic extraction as a strict fallback only when AI context
-        // enrichment is not available.
-        if (!shouldUseHeuristicEnrichment(aiEnriched)) {
-            return plan;
-        }
-
-        if (plan.getProviderId() == null) {
-            Long providerId = firstNonNull(extractProviderId(request.getMessage()), findRecentProviderId(history));
-            if (providerId == null) {
-                String providerName = firstText(
-                        firstText(plan.getProviderName(), extractProviderName(request.getMessage())),
-                        findRecentProviderName(history));
-                providerId = resolveProviderIdByName(providerName);
-                if (!StringUtils.hasText(plan.getProviderName())) {
-                    plan.setProviderName(providerName);
-                }
+                return allServices.stream()
+                        .filter(st -> st.getId().equals(id))
+                        .findFirst()
+                        .orElse(null);
+            } catch (Exception ex) {
+                log.debug("AI meaning resolution failed: {}", ex.getMessage());
             }
-            plan.setProviderId(providerId);
-        }
-
-        if (plan.getRequestedDate() == null) {
-            LocalDate date = firstNonNull(parseDateFromText(request.getMessage()), findRecentRequestedDate(history));
-            plan.setRequestedDate(date);
-        }
-
-        if (plan.getRequestedTime() == null) {
-            LocalTime time = firstNonNull(parseTimeFromText(request.getMessage()), findRecentRequestedTime(history));
-            plan.setRequestedTime(time);
-        }
-
-        if (!StringUtils.hasText(plan.getProblemDescription())) {
-            String problem = firstNonNull(extractProblemDescription(request.getMessage()),
-                    findRecentProblemDescription(history));
-            plan.setProblemDescription(problem);
-        }
-
-        return plan;
-    }
-
-    private boolean shouldUseHeuristicEnrichment(AssistantPlan aiEnriched) {
-        if (!geminiClient.isEnabled()) {
-            return true;
-        }
-        return aiEnriched == null;
-    }
-
-    private AssistantPlan enrichPlanWithAiContext(AiChatRequest request, AssistantPlan currentPlan,
-            List<ChatMessage> history) {
-        if (!geminiClient.isEnabled() || currentPlan == null) {
-            return null;
-        }
-
-        StringBuilder builder = new StringBuilder();
-        builder.append("You are improving an existing assistant plan for Ay Khedma. ");
-        builder.append(
-                "Fill missing fields using conversation context, but do not overwrite fields already provided. ");
-        builder.append("Return ONLY valid JSON with this schema: ");
-        builder.append(
-                "{action, intent, reply, detectedLanguage, providerId, providerName, serviceTypeId, serviceTypeName, ");
-        builder.append(
-                "requestedDate, requestedTime, problemDescription, searchRadiusKm, location{latitude,longitude,address,area,city}}. ");
-        builder.append("Do not invent impossible values. If unknown, keep null. ");
-        builder.append("Current plan: ").append(planSnapshot(currentPlan)).append(". ");
-
-        if (history != null && !history.isEmpty()) {
-            builder.append("Conversation history:\n");
-            for (ChatMessage msg : history) {
-                String roleLabel = msg.getSenderRole() == MessageRole.USER ? "User" : "Assistant";
-                builder.append(roleLabel).append(": ").append(msg.getContent()).append("\n");
-            }
-        }
-
-        builder.append("Latest user message: ").append(request.getMessage());
-
-        String modelResponse = geminiClient.generateJson(builder.toString());
-        return parsePlan(modelResponse);
-    }
-
-    private AssistantPlan mergeMissingFields(AssistantPlan base, AssistantPlan candidate) {
-        if (base == null) {
-            return candidate;
-        }
-        if (candidate == null) {
-            return base;
-        }
-
-        if (base.getAction() == null && candidate.getAction() != null) {
-            base.setAction(candidate.getAction());
-        }
-        if (base.getIntent() == null && candidate.getIntent() != null) {
-            base.setIntent(candidate.getIntent());
-        }
-        if (!StringUtils.hasText(base.getReply()) && StringUtils.hasText(candidate.getReply())) {
-            base.setReply(candidate.getReply());
-        }
-        if (!StringUtils.hasText(base.getDetectedLanguage()) && StringUtils.hasText(candidate.getDetectedLanguage())) {
-            base.setDetectedLanguage(candidate.getDetectedLanguage());
-        }
-        if (base.getProviderId() == null && candidate.getProviderId() != null) {
-            base.setProviderId(candidate.getProviderId());
-        }
-        if (!StringUtils.hasText(base.getProviderName()) && StringUtils.hasText(candidate.getProviderName())) {
-            base.setProviderName(candidate.getProviderName());
-        }
-        if (base.getServiceTypeId() == null && candidate.getServiceTypeId() != null) {
-            base.setServiceTypeId(candidate.getServiceTypeId());
-        }
-        if (!StringUtils.hasText(base.getServiceTypeName()) && StringUtils.hasText(candidate.getServiceTypeName())) {
-            base.setServiceTypeName(candidate.getServiceTypeName());
-        }
-        if (base.getRequestedDate() == null && candidate.getRequestedDate() != null) {
-            base.setRequestedDate(candidate.getRequestedDate());
-        }
-        if (base.getRequestedTime() == null && candidate.getRequestedTime() != null) {
-            base.setRequestedTime(candidate.getRequestedTime());
-        }
-        if (!StringUtils.hasText(base.getProblemDescription())
-                && StringUtils.hasText(candidate.getProblemDescription())) {
-            base.setProblemDescription(candidate.getProblemDescription());
-        }
-        if (base.getSearchRadiusKm() == null && candidate.getSearchRadiusKm() != null) {
-            base.setSearchRadiusKm(candidate.getSearchRadiusKm());
-        }
-        if (base.getLocation() == null && candidate.getLocation() != null) {
-            base.setLocation(candidate.getLocation());
-        }
-
-        return base;
-    }
-
-    private String planSnapshot(AssistantPlan plan) {
-        if (plan == null) {
-            return "{}";
-        }
-
-        return "{"
-                + "action:" + plan.getAction()
-                + ",intent:" + plan.getIntent()
-                + ",providerId:" + plan.getProviderId()
-                + ",providerName:" + plan.getProviderName()
-                + ",serviceTypeId:" + plan.getServiceTypeId()
-                + ",serviceTypeName:" + plan.getServiceTypeName()
-                + ",requestedDate:" + plan.getRequestedDate()
-                + ",requestedTime:" + plan.getRequestedTime()
-                + ",problemDescription:" + sanitizeForPrompt(plan.getProblemDescription())
-                + ",searchRadiusKm:" + plan.getSearchRadiusKm()
-                + "}";
-    }
-
-    private String buildAiFinalReply(AiChatRequest request,
-            User currentUser,
-            AssistantPlan plan,
-            ChatResponse chatResponse,
-            List<ChatMessage> history) {
-        if (!geminiClient.isEnabled() || chatResponse == null || !StringUtils.hasText(chatResponse.getMessage())) {
-            return chatResponse != null ? chatResponse.getMessage() : null;
-        }
-
-        try {
-            String prompt = buildFinalReplyPrompt(request, currentUser, plan, chatResponse, history);
-            String modelResponse = geminiClient.generateJson(prompt);
-            if (!StringUtils.hasText(modelResponse)) {
-                return chatResponse.getMessage();
-            }
-
-            String json = extractJson(modelResponse);
-            if (!StringUtils.hasText(json)) {
-                return chatResponse.getMessage();
-            }
-
-            String aiReply = objectMapper.readTree(json).path("reply").asText(null);
-            return StringUtils.hasText(aiReply) ? aiReply.trim() : chatResponse.getMessage();
-        } catch (Exception ex) {
-            log.debug("Failed to generate final AI reply: {}", ex.getMessage());
-            return chatResponse.getMessage();
-        }
-    }
-
-    private String buildFinalReplyPrompt(AiChatRequest request,
-            User currentUser,
-            AssistantPlan plan,
-            ChatResponse chatResponse,
-            List<ChatMessage> history) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("You are an empathetic AI assistant for Ay Khedma. ");
-        builder.append(
-                "Write the final response to the user in natural language (Arabic if user wrote Arabic, otherwise English). ");
-        builder.append("Return JSON only in this format: {\"reply\":\"...\"}. ");
-        builder.append("Do not invent data, IDs, times, or availability that are not in the provided context. ");
-        builder.append("Keep the response concise (1-3 short sentences). ");
-        builder.append("If information is missing, ask for only the missing fields. ");
-
-        builder.append("Current user role: ").append(currentUser != null ? currentUser.getRole() : "anonymous")
-                .append(". ");
-        builder.append("Detected language: ")
-                .append(plan != null && StringUtils.hasText(plan.getDetectedLanguage()) ? plan.getDetectedLanguage()
-                        : "unknown")
-                .append(". ");
-        builder.append("Action: ").append(resolveAction(plan)).append(". ");
-        builder.append("User message: ").append(request.getMessage()).append(". ");
-
-        if (history != null && !history.isEmpty()) {
-            ChatMessage lastUserMessage = null;
-            for (int i = history.size() - 1; i >= 0; i--) {
-                if (history.get(i).getSenderRole() == MessageRole.USER) {
-                    lastUserMessage = history.get(i);
-                    break;
-                }
-            }
-            if (lastUserMessage != null && StringUtils.hasText(lastUserMessage.getContent())) {
-                builder.append("Previous user message: ").append(lastUserMessage.getContent()).append(". ");
-            }
-        }
-
-        String actionSummary = summarizeActionOutcome(chatResponse, plan);
-        builder.append("Action outcome: ").append(actionSummary).append(". ");
-        builder.append("Current fallback reply: ").append(chatResponse.getMessage()).append(".");
-
-        return builder.toString();
-    }
-
-    private String summarizeActionOutcome(ChatResponse chatResponse, AssistantPlan plan) {
-        if (chatResponse == null) {
-            return "no action executed";
-        }
-
-        ChatResponseType responseType = chatResponse.getResponseType();
-        if (responseType == null) {
-            return "text response";
-        }
-
-        return switch (responseType) {
-            case PROVIDER_LIST -> {
-                int providerCount = chatResponse.getProviders() != null ? chatResponse.getProviders().size() : 0;
-                String providerNames = chatResponse.getProviders() == null ? ""
-                        : chatResponse.getProviders().stream()
-                                .limit(3)
-                                .map(ProviderSummaryResponse::getName)
-                                .filter(StringUtils::hasText)
-                                .collect(Collectors.joining(", "));
-                yield providerCount > 0
-                        ? "provider search succeeded with " + providerCount + " providers: " + providerNames
-                        : "provider search succeeded but no providers were found";
-            }
-            case AVAILABLE_SLOTS -> {
-                int slotCount = chatResponse.getAvailableTimeSlots() != null
-                        ? chatResponse.getAvailableTimeSlots().size()
-                        : 0;
-                String providerPart = plan != null && plan.getProviderId() != null
-                        ? " for provider " + plan.getProviderId()
-                        : "";
-                String datePart = plan != null && plan.getRequestedDate() != null
-                        ? " on " + DATE_FORMAT.format(plan.getRequestedDate())
-                        : "";
-                yield "availability check returned " + slotCount + " slots" + providerPart + datePart;
-            }
-            case BOOKING_CREATED -> {
-                Long bookingId = chatResponse.getBooking() != null ? chatResponse.getBooking().getId() : null;
-                yield bookingId != null ? "booking created with id " + bookingId : "booking request created";
-            }
-            case BOOKING_REDIRECT -> "booking cannot be completed yet due to missing fields";
-            case CLARIFICATION -> "clarification required from user";
-            case ERROR -> "system action failed";
-            default -> "general conversational response";
-        };
-    }
-
-    private Action resolveAction(AssistantPlan plan) {
-        if (plan == null) {
-            return Action.GENERAL;
-        }
-        if (plan.getAction() != null) {
-            return plan.getAction();
-        }
-        return mapIntentToAction(plan.getIntent());
-    }
-
-    private Action mapIntentToAction(Intent intent) {
-        if (intent == null) {
-            return Action.GENERAL;
-        }
-
-        return switch (intent) {
-            case SEARCH_PROVIDERS -> Action.SEARCH_PROVIDERS;
-            case GET_AVAILABILITY -> Action.CHECK_AVAILABILITY;
-            case CREATE_BOOKING -> Action.CREATE_BOOKING;
-            case CLARIFICATION -> Action.ASK_CLARIFICATION;
-            case GENERAL -> Action.GENERAL;
-        };
-    }
-
-    private Intent mapActionToIntent(Action action) {
-        if (action == null) {
-            return Intent.GENERAL;
-        }
-
-        return switch (action) {
-            case SEARCH_PROVIDERS -> Intent.SEARCH_PROVIDERS;
-            case CHECK_AVAILABILITY -> Intent.GET_AVAILABILITY;
-            case CREATE_BOOKING -> Intent.CREATE_BOOKING;
-            case ASK_CLARIFICATION -> Intent.CLARIFICATION;
-            case GENERAL -> Intent.GENERAL;
-        };
-    }
-
-    private Long resolveProviderId(AiChatRequest request, AssistantPlan plan) {
-        Long providerId = firstNonNull(request.getProviderId(), plan.getProviderId());
-        if (providerId != null) {
-            return providerId;
-        }
-
-        String providerName = firstText(plan.getProviderName(), extractProviderName(request.getMessage()));
-        return resolveProviderIdByName(providerName);
-    }
-
-    private Long extractProviderId(String text) {
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-
-        Matcher matcher = PROVIDER_ID_PATTERN.matcher(text);
-        if (!matcher.find()) {
-            return null;
-        }
-
-        String idText = firstText(matcher.group(1), matcher.group(2));
-        if (!StringUtils.hasText(idText)) {
-            return null;
-        }
-
-        try {
-            return Long.parseLong(idText);
-        } catch (NumberFormatException ex) {
-            return null;
-        }
-    }
-
-    private LocalDate parseDateFromText(String text) {
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-
-        LocalDate parsed = parseDateSafe(text);
-        if (parsed != null) {
-            return parsed;
-        }
-
-        String normalized = normalize(text);
-        if (containsAny(normalized, "next wednesday", "wednesday القادم", "الاربعاء القادم", "الأربعاء القادم")) {
-            return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.WEDNESDAY));
-        }
-        if (containsAny(normalized, "next thursday", "thursday القادم", "الخميس القادم")) {
-            return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.THURSDAY));
-        }
-        if (containsAny(normalized, "next friday", "friday القادم", "الجمعة القادمة", "الجمعه القادمه")) {
-            return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.FRIDAY));
-        }
-        if (containsAny(normalized, "next saturday", "saturday القادم", "السبت القادم")) {
-            return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.SATURDAY));
-        }
-        if (containsAny(normalized, "next sunday", "sunday القادم", "الاحد القادم", "الأحد القادم")) {
-            return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.SUNDAY));
-        }
-        if (containsAny(normalized, "next monday", "monday القادم", "الاثنين القادم", "الإثنين القادم")) {
-            return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
-        }
-        if (containsAny(normalized, "next tuesday", "tuesday القادم", "الثلاثاء القادم")) {
-            return LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.TUESDAY));
         }
 
         return null;
     }
 
-    private String extractProviderName(String text) {
-        if (!StringUtils.hasText(text)) {
+    private ServiceType resolveServiceTypeWithCategoriesThenAi(String userMessage) {
+
+        List<ServiceCategory> allCategories = categoryRepository.findAll();
+        ServiceCategory detectedCategory = detectCategoryWithAi(userMessage, allCategories);
+
+        if (detectedCategory == null) {
             return null;
         }
 
-        Matcher matcher = PROVIDER_NAME_PATTERN.matcher(text);
-        if (!matcher.find()) {
+        List<ServiceType> servicesInCategory = serviceTypeRepository.findByCategoryId(detectedCategory.getId());
+
+        if (servicesInCategory.isEmpty()) {
             return null;
         }
 
-        String name = firstText(matcher.group(1), matcher.group(2));
-        if (!StringUtils.hasText(name)) {
-            return null;
-        }
-
-        return name.trim();
+        return resolveServiceTypeWithAiByMeaning(userMessage, servicesInCategory);
     }
 
-    private Long resolveProviderIdByName(String providerName) {
-        if (!StringUtils.hasText(providerName)) {
-            return null;
+    private ServiceCategory detectCategoryWithAi(String userMessage, List<ServiceCategory> categories) {
+
+        String categoriesJson = categories.stream()
+                .map(cat -> String.format("{\"id\":%d,\"name\":\"%s\",\"nameAr\":\"%s\"}",
+                        cat.getId(), escapeJson(cat.getName()), escapeJson(cat.getNameAr())))
+                .collect(Collectors.joining(","));
+
+        String prompt = "أنت مساعد في تطبيق يضم جميع المهن والخدمات (أطباء، مهندسين، سباكين، محامين، إلخ).\n"
+                + "المستخدم يقول: " + userMessage + "\n\n"
+                + "التصنيفات المتاحة: [" + categoriesJson + "]\n\n"
+                + "المطلوب: اختار التصنيف الوحيد الأنسب لطلب المستخدم من حيث المعنى، مش لازم كلمة مطابقة.\n\n"
+                + "أمثلة:\n"
+                + "- \"أنا تعبان / دكتور / عندي وجع / صحتي\" -> اختار التصنيف الطبي (لو موجود)\n"
+                + "- \"الحوض مسرب / سباك / مواسير / حمام بايظ\" -> Plumbing\n"
+                + "- \"عايز محامي / قضية / contract\" -> Legal\n"
+                + "- \"كهربائي / فيشة / إضاءة\" -> Electrical\n"
+                + "- \"مهندس / تصميم / بناء\" -> Engineering\n"
+                + "- \"أنظف / تنظيف / كناسة\" -> Cleaning\n\n"
+                + "Return ONLY JSON: {\"categoryId\": number}\n"
+                + "إذا مش متأكد، ترجع {\"categoryId\": null}";
+
+        String response = geminiClient.generateJson(prompt);
+
+        if (StringUtils.hasText(response)) {
+            try {
+                String json = extractJson(response);
+                JsonNode node = objectMapper.readTree(json);
+
+                if (node.has("categoryId") && !node.path("categoryId").isNull()) {
+                    Long categoryId = node.path("categoryId").asLong();
+                    return categories.stream()
+                            .filter(cat -> cat.getId().equals(categoryId))
+                            .findFirst()
+                            .orElse(null);
+                }
+            } catch (Exception ex) {
+                log.debug("AI category detection failed: {}", ex.getMessage());
+            }
         }
 
-        String targetName = normalize(providerName);
-        if (!StringUtils.hasText(targetName)) {
-            return null;
+        return null;
+    }
+
+    private List<ProviderSummaryResponse> findAndSortProviders(Long serviceTypeId,
+            LocationDTO userLocation, Integer radiusKm, User currentUser) {
+
+        List<Provider> providers = providerRepository.findByServiceTypeIdAndVerificationStatus(
+                serviceTypeId, VerificationStatus.VERIFIED);
+
+        if (providers.isEmpty()) {
+            log.info("No verified providers for service type: {}", serviceTypeId);
+            return new ArrayList<>();
         }
 
-        List<Provider> providers = providerRepository.findAll();
+        List<ProviderSummaryResponse> responses = providers.stream()
+                .map(provider -> toProviderSummaryWithDistance(provider, userLocation, currentUser))
+                .collect(Collectors.toList());
 
-        Optional<Provider> exact = providers.stream()
-                .filter(provider -> normalize(provider.getName()).equals(targetName))
-                .findFirst();
-        if (exact.isPresent()) {
-            return exact.get().getId();
+        responses.sort((p1, p2) -> {
+            double score1 = calculateScore(p1);
+            double score2 = calculateScore(p2);
+            return Double.compare(score2, score1);
+        });
+
+        return responses;
+    }
+
+    private double calculateScore(ProviderSummaryResponse provider) {
+        double score = 0.0;
+
+        // Weight 1: Distance (closer is better) - max 50 points
+        if (provider.getDistance() != null && provider.getDistance() > 0) {
+            // Distance 0km = 50 points, distance 10km = 0 points
+            double distanceScore = Math.max(0, 50 - (provider.getDistance() * 5));
+            score += distanceScore;
+        } else {
+            score += 25; // average if no distance
+        }
+
+        // Weight 2: Rating - max 50 points
+        if (provider.getAverageRating() != null) {
+            double ratingScore = provider.getAverageRating() * 10;
+            score += ratingScore;
+        } else {
+            score += 25; 
+        }
+
+        return score;
+    }
+
+    private ProviderSummaryResponse toProviderSummaryWithDistance(Provider provider, LocationDTO userLocation,
+            User currentUser) {
+        ProviderSummaryResponse response = providerMapper.toProviderSummaryResponse(provider);
+
+        if (currentUser != null && currentUser.getRole() == UserType.CONSUMER) {
+            try {
+                DistanceResponse distanceResponse = locationService
+                        .calculateDistanceBetweenConsumerAndProvider(currentUser.getId(), provider.getId());
+                if (distanceResponse != null) {
+                    response.setDistance(Math.round(distanceResponse.getDistanceKm() * 10.0) / 10.0);
+                }
+            } catch (Exception e) {
+                log.debug("Could not calculate consumer-provider distance for provider {}: {}", provider.getId(),
+                        e.getMessage());
+            }
+        } else if (userLocation != null && provider.getLocation() != null) {
+            try {
+                Location userLoc = locationMapper.toEntity(userLocation);
+                if (userLoc.getLatitude() != null && userLoc.getLongitude() != null) {
+                    double distance = provider.getLocation().calculateDistance(userLoc);
+                    response.setDistance(Math.round(distance * 10.0) / 10.0); // round to 1 decimal
+                }
+            } catch (Exception e) {
+                log.debug("Could not calculate distance for provider {}: {}", provider.getId(), e.getMessage());
+            }
+        }
+
+        return response;
+    }
+
+    private String buildSmartReply(List<ProviderSummaryResponse> providers, ServiceType serviceType,
+            String userMessage) {
+
+        String serviceName = serviceType.getNameAr() != null ? serviceType.getNameAr() : serviceType.getName();
+
+        if (providers.isEmpty()) {
+            return "عذراً، لم أجد أي " + serviceName
+                    + " متاحين في منطقتك حالياً. جرب توسيع نطاق البحث أو حاول مرة أخرى لاحقاً.";
+        }
+
+        if (providers.size() == 1) {
+            ProviderSummaryResponse p = providers.get(0);
+            String distanceText = p.getDistance() != null ? " (يبعد " + p.getDistance() + " كم)" : "";
+            String ratingText = p.getAverageRating() != null ? " - تقييم " + p.getAverageRating() + "/5" : "";
+            return "وجدت " + serviceName + " واحد مناسب" + distanceText + ratingText + ".\n" +
+                    "الاسم: " + p.getName();
+        }
+
+        // 2+ providers
+        String topProviders = providers.stream()
+                .limit(3)
+                .map(p -> {
+                    String name = p.getName();
+                    String rating = p.getAverageRating() != null ? " ⭐" + p.getAverageRating() : "";
+                    String distance = p.getDistance() != null ? " 📍" + p.getDistance() + "km" : "";
+                    return name + rating + distance;
+                })
+                .collect(Collectors.joining("\n• ", "• ", ""));
+
+        return "وجدت " + providers.size() + " " + serviceName + " مناسبين:\n" + topProviders;
+    }
+
+    /**
+     * Helper: escape JSON strings
+     */
+    private String escapeJson(String value) {
+        if (value == null)
+            return "";
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", " ")
+                .replace("\r", " ");
+    }
+
+    private List<ProviderSummaryResponse> searchProvidersOptimized(ServiceType serviceType,
+            String queryText, LocationDTO locationDTO, Integer radiusKm) {
+
+        log.info("Searching for providers - serviceType: {}, queryText: {}, locationDTO: {}",
+                serviceType != null ? serviceType.getName() : "null", queryText, locationDTO);
+        log.info("Searching for providers - serviceType: {}, queryText: {}, locationDTO: {}",
+                serviceType != null ? serviceType.getName() : "null", queryText, locationDTO);
+
+        List<Provider> providers;
+
+        if (serviceType != null) {
+            log.info("Finding providers by serviceTypeId: {} and VERIFIED status", serviceType.getId());
+            providers = providerRepository.findByServiceTypeIdAndVerificationStatus(
+                    serviceType.getId(), VerificationStatus.VERIFIED);
+        } else {
+            log.info("Finding all VERIFIED providers");
+            providers = providerRepository.findByVerificationStatus(VerificationStatus.VERIFIED);
+        }
+
+        log.info("Found {} providers from database", providers.size());
+
+        if (!providers.isEmpty()) {
+            providers.forEach(p -> log.info("   - Provider: id={}, name={}, serviceType={}",
+                    p.getId(), p.getName(),
+                    p.getServiceType() != null ? p.getServiceType().getName() : "null"));
+        }
+        Set<String> queryTokens = tokenize(queryText);
+        if (!queryTokens.isEmpty()) {
+            providers = providers.stream()
+                    .filter(p -> matchesSearchText(p, serviceType, queryTokens))
+                    .sorted((p1, p2) -> Integer.compare(scoreProvider(p2, queryTokens), scoreProvider(p1, queryTokens)))
+                    .limit(DEFAULT_PROVIDER_LIMIT * 2)
+                    .collect(Collectors.toList());
         }
 
         return providers.stream()
-                .filter(provider -> {
-                    String providerNameNormalized = normalize(provider.getName());
-                    return providerNameNormalized.contains(targetName) || targetName.contains(providerNameNormalized);
-                })
+                .limit(DEFAULT_PROVIDER_LIMIT)
+                .map(p -> toProviderSummary(p, locationDTO, radiusKm))
+                .sorted(Comparator.comparing(ProviderSummaryResponse::getDistance,
+                        Comparator.nullsLast(Double::compareTo)))
+                .collect(Collectors.toList());
+    }
+
+    private ChatResponse handleBookingAction(AiChatRequest request, User currentUser,
+            UnifiedAssistantResponse unified, ChatResponse.ChatResponseBuilder responseBuilder) {
+
+        if (!isConsumer(currentUser)) {
+            return responseBuilder
+                    .responseType(ChatResponseType.CLARIFICATION)
+                    .message("يرجى تسجيل الدخول كمستهلك لإنشاء حجز.")
+                    .build();
+        }
+
+        Long providerId = unified.providerId;
+        if (providerId == null && StringUtils.hasText(unified.providerName)) {
+            providerId = resolveProviderIdByName(unified.providerName);
+        }
+
+        if (providerId == null || unified.requestedDate == null ||
+                unified.requestedTime == null || !StringUtils.hasText(unified.problemDescription)) {
+
+            List<String> missing = new ArrayList<>();
+            if (providerId == null)
+                missing.add("provider");
+            if (unified.requestedDate == null)
+                missing.add("date");
+            if (unified.requestedTime == null)
+                missing.add("time");
+            if (!StringUtils.hasText(unified.problemDescription))
+                missing.add("problemDescription");
+
+            return responseBuilder
+                    .responseType(ChatResponseType.BOOKING_REDIRECT)
+                    .message("محتاج هذه المعلومات لإتمام الحجز: " + String.join(", ", missing))
+                    .build();
+        }
+
+        try {
+            BookingResponse bookingResponse = bookingService.requestBooking(currentUser.getId(),
+                    BookingRequest.builder()
+                            .providerId(providerId)
+                            .requestedDate(unified.requestedDate)
+                            .requestedTime(unified.requestedTime)
+                            .problemDescription(unified.problemDescription)
+                            .build());
+
+            return responseBuilder
+                    .responseType(ChatResponseType.BOOKING_CREATED)
+                    .booking(bookingResponse)
+                    .message("تم إنشاء طلب الحجز بنجاح رقم #" + bookingResponse.getId())
+                    .build();
+        } catch (Exception ex) {
+            log.error("Booking creation failed: {}", ex.getMessage());
+            return responseBuilder
+                    .responseType(ChatResponseType.ERROR)
+                    .message("حدث خطأ أثناء إنشاء الحجز. حاول مرة أخرى.")
+                    .build();
+        }
+    }
+
+    private ChatResponse handleAvailabilityAction(UnifiedAssistantResponse unified,
+            ChatResponse.ChatResponseBuilder responseBuilder) {
+
+        if (unified.providerId == null || unified.requestedDate == null) {
+            return responseBuilder
+                    .responseType(ChatResponseType.CLARIFICATION)
+                    .message("محتاج معرف المزود والتاريخ للتحقق من المواعيد.")
+                    .build();
+        }
+
+        List<ScheduleResponse.TimeSlotResponse> slots = providerService.getAvailableTimeSlots(
+                unified.providerId, unified.requestedDate);
+
+        return responseBuilder
+                .responseType(ChatResponseType.AVAILABLE_SLOTS)
+                .availableTimeSlots(slots)
+                .message(formatAvailabilityMessage(unified.providerId, unified.requestedDate, slots))
+                .build();
+    }
+
+    private LocationDTO resolveSearchLocation(User currentUser, AiChatRequest request) {
+        if (isConsumer(currentUser)) {
+            Optional<Consumer> consumer = consumerRepository.findById(currentUser.getId());
+            if (consumer.isPresent() && consumer.get().getLocation() != null) {
+                return locationMapper.toDto(consumer.get().getLocation());
+            }
+        }
+        return request.getLocation();
+    }
+
+    private Long resolveProviderIdByName(String providerName) {
+        if (!StringUtils.hasText(providerName))
+            return null;
+
+        String targetName = normalize(providerName);
+        List<Provider> providers = providerRepository.findAll();
+
+        Optional<Provider> exact = providers.stream()
+                .filter(p -> normalize(p.getName()).equals(targetName))
+                .findFirst();
+        if (exact.isPresent())
+            return exact.get().getId();
+
+        return providers.stream()
+                .filter(p -> normalize(p.getName()).contains(targetName) || targetName.contains(normalize(p.getName())))
                 .findFirst()
                 .map(Provider::getId)
                 .orElse(null);
     }
 
-    private LocalTime parseTimeFromText(String text) {
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-
-        LocalTime parsed = parseTimeSafe(text);
-        if (parsed != null) {
-            return parsed;
-        }
-
-        Matcher matcher = TIME_PATTERN.matcher(text);
-        if (!matcher.find()) {
-            return null;
-        }
-
-        int hour;
-        int minute = 0;
-        try {
-            hour = Integer.parseInt(matcher.group(1));
-            if (StringUtils.hasText(matcher.group(2))) {
-                minute = Integer.parseInt(matcher.group(2));
-            }
-        } catch (NumberFormatException ex) {
-            return null;
-        }
-
-        String meridiem = matcher.group(3);
-        if (StringUtils.hasText(meridiem)) {
-            String meridiemNormalized = meridiem.toLowerCase(Locale.ROOT);
-            if ("pm".equals(meridiemNormalized) && hour < 12) {
-                hour += 12;
-            }
-            if ("am".equals(meridiemNormalized) && hour == 12) {
-                hour = 0;
-            }
-        }
-
-        if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-            return null;
-        }
-
-        return LocalTime.of(hour, minute);
-    }
-
-    private Long findRecentProviderId(List<ChatMessage> history) {
-        if (history == null || history.isEmpty()) {
-            return null;
-        }
-
-        for (int i = history.size() - 1; i >= 0; i--) {
-            ChatMessage message = history.get(i);
-            if (message.getSenderRole() != MessageRole.USER || !StringUtils.hasText(message.getContent())) {
-                continue;
-            }
-            Long providerId = extractProviderId(message.getContent());
-            if (providerId != null) {
-                return providerId;
-            }
-        }
-        return null;
-    }
-
-    private String findRecentProviderName(List<ChatMessage> history) {
-        if (history == null || history.isEmpty()) {
-            return null;
-        }
-
-        for (int i = history.size() - 1; i >= 0; i--) {
-            ChatMessage message = history.get(i);
-            if (message.getSenderRole() != MessageRole.USER || !StringUtils.hasText(message.getContent())) {
-                continue;
-            }
-            String providerName = extractProviderName(message.getContent());
-            if (StringUtils.hasText(providerName)) {
-                return providerName;
-            }
-        }
-        return null;
-    }
-
-    private LocalDate findRecentRequestedDate(List<ChatMessage> history) {
-        if (history == null || history.isEmpty()) {
-            return null;
-        }
-
-        for (int i = history.size() - 1; i >= 0; i--) {
-            ChatMessage message = history.get(i);
-            if (message.getSenderRole() != MessageRole.USER || !StringUtils.hasText(message.getContent())) {
-                continue;
-            }
-            LocalDate date = parseDateFromText(message.getContent());
-            if (date != null) {
-                return date;
-            }
-        }
-        return null;
-    }
-
-    private LocalTime findRecentRequestedTime(List<ChatMessage> history) {
-        if (history == null || history.isEmpty()) {
-            return null;
-        }
-
-        for (int i = history.size() - 1; i >= 0; i--) {
-            ChatMessage message = history.get(i);
-            if (message.getSenderRole() != MessageRole.USER || !StringUtils.hasText(message.getContent())) {
-                continue;
-            }
-            LocalTime time = parseTimeFromText(message.getContent());
-            if (time != null) {
-                return time;
-            }
-        }
-        return null;
-    }
-
-    private String extractProblemDescription(String text) {
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-
-        String normalized = normalize(text);
-        if (containsAny(normalized,
-                "available", "availability", "time slot", "book", "booking", "provider",
-                "متاح", "المواعيد", "الوقت", "احجز", "حجز", "مزود", "مين المزودين")) {
-            return null;
-        }
-
-        return text.trim();
-    }
-
-    private String findRecentProblemDescription(List<ChatMessage> history) {
-        if (history == null || history.isEmpty()) {
-            return null;
-        }
-
-        for (int i = history.size() - 1; i >= 0; i--) {
-            ChatMessage message = history.get(i);
-            if (message.getSenderRole() != MessageRole.USER || !StringUtils.hasText(message.getContent())) {
-                continue;
-            }
-            String problem = extractProblemDescription(message.getContent());
-            if (StringUtils.hasText(problem)) {
-                return problem;
-            }
-        }
-        return null;
-    }
-
-    private Optional<ServiceType> resolveServiceType(AssistantPlan plan, String message) {
-        if (plan == null) {
-            return Optional.empty();
-        }
-
-        if (plan.getServiceTypeId() != null) {
-            return serviceTypeRepository.findById(plan.getServiceTypeId());
-        }
-
-        List<ServiceType> serviceTypes = serviceTypeRepository.findAll();
-        if (serviceTypes.isEmpty()) {
-            return Optional.empty();
-        }
-
-        String query = firstText(
-                firstText(plan.getServiceTypeName(), plan.getProblemDescription()),
-                message);
-
-        Optional<ServiceType> aiChosen = resolveServiceTypeWithAi(query, serviceTypes);
-        if (aiChosen.isPresent()) {
-            return aiChosen;
-        }
-
-        Set<String> queryTokens = tokenize(query);
-        return serviceTypes.stream()
-                .max(Comparator.comparingInt(serviceType -> scoreServiceType(serviceType, queryTokens)))
-                .filter(serviceType -> scoreServiceType(serviceType, queryTokens) > 0);
-    }
-
-    private Optional<ServiceType> resolveServiceTypeWithAi(String query, List<ServiceType> serviceTypes) {
-        if (!StringUtils.hasText(query) || serviceTypes == null || serviceTypes.isEmpty()) {
-            return Optional.empty();
-        }
-
-        String serviceList = serviceTypes.stream()
-                .map(serviceType -> "{id:" + serviceType.getId()
-                        + ",name:'" + sanitizeForPrompt(serviceType.getName()) + "'"
-                        + ",nameAr:'" + sanitizeForPrompt(serviceType.getNameAr()) + "'"
-                        + ",description:'" + sanitizeForPrompt(serviceType.getDescription()) + "'}")
-                .collect(Collectors.joining(","));
-
-        String prompt = "Select the best matching service type ID for this user request. "
-                + "Return JSON only in format {\"serviceTypeId\": number|null}. "
-                + "If uncertain, return null. "
-                + "User request: " + query + " "
-                + "Available services: [" + serviceList + "]";
-
-        String modelResponse = geminiClient.generateJson(prompt);
-        if (!StringUtils.hasText(modelResponse)) {
-            return Optional.empty();
-        }
-
-        try {
-            String json = extractJson(modelResponse);
-            if (!StringUtils.hasText(json)) {
-                return Optional.empty();
-            }
-
-            Long chosenId = objectMapper.readTree(json).path("serviceTypeId").isNumber()
-                    ? objectMapper.readTree(json).path("serviceTypeId").asLong()
-                    : null;
-
-            if (chosenId == null) {
-                return Optional.empty();
-            }
-
-            return serviceTypes.stream()
-                    .filter(serviceType -> chosenId.equals(serviceType.getId()))
-                    .findFirst();
-        } catch (Exception ex) {
-            log.debug("Failed to AI-resolve service type: {}", ex.getMessage());
-            return Optional.empty();
-        }
-    }
-
-    private List<ProviderSummaryResponse> searchProviders(ServiceType serviceType,
-            String queryText,
-            LocationDTO locationDTO,
-            Integer radiusKm) {
-        Set<String> queryTokens = tokenize(queryText);
-
-        List<Provider> providers = providerRepository.findAll().stream()
-                .filter(provider -> provider.getVerificationStatus() == null
-                        || provider.getVerificationStatus().name().equals("VERIFIED"))
-                .filter(provider -> serviceType == null
-                        || (provider.getServiceType() != null
-                                && serviceType.getId().equals(provider.getServiceType().getId())))
-                .filter(provider -> matchesSearchText(provider, serviceType, queryTokens))
-                .sorted(Comparator
-                        .comparingInt((Provider provider) -> scoreProvider(provider, queryTokens)).reversed()
-                        .thenComparing(provider -> provider.getAverageRating(),
-                                Comparator.nullsLast(Comparator.reverseOrder())))
-                .limit(DEFAULT_PROVIDER_LIMIT)
-                .collect(Collectors.toList());
-
-        return providers.stream()
-                .map(provider -> toProviderSummary(provider, locationDTO, radiusKm))
-                .collect(Collectors.toList());
-    }
-
     private int scoreProvider(Provider provider, Set<String> queryTokens) {
-        if (queryTokens == null || queryTokens.isEmpty()) {
+        if (queryTokens == null || queryTokens.isEmpty())
             return 0;
-        }
 
         String providerText = normalize(
-                Optional.ofNullable(provider.getName()).orElse("") + " "
-                        + Optional.ofNullable(provider.getBio()).orElse("") + " "
-                        + Optional.ofNullable(provider.getServiceType()).map(ServiceType::getName).orElse("") + " "
-                        + Optional.ofNullable(provider.getServiceType()).map(ServiceType::getNameAr).orElse(""));
+                (provider.getName() != null ? provider.getName() : "") + " " +
+                        (provider.getBio() != null ? provider.getBio() : "") + " " +
+                        (provider.getServiceType() != null ? provider.getServiceType().getName() : "") + " " +
+                        (provider.getServiceType() != null ? provider.getServiceType().getNameAr() : ""));
 
         return (int) queryTokens.stream().filter(providerText::contains).count();
     }
 
-    private int scoreServiceType(ServiceType serviceType, Set<String> queryTokens) {
-        if (queryTokens == null || queryTokens.isEmpty()) {
-            return 0;
-        }
-
-        String serviceText = normalize(
-                Optional.ofNullable(serviceType.getName()).orElse("") + " "
-                        + Optional.ofNullable(serviceType.getNameAr()).orElse("") + " "
-                        + Optional.ofNullable(serviceType.getDescription()).orElse(""));
-
-        int score = (int) queryTokens.stream().filter(serviceText::contains).count();
-        if (score == 0) {
-            return 0;
-        }
-
-        // Favor direct name matches over description-only matches.
-        String nameText = normalize(
-                Optional.ofNullable(serviceType.getName()).orElse("") + " "
-                        + Optional.ofNullable(serviceType.getNameAr()).orElse(""));
-        int nameScore = (int) queryTokens.stream().filter(nameText::contains).count();
-        return score + (nameScore * 2);
-    }
-
     private boolean matchesSearchText(Provider provider, ServiceType serviceType, Set<String> queryTokens) {
-        if (queryTokens == null || queryTokens.isEmpty()) {
+        if (queryTokens == null || queryTokens.isEmpty())
             return true;
-        }
-        int providerScore = scoreProvider(provider, queryTokens);
-        int serviceScore = serviceType != null ? scoreServiceType(serviceType, queryTokens) : 0;
-        return providerScore > 0 || serviceScore > 0;
+        return scoreProvider(provider, queryTokens) > 0;
     }
 
     private ProviderSummaryResponse toProviderSummary(Provider provider, LocationDTO locationDTO, Integer radiusKm) {
@@ -1356,31 +911,22 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
     private Set<String> tokenize(String text) {
         String normalized = normalize(text);
-        if (!StringUtils.hasText(normalized)) {
+        if (!StringUtils.hasText(normalized))
             return new HashSet<>();
-        }
 
         return Arrays.stream(normalized.split("\\s+"))
                 .filter(token -> token.length() >= 3)
                 .collect(Collectors.toCollection(HashSet::new));
     }
 
-    private String sanitizeForPrompt(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace("'", " ").replace("\"", " ");
-    }
-
     private String buildProviderSummaryMessage(List<ProviderSummaryResponse> providers, ServiceType serviceType) {
         String header = serviceType != null
-                ? "I found " + providers.size() + " verified providers for " + serviceType.getName() + ":"
-                : "I found these verified providers:";
+                ? "لقد وجدت " + providers.size() + " مقدم خدمة موثوق لـ " + serviceType.getName() + ":"
+                : "لقد وجدت مقدمي الخدمة الموثوقين:";
 
         String details = providers.stream()
                 .limit(3)
-                .map(provider -> provider.getName()
-                        + (provider.getAverageRating() != null ? " (" + provider.getAverageRating() + "/5)" : ""))
+                .map(p -> p.getName() + (p.getAverageRating() != null ? " (" + p.getAverageRating() + "/5)" : ""))
                 .collect(Collectors.joining(", "));
 
         return details.isBlank() ? header : header + " " + details;
@@ -1389,7 +935,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private String formatAvailabilityMessage(Long providerId, LocalDate date,
             List<ScheduleResponse.TimeSlotResponse> slots) {
         if (slots == null || slots.isEmpty()) {
-            return "No available slots were found for provider " + providerId + " on " + DATE_FORMAT.format(date) + ".";
+            return "لم يتم العثور على مواعيد متاحة للمزود " + providerId + " في تاريخ " + DATE_FORMAT.format(date);
         }
 
         String slotSummary = slots.stream()
@@ -1397,91 +943,112 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .map(slot -> TIME_FORMAT.format(slot.getStartTime()) + " - " + TIME_FORMAT.format(slot.getEndTime()))
                 .collect(Collectors.joining(", "));
 
-        return "Available slots for provider " + providerId + " on " + DATE_FORMAT.format(date) + ": " + slotSummary;
+        return "المواعيد المتاحة للمزود " + providerId + " في تاريخ " + DATE_FORMAT.format(date) + ": " + slotSummary;
+    }
+
+    private void saveUserMessage(ChatSession session, Long userId, String content) {
+        ChatMessage userMessage = ChatMessage.builder()
+                .chatSession(session)
+                .senderId(userId != null ? userId : 0L)
+                .senderRole(MessageRole.USER)
+                .content(content)
+                .type(MessageType.TEXT)
+                .isRead(true)
+                .build();
+        chatMessageRepository.save(userMessage);
+    }
+
+    private void saveAssistantMessage(ChatSession session, String content) {
+        ChatMessage assistantMessage = ChatMessage.builder()
+                .chatSession(session)
+                .senderId(0L)
+                .senderRole(MessageRole.ASSISTANT)
+                .content(content)
+                .type(MessageType.TEXT)
+                .isRead(true)
+                .build();
+        chatMessageRepository.save(assistantMessage);
+    }
+
+    private String extractJson(String text) {
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+        if (start < 0 || end <= start)
+            return null;
+        return text.substring(start, end + 1);
+    }
+
+    private LocalDate parseDateSafe(String dateText) {
+        if (!StringUtils.hasText(dateText))
+            return null;
+        try {
+            return LocalDate.parse(dateText.trim(), DATE_FORMAT);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private LocalTime parseTimeSafe(String timeText) {
+        if (!StringUtils.hasText(timeText))
+            return null;
+        try {
+            return LocalTime.parse(timeText.trim(), TIME_FORMAT);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private String detectLanguage(String text) {
+        if (text == null)
+            return "en";
+        return text.matches(".*[\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF].*") ? "ar" : "en";
     }
 
     private boolean isConsumer(User currentUser) {
         return currentUser != null && currentUser.getRole() == UserType.CONSUMER;
     }
 
-    private String defaultReply(Intent intent) {
-        return switch (intent) {
-            case SEARCH_PROVIDERS -> "Tell me what service you need and I will suggest providers.";
-            case GET_AVAILABILITY -> "Share the provider ID and the date, and I will check the available times.";
-            case CREATE_BOOKING ->
-                "I can create the booking once I have the provider, date, time, and issue description.";
-            // case CREATE_EMERGENCY ->
-            // "Share the service type and your live location so I can create the emergency
-            // request.";
-            case CLARIFICATION -> "I need a bit more information to continue.";
-            case GENERAL -> "How can I help you today?";
-        };
-    }
-
     private String normalize(String value) {
-        if (!StringUtils.hasText(value)) {
+        if (!StringUtils.hasText(value))
             return "";
-        }
         return NON_ALPHANUMERIC.matcher(value.toLowerCase(Locale.ROOT)).replaceAll(" ").trim();
     }
 
     private boolean containsAny(String normalizedText, String... keywords) {
         for (String keyword : keywords) {
-            if (normalizedText.contains(normalize(keyword))) {
+            if (normalizedText.contains(normalize(keyword)))
                 return true;
-            }
         }
         return false;
     }
 
-    private String firstText(String primary, String secondary) {
-        return StringUtils.hasText(primary) ? primary : secondary;
-    }
-
-    private <T> T firstNonNull(T primary, T secondary) {
-        return primary != null ? primary : secondary;
-    }
+    // ==================== INNER CLASSES ====================
 
     @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class AssistantPlan {
+    private static class UnifiedAssistantResponse {
         private Action action;
         private Intent intent;
         private String reply;
-        private String detectedLanguage;
         private Long providerId;
         private String providerName;
-        private Long serviceTypeId;
         private String serviceTypeName;
-
-        @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd")
         private LocalDate requestedDate;
-
-        @com.fasterxml.jackson.annotation.JsonFormat(pattern = "HH:mm")
         private LocalTime requestedTime;
-
         private String problemDescription;
         private Integer searchRadiusKm;
-        private LocationDTO location;
+        private boolean needsClarification;
+        private List<String> missingFields;
+
+        boolean isValid() {
+            return action != null;
+        }
     }
 
-    enum Intent {
-        GENERAL,
-        SEARCH_PROVIDERS,
-        GET_AVAILABILITY,
-        CREATE_BOOKING,
-        // CREATE_EMERGENCY,
-        CLARIFICATION
+    private enum Intent {
+        GENERAL, SEARCH_PROVIDERS, GET_AVAILABILITY, CREATE_BOOKING, CLARIFICATION
     }
 
-    enum Action {
-        GENERAL,
-        SEARCH_PROVIDERS,
-        CHECK_AVAILABILITY,
-        CREATE_BOOKING,
-        ASK_CLARIFICATION
+    private enum Action {
+        GENERAL, SEARCH_PROVIDERS, CHECK_AVAILABILITY, CREATE_BOOKING, ASK_CLARIFICATION
     }
 }
