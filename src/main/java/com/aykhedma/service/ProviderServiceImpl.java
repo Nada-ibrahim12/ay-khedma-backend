@@ -986,6 +986,33 @@ public class ProviderServiceImpl implements ProviderService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlotsForDateRange(Long providerId,
+            LocalDate startDate, LocalDate endDate) {
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        if (provider.getSchedule() == null) {
+            return new ArrayList<>();
+        }
+
+        List<TimeSlot> availableSlots = timeSlotRepository.findByScheduleIdAndDateBetweenAndStatus(
+                provider.getSchedule().getId(),
+                startDate,
+                endDate,
+                TimeSlotStatus.AVAILABLE);
+
+        if (availableSlots.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return toDiscreteStartTimeResponses(availableSlots, null).stream()
+                .sorted(Comparator
+                        .comparing(ScheduleResponse.TimeSlotResponse::getDate)
+                        .thenComparing(ScheduleResponse.TimeSlotResponse::getStartTime))
+                .collect(Collectors.toList());
+    }
     // /**
     // * Helper method to generate time slots for a working day
     // */

@@ -235,31 +235,42 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 ## YOUR TASK:
                 Analyze the user's message and return a SINGLE JSON response that captures their intent.
 
-                ## CRITICAL RULES:
-                1. This platform covers ALL professions - don't assume it's only "home services"
-                2. Understand the user's request by MEANING, not exact keywords
-                3. If the user describes a profession or need, map it to the appropriate service type
-                4. Never invent provider IDs or fake data
-                5. If missing critical information, set needsClarification=true and list missingFields
-                6. For unauthenticated users, prevent CREATE_BOOKING action
-                7. For urgent requests (طوارئ, emergency), set searchRadiusKm=5
+                ## AVAILABLE ACTIONS (MUST USE ONE OF THESE):
+                1. SEARCH_PROVIDERS - When user wants to FIND or SEARCH for providers (e.g., "دكتور", "سباك", "عايز حد يصلح التكييف", "جيبلي دكاترة", "فين اقرب سباك")
+                2. CHECK_AVAILABILITY - When user wants to SEE AVAILABLE TIME SLOTS for a SPECIFIC provider (e.g., "وريني المواعيد عند دكتور أحمد", "طارق أحمد متاح امتى", "عندي عنده مواعيد", "شوفيلي جدول دكتور محمد")
+                3. CREATE_BOOKING - When user wants to BOOK or RESERVE an appointment with specific provider, date, and time
+                4. ASK_CLARIFICATION - When missing critical information needed to proceed
+                5. GENERAL - For casual conversation, greetings, or questions not related to finding/booking services
 
-                ## HOW TO UNDERSTAND DIFFERENT REQUESTS:
+                ## CRITICAL RULES FOR CHECK_AVAILABILITY:
+                - Use CHECK_AVAILABILITY when user wants to VIEW available time slots for a SPECIFIC provider
+                - Keywords: "وريني المواعيد", "متاح امتى", "available slots", "show me schedule", "شوفيلي جدول", "عندي عنده مواعيد"
 
-                | User says (Arabic/English) | Meaning | Expected action |
-                |---------------------------|---------|-----------------|
-                | "أنا تعبان / دكتور / عندي وجع" | Needs medical service | SEARCH_PROVIDERS with serviceTypeName="طبيب" or any medical service |
-                | "مهندس / تصميم فيلا / مخطط" | Needs architectural/engineering service | SEARCH_PROVIDERS with serviceTypeName related to engineering |
-                | "محامي / قضية / عقد" | Needs legal service | SEARCH_PROVIDERS for lawyers or legal services |
-                | "مبرمج / موقع ويب / تطبيق" | Needs tech/programming service | SEARCH_PROVIDERS for developers |
-                | "سباك / مواسير / حمام بايظ" | Needs plumbing service | SEARCH_PROVIDERS for plumbing |
-                | "كهربائي / فيشة / قطع الكهرباء" | Needs electrical service | SEARCH_PROVIDERS for electrical |
-                | "الحوض مسرب / الحنفية بتقطر" | Needs plumbing repair | SEARCH_PROVIDERS for pipe repair |
-                | "عايز أحجز مع [اسم] يوم [تاريخ]" | Wants to book appointment | CREATE_BOOKING with extracted data |
-                | "متاح دلوقتي / طوارئ" | Urgent immediate need | SEARCH_PROVIDERS with problemDescription="emergency", searchRadiusKm=5 |
+                - REQUIRED fields:
+                  * providerName OR providerId (extract from user message) - REQUIRED!
+
+                - OPTIONAL fields (user may or may not provide):
+                  * requestedDate - If user provides a date, use it. If NOT provided, set to null (DO NOT ask for it!)
+
+                - BEHAVIOR:
+                  * If user provides a specific date: check availability for that date only
+                  * If user does NOT provide a date: we will show upcoming availability (next 7 days)
+                  * NEVER set needsClarification=true just because requestedDate is missing
+                  * NEVER add requestedDate to missingFields
+
+                ## CRITICAL RULES FOR CREATE_BOOKING:
+                - Use CREATE_BOOKING when user wants to MAKE a booking or appointment
+                - Keywords: "احجز", "حجز", "book", "appointment", "عايز أحجز"
+                - REQUIRED: providerName/providerId, requestedDate, requestedTime, problemDescription
+                - If missing ANY of these, set needsClarification=true and list missingFields
+                - For unauthenticated users, set action=ASK_CLARIFICATION with message to login
+
+                ## CRITICAL RULES FOR SEARCH_PROVIDERS:
+                - Use SEARCH_PROVIDERS when user wants to FIND providers
+                - For urgent needs, set problemDescription="emergency" and searchRadiusKm=5
 
                 ## OUTPUT FORMAT:
-                Return ONLY valid JSON. No extra text, no explanation.
+                Return ONLY valid JSON. No extra text, no explanation, no markdown.
 
                 {
                   "action": "SEARCH_PROVIDERS | CHECK_AVAILABILITY | CREATE_BOOKING | ASK_CLARIFICATION | GENERAL",
@@ -278,42 +289,96 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
                 ## EXAMPLES:
 
-                ### Medical Request:
+                ### Example 1: CHECK_AVAILABILITY (with date provided)
+                User: "وريني المواعيد عند طارق أحمد يوم الأحد"
+                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"تمام، ببحثلك عن المواعيد المتاحة عند طارق أحمد يوم الأحد","providerName":"طارق أحمد","requestedDate":"2026-05-07","needsClarification":false}
+
+                ### Example 2: CHECK_AVAILABILITY (without date - just show upcoming)
+                User: "وريني المواعيد المتاحة عند طارق أحمد"
+                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"تمام، ببحثلك عن أقرب المواعيد المتاحة عند طارق أحمد","providerName":"طارق أحمد","requestedDate":null,"needsClarification":false}
+
+                ### Example 3: CHECK_AVAILABILITY (Arabic slang)
+                User: "شوفيلي جدول دكتور محمد"
+                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"ببحثلك عن جدول مواعيد دكتور محمد للأيام القادمة","providerName":"دكتور محمد","requestedDate":null,"needsClarification":false}
+
+                ### Example 4: CHECK_AVAILABILITY (plural)
+                User: "عند دكتور أسماء مواعيد امتى"
+                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"ببحثلك عن المواعيد المتاحة عند دكتورة أسماء","providerName":"دكتور أسماء","requestedDate":null,"needsClarification":false}
+
+                ### Example 5: CHECK_AVAILABILITY (with provider ID)
+                User: "وريني المواعيد عند provider 123"
+                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"ببحثلك عن المواعيد المتاحة للمزود رقم 123","providerId":123,"requestedDate":null,"needsClarification":false}
+
+                ### Example 6: CREATE_BOOKING (all info provided)
+                User: "عايز احجز مع دكتور محمد يوم الأحد الساعة 4، عندي صداع"
+                → {"action":"CREATE_BOOKING","intent":"CREATE_BOOKING","reply":"تمام، هحجزلك مع دكتور محمد يوم الأحد الساعة 4 لعلاج الصداع","providerName":"دكتور محمد","requestedDate":"2026-05-07","requestedTime":"16:00","problemDescription":"صداع"}
+
+                ### Example 7: CREATE_BOOKING (missing info - needs clarification)
+                User: "عايز احجز مع دكتور محمد"
+                → {"action":"CREATE_BOOKING","intent":"CREATE_BOOKING","reply":"تمام، هحجزلك مع دكتور محمد. محتاج منك التاريخ والوقت ووصف المشكلة","providerName":"دكتور محمد","needsClarification":true,"missingFields":["requestedDate","requestedTime","problemDescription"]}
+
+                ### Example 8: SEARCH_PROVIDERS (medical)
                 User: "أنا تعبان وعندي صداع"
                 → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"ممكن توصفلي الأعراض بالتفصيل عشان أقترح دكتور مناسب؟","serviceTypeName":"طبيب","needsClarification":true,"missingFields":["symptoms"]}
 
-                ### Engineering Request:
-                User: "عايز مهندس معماري يصمم فيلا"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، بدورلك على مهندسين معماريين متخصصين في تصميم الفلل. ممكن تقولي في أي منطقة؟","serviceTypeName":"مهندس معماري","searchRadiusKm":10}
-
-                ### Legal Request:
-                User: "عايز محامي للقضية بتاعتي"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"فهمت، محتاج محامي. ممكن توصف نوع القضية عشان ألاقي لك المتخصص المناسب؟","serviceTypeName":"محامي","needsClarification":true,"missingFields":["caseType"]}
-
-                ### Tech Request:
-                User: "عايز مبرمج يعمل لي تطبيق"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، هدورلك على مبرمجين متخصصين في تطوير التطبيقات. نوع التطبيق إيه؟","serviceTypeName":"مبرمج","needsClarification":true,"missingFields":["appType"]}
-
-                ### Home Service (Plumbing):
+                ### Example 9: SEARCH_PROVIDERS (home service)
                 User: "الحوض عندي مسرب"
                 → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، سأبحث لك عن سباكين متاحين في منطقتك.","serviceTypeName":"سباك","searchRadiusKm":10}
 
-                ### Urgent:
+                ### Example 10: SEARCH_PROVIDERS (engineering)
+                User: "عايز مهندس معماري يصمم فيلا"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، بدورلك على مهندسين معماريين متخصصين في تصميم الفلل. ممكن تقولي في أي منطقة؟","serviceTypeName":"مهندس معماري","searchRadiusKm":10}
+
+                ### Example 11: SEARCH_PROVIDERS (legal)
+                User: "عايز محامي للقضية بتاعتي"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"فهمت، محتاج محامي. ممكن توصف نوع القضية عشان ألاقي لك المتخصص المناسب؟","serviceTypeName":"محامي","needsClarification":true,"missingFields":["caseType"]}
+
+                ### Example 12: SEARCH_PROVIDERS (tech)
+                User: "عايز مبرمج يعمل لي تطبيق"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، هدورلك على مبرمجين متخصصين في تطوير التطبيقات. نوع التطبيق إيه؟","serviceTypeName":"مبرمج","needsClarification":true,"missingFields":["appType"]}
+
+                ### Example 13: SEARCH_PROVIDERS (urgent/emergency)
                 User: "طوارئ كهربائي البيت وقعت الكهرباء"
                 → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"فهمت، حالة طارئة. هدورلك على كهربائي قريب منك جداً.","serviceTypeName":"كهربائي","problemDescription":"emergency","searchRadiusKm":5}
 
-                ### Booking with Provider Name:
-                User: "عايز احجز مع دكتور محمد يوم الأحد الساعة 4"
-                → {"action":"CREATE_BOOKING","intent":"CREATE_BOOKING","reply":"تمام، هحجزلك مع دكتور محمد يوم الأحد الساعة 4. محتاج وصف المشكلة","providerName":"محمد","requestedDate":"2026-05-07","requestedTime":"16:00","needsClarification":true,"missingFields":["problemDescription"]}
-
-                ### General Chat:
+                ### Example 14: GENERAL (greeting)
                 User: "السلام عليكم"
-                → {"action":"GENERAL","intent":"GENERAL","reply":"وعليكم السلام ورحمة الله! كيف أقدر أساعدك اليوم؟ ممكن تطلب أي خدمة أو تحجز مع أي مزود."}
+                → {"action":"GENERAL","intent":"GENERAL","reply":"وعليكم السلام ورحمة الله وبركاته! كيف أقدر أساعدك اليوم؟ ممكن تطلب أي خدمة - دكتور، مهندس، محامي، سباك، كهربائي، أو تحجز مع أي مزود."}
 
-                ## CONTEXT:
-                Current user role: """
-                + userRole + """
-                        Today's date: """ + LocalDate.now() + """
+                ### Example 15: GENERAL (question about app)
+                User: "إيه الخدمات اللي عندكم؟"
+                → {"action":"GENERAL","intent":"GENERAL","reply":"أي خدمة - أي حرفة - أي مهنة. عندنا أطباء، مهندسين، محامين، سباكين، كهربائيين، مبرمجين، معلمين، ومئات المهن التانية. ممكن تطلب أي خدمة واحنا ندورلك على أفضل مقدمي الخدمة في منطقتك."}
+
+                ## DATE HANDLING:
+                Today's date is: """
+                + LocalDate.now() + """
+                        - "بكرا" / "tomorrow" → """ + LocalDate.now().plusDays(1)
+                + """
+                        - "الأحد" / "Sunday" → next Sunday from today
+                        - "الأحد القادم" / "next Sunday" → the Sunday after this week
+                        - Always use format "yyyy-MM-dd"
+                        - If user doesn't provide a date, set requestedDate = null (DO NOT ask for it in CHECK_AVAILABILITY)
+
+                        ## TIME HANDLING:
+                        - "الساعة 4" / "4" → "16:00" (if context is PM/evening) or "04:00"
+                        - "الساعة 4 العصر" / "4 PM" → "16:00"
+                        - "الساعة 10 صباحاً" / "10 AM" → "10:00"
+                        - Always use 24-hour format "HH:mm"
+
+                        ## CONTEXT:
+                        Current user role: """
+                + userRole
+                + """
+                        - If role = "anonymous" or role = "null" or role = "ANONYMOUS", user is NOT logged in
+                        - For CREATE_BOOKING when user is anonymous, set action=ASK_CLARIFICATION and reply: "يرجى تسجيل الدخول أولاً للحجز / Please login first to book"
+                        - For SEARCH_PROVIDERS and CHECK_AVAILABILITY, anonymous users ARE allowed
+
+                        ## REMEMBER:
+                        - Return ONLY valid JSON
+                        - No explanation outside JSON
+                        - No markdown formatting around JSON
+                        - Always use double quotes for JSON properties
+                        - Keep replies concise, friendly, and helpful in Arabic or English matching the user's language
                         """;
     }
 
@@ -359,15 +424,33 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             response.searchRadiusKm = node.hasNonNull("searchRadiusKm") && node.path("searchRadiusKm").canConvertToInt()
                     ? node.path("searchRadiusKm").asInt()
                     : DEFAULT_SEARCH_RADIUS_KM;
+
+            // Parse needsClarification from Gemini
             response.needsClarification = node.path("needsClarification").asBoolean(false);
 
+            // Parse missingFields array and filter based on action
             if (node.has("missingFields") && node.path("missingFields").isArray()) {
                 response.missingFields = new ArrayList<>();
                 for (JsonNode field : node.path("missingFields")) {
-                    response.missingFields.add(field.asText());
+                    String missingField = field.asText();
+
+                    // For CHECK_AVAILABILITY, requestedDate is optional - don't treat as missing
+                    if (response.action == Action.CHECK_AVAILABILITY && "requestedDate".equals(missingField)) {
+                        log.debug("CHECK_AVAILABILITY: Ignoring requestedDate as missing field (date is optional)");
+                        continue;
+                    }
+
+                    response.missingFields.add(missingField);
                 }
             }
 
+            // If missingFields is empty after filtering, reset needsClarification to false
+            if (response.missingFields != null && response.missingFields.isEmpty()) {
+                response.needsClarification = false;
+                response.missingFields = null;
+            }
+
+            // Set default action if still null
             if (response.action == null) {
                 response.action = Action.ASK_CLARIFICATION;
                 response.intent = Intent.CLARIFICATION;
@@ -644,7 +727,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             double ratingScore = provider.getAverageRating() * 10;
             score += ratingScore;
         } else {
-            score += 25; 
+            score += 25;
         }
 
         return score;
@@ -827,21 +910,82 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private ChatResponse handleAvailabilityAction(UnifiedAssistantResponse unified,
             ChatResponse.ChatResponseBuilder responseBuilder) {
 
-        if (unified.providerId == null || unified.requestedDate == null) {
+        Long providerId = unified.providerId;
+
+        if (providerId == null && StringUtils.hasText(unified.providerName)) {
+            providerId = resolveProviderIdByName(unified.providerName);
+        }
+
+        if (providerId == null) {
             return responseBuilder
                     .responseType(ChatResponseType.CLARIFICATION)
-                    .message("محتاج معرف المزود والتاريخ للتحقق من المواعيد.")
+                    .message("محتاج اسم المزود عشان أقدر أوريك مواعيده. ممكن تقولي اسمه بالكامل؟")
                     .build();
         }
 
-        List<ScheduleResponse.TimeSlotResponse> slots = providerService.getAvailableTimeSlots(
-                unified.providerId, unified.requestedDate);
+        LocalDate targetDate = unified.requestedDate;
+        List<ScheduleResponse.TimeSlotResponse> slots;
 
-        return responseBuilder
-                .responseType(ChatResponseType.AVAILABLE_SLOTS)
-                .availableTimeSlots(slots)
-                .message(formatAvailabilityMessage(unified.providerId, unified.requestedDate, slots))
-                .build();
+        if (targetDate == null) {
+            log.info("No date specified for provider {}, fetching upcoming availability for next 7 days", providerId);
+            slots = providerService.getAvailableTimeSlotsForDateRange(providerId,
+                    LocalDate.now().plusDays(1),
+                    LocalDate.now().plusDays(7));
+
+            if (slots.isEmpty()) {
+                return responseBuilder
+                        .responseType(ChatResponseType.AVAILABLE_SLOTS)
+                        .availableTimeSlots(slots)
+                        .message("عذراً، لا توجد مواعيد متاحة حالياً للأيام القادمة. حاول مرة أخرى لاحقاً.")
+                        .build();
+            }
+
+            return responseBuilder
+                    .responseType(ChatResponseType.AVAILABLE_SLOTS)
+                    .availableTimeSlots(slots)
+                    .message(formatUpcomingAvailabilityMessage(unified.providerName, slots))
+                    .build();
+        } else {
+            slots = providerService.getAvailableTimeSlots(providerId, targetDate);
+
+            return responseBuilder
+                    .responseType(ChatResponseType.AVAILABLE_SLOTS)
+                    .availableTimeSlots(slots)
+                    .message(formatAvailabilityMessage(providerId, targetDate, slots))
+                    .build();
+        }
+    }
+
+    private String formatUpcomingAvailabilityMessage(String providerName,
+            List<ScheduleResponse.TimeSlotResponse> slots) {
+        if (slots == null || slots.isEmpty()) {
+            return "لا توجد مواعيد متاحة لـ " + (providerName != null ? providerName : "هذا المزود")
+                    + " في الأيام القادمة.";
+        }
+
+        Map<LocalDate, List<ScheduleResponse.TimeSlotResponse>> slotsByDate = slots.stream()
+                .collect(Collectors.groupingBy(slot -> parseDateSafe(slot.getDate())));
+
+        slotsByDate.remove(null);
+
+        StringBuilder message = new StringBuilder();
+        message.append("المواعيد المتاحة لـ ").append(providerName != null ? providerName : "المزود")
+                .append(" خلال الأيام القادمة:\n\n");
+
+        int dateCount = 0;
+        for (Map.Entry<LocalDate, List<ScheduleResponse.TimeSlotResponse>> entry : slotsByDate.entrySet()) {
+            if (dateCount++ >= 7)
+                break;
+            message.append("📅 ").append(DATE_FORMAT.format(entry.getKey())).append(":\n");
+            String times = entry.getValue().stream()
+                    .limit(3)
+                    .map(slot -> TIME_FORMAT.format(slot.getStartTime()) + " - "
+                            + TIME_FORMAT.format(slot.getEndTime()))
+                    .collect(Collectors.joining(", "));
+            message.append("   🕐 ").append(times).append("\n");
+        }
+
+        return message.toString();
     }
 
     private LocationDTO resolveSearchLocation(User currentUser, AiChatRequest request) {
