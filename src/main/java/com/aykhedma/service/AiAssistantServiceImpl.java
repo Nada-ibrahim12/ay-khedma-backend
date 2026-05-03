@@ -146,7 +146,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         String messageToStore = isVoiceNote ? "🎤 [Voice] " + userMessage : userMessage;
         saveUserMessage(session, userId != null ? userId : 0L, messageToStore);
 
-        AiChatRequest modifiedRequest = AiChatRequest.builder()
+        AiChatRequest effectiveRequest = AiChatRequest.builder()
                 .sessionId(request.getSessionId())
                 .message(userMessage)
                 .providerId(request.getProviderId())
@@ -156,9 +156,9 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .location(request.getLocation())
                 .build();
 
-        UnifiedAssistantResponse unifiedResponse = getUnifiedResponse(request, currentUser, recentHistory);
+        UnifiedAssistantResponse unifiedResponse = getUnifiedResponse(effectiveRequest, currentUser, recentHistory);
 
-        ChatResponse chatResponse = executeAction(request, currentUser, unifiedResponse);
+        ChatResponse chatResponse = executeAction(effectiveRequest, currentUser, unifiedResponse);
 
         saveAssistantMessage(session, chatResponse.getMessage());
 
