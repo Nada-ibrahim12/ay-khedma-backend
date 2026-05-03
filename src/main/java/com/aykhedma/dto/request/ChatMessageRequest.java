@@ -42,7 +42,7 @@ public class ChatMessageRequest {
     private String mediaUrl;
     private List<MultipartFile> mediaFiles;
 
-    private MessageType type = MessageType.TEXT;
+    private MessageType type ;
 
     @AssertTrue(message = "Either roomId or sessionId must be provided")
     private boolean isValidChat() {
