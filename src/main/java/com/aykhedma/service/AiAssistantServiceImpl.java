@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -62,6 +63,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ServiceCategoryRepository categoryRepository;
+    private final SpeechToTextService speechToTextService;
 
     @Override
     public ChatResponse getChat(String sessionId) {
@@ -97,8 +99,40 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
     @Override
     public ChatResponse chat(AiChatRequest request, User currentUser) {
-        if (request == null || !StringUtils.hasText(request.getMessage())) {
-            throw new BadRequestException("Message is required");
+
+        String userMessage = request.getMessage();
+        boolean isVoiceNote = request.getVoiceNote() != null && !request.getVoiceNote().isEmpty();
+
+        if (isVoiceNote) {
+            log.info("Received voice note in chat request, starting transcription");
+
+            try {
+                String transcribedText = speechToTextService.transcribeAudio(request.getVoiceNote());
+                if (StringUtils.hasText(transcribedText)) {
+                    userMessage = transcribedText;
+                    log.info("Voice transcribed to: {}", userMessage);
+                } else {
+                    Long userId = currentUser != null ? currentUser.getId() : null;
+                    ChatSession session = resolveSession(request, userId);
+                    saveUserMessage(session, userId != null ? userId : 0L, "[Voice note - transcription failed]");
+                    saveAssistantMessage(session,
+                            "عذراً، لم أتمكن من تحويل الرسالة الصوتية. ممكن تعيد تسجيلها أو تكتبها نصياً؟");
+                    return ChatResponse.builder()
+                            .sessionId(session.getSessionId())
+                            .timestamp(LocalDateTime.now())
+                            .message("عذراً، لم أتمكن من تحويل الرسالة الصوتية. ممكن تعيد تسجيلها أو تكتبها نصياً؟")
+                            .responseType(ChatResponseType.CLARIFICATION)
+                            .detectedLanguage("ar")
+                            .build();
+                }
+            } catch (IOException e) {
+                log.error("Error occurred while transcribing voice note", e);
+                userMessage = request.getMessage();
+            }
+        }
+
+        if (!StringUtils.hasText(userMessage)) {
+            throw new BadRequestException("Message or voice note is required");
         }
 
         Long userId = currentUser != null ? currentUser.getId() : null;
@@ -109,7 +143,18 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId());
         List<ChatMessage> recentHistory = getRecentHistory(fullHistory, MAX_HISTORY_TURNS);
 
-        saveUserMessage(session, userId, request.getMessage());
+        String messageToStore = isVoiceNote ? "🎤 [Voice] " + userMessage : userMessage;
+        saveUserMessage(session, userId != null ? userId : 0L, messageToStore);
+
+        AiChatRequest modifiedRequest = AiChatRequest.builder()
+                .sessionId(request.getSessionId())
+                .message(userMessage)
+                .providerId(request.getProviderId())
+                .serviceTypeId(request.getServiceTypeId())
+                .requestedDate(request.getRequestedDate())
+                .requestedTime(request.getRequestedTime())
+                .location(request.getLocation())
+                .build();
 
         UnifiedAssistantResponse unifiedResponse = getUnifiedResponse(request, currentUser, recentHistory);
 

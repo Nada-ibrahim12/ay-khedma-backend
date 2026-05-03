@@ -151,7 +151,7 @@ public class ConsumerController {
         }
 
 
-        @PreAuthorize("hasRole('CONSUMER")
+        @PreAuthorize("hasRole('CONSUMER')")
         @GetMapping("/me/saved-providers/{providerId}/exists")
         @Operation(summary = "Check if a provider is in my saved/favorites list")
         @ApiResponses(value = {

@@ -236,6 +236,26 @@ class ConsumerControllerTest {
         }
 
         @Test
+        @DisplayName("GET /api/consumers/{id}/saved-providers/{providerId}/exists - Should return 200 when saved")
+        void checkIfProviderIsSaved_ShouldReturn200WhenSaved() throws Exception {
+                when(consumerService.isProviderSaved(PROVIDER_ID, CONSUMER_ID)).thenReturn(true);
+
+                mockMvc.perform(get("/api/v1/consumers/me/saved-providers/{providerId}/exists", PROVIDER_ID)
+                                .with(authenticatedConsumer()))
+                                .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("GET /api/consumers/{id}/saved-providers/{providerId}/exists - Should return 204 when not saved")
+        void checkIfProviderIsSaved_ShouldReturn204WhenNotSaved() throws Exception {
+                when(consumerService.isProviderSaved(PROVIDER_ID, CONSUMER_ID)).thenReturn(false);
+
+                mockMvc.perform(get("/api/v1/consumers/me/saved-providers/{providerId}/exists", PROVIDER_ID)
+                                .with(authenticatedConsumer()))
+                                .andExpect(status().isNoContent());
+        }
+
+        @Test
         @DisplayName("POST /api/consumers/{id}/profile-picture - Should upload profile picture")
         void updateProfilePicture_ShouldReturnUpdatedConsumer() throws Exception {
                 // Arrange
