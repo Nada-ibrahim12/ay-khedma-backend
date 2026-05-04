@@ -405,10 +405,12 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                         - If user doesn't provide a date, set requestedDate = null (DO NOT ask for it in CHECK_AVAILABILITY)
 
                         ## TIME HANDLING:
-                        - "الساعة 4" / "4" → "16:00" (if context is PM/evening) or "04:00"
-                        - "الساعة 4 العصر" / "4 PM" → "16:00"
-                        - "الساعة 10 صباحاً" / "10 AM" → "10:00"
-                        - Always use 24-hour format "HH:mm"
+                        - "الساعة 4" / "4" → If user provides afternoon context, use "16:00", otherwise ask for clarification
+                        - "الساعة 4 العصر" / "4 PM" / "16:00" → "16:00" (24-hour format)
+                        - "الساعة 10 صباحاً" / "10 AM" / "10:00" → "10:00" (24-hour format)
+                        - "1:30" / "1.30" / "الساعة 1:30" → interpret as "13:30" in afternoon context, otherwise "01:30" if explicitly AM
+                        - Always use 24-hour format "HH:mm" (00:00 to 23:59)
+                        - IMPORTANT: When time is ambiguous (like "1:30" without AM/PM), prefer afternoon (13:xx) unless context suggests morning
 
                         ## CONTEXT:
                         Current user role: """
@@ -1023,7 +1025,6 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 break;
             message.append("📅 ").append(DATE_FORMAT.format(entry.getKey())).append(":\n");
             String times = entry.getValue().stream()
-                    .limit(3)
                     .map(slot -> TIME_FORMAT.format(slot.getStartTime()) + " - "
                             + TIME_FORMAT.format(slot.getEndTime()))
                     .collect(Collectors.joining(", "));
