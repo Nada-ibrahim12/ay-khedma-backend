@@ -5,6 +5,7 @@ import com.aykhedma.dto.request.AiChatRequest;
 import com.aykhedma.dto.request.BookingRequest;
 import com.aykhedma.dto.response.*;
 import com.aykhedma.exception.BadRequestException;
+import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.model.chat.*;
 import com.aykhedma.model.location.Location;
 import com.aykhedma.model.service.ServiceCategory;
@@ -97,7 +98,8 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .build();
     }
 
-    @Override
+    private final TimeSlotRepository timeSlotRepository;
+
     public ChatResponse chat(AiChatRequest request, User currentUser) {
 
         String userMessage = request.getMessage();
@@ -932,6 +934,39 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         }
 
         try {
+            Provider provider = providerRepository.findById(providerId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+            if (provider.getSchedule() == null) {
+                return responseBuilder
+                        .responseType(ChatResponseType.ERROR)
+                        .message("لا يمتلك المزود جدول مواعيد محدد.")
+                        .build();
+            }
+
+            boolean isTimeAvailable = timeSlotRepository.isTimeWithinAvailableSlot(
+                    provider.getSchedule().getId(),
+                    unified.requestedDate,
+                    unified.requestedTime);
+
+            if (!isTimeAvailable) {
+                List<ScheduleResponse.TimeSlotResponse> availableSlots = providerService
+                        .getAvailableTimeSlots(providerId, unified.requestedDate);
+
+                String slotMessage;
+                if (availableSlots.isEmpty()) {
+                    slotMessage = "للأسف، لا توجد مواعيد متاحة في هذا التاريخ. الرجاء اختيار تاريخ آخر.";
+                } else {
+                    slotMessage = "المكان المطلوب غير متاح. اختر من المواعيد المتاحة التالية:";
+                }
+
+                return responseBuilder
+                        .responseType(ChatResponseType.AVAILABLE_SLOTS)
+                        .availableTimeSlots(availableSlots)
+                        .message(slotMessage)
+                        .build();
+            }
+
             BookingResponse bookingResponse = bookingService.requestBooking(currentUser.getId(),
                     BookingRequest.builder()
                             .providerId(providerId)
@@ -944,6 +979,31 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                     .responseType(ChatResponseType.BOOKING_CREATED)
                     .booking(bookingResponse)
                     .message("تم إنشاء طلب الحجز بنجاح رقم #" + bookingResponse.getId())
+                    .build();
+        } catch (BadRequestException ex) {
+            log.warn("Booking validation failed: {}", ex.getMessage());
+
+            if (ex.getMessage() != null && ex.getMessage().contains("TimeSlot not available")) {
+                List<ScheduleResponse.TimeSlotResponse> availableSlots = providerService
+                        .getAvailableTimeSlots(providerId, unified.requestedDate);
+
+                String slotMessage;
+                if (availableSlots.isEmpty()) {
+                    slotMessage = "للأسف، لا توجد مواعيد متاحة في هذا التاريخ. الرجاء اختيار تاريخ آخر.";
+                } else {
+                    slotMessage = "المكان المطلوب غير متاح. اختر من المواعيد المتاحة التالية:";
+                }
+
+                return responseBuilder
+                        .responseType(ChatResponseType.AVAILABLE_SLOTS)
+                        .availableTimeSlots(availableSlots)
+                        .message(slotMessage)
+                        .build();
+            }
+
+            return responseBuilder
+                    .responseType(ChatResponseType.ERROR)
+                    .message("خطأ في البيانات: " + ex.getMessage())
                     .build();
         } catch (Exception ex) {
             log.error("Booking creation failed: {}", ex.getMessage());
@@ -1212,7 +1272,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         return false;
     }
 
-    // ==================== INNER CLASSES ====================
+    // ===== INNER CLASSES =====
 
     @Data
     private static class UnifiedAssistantResponse {
