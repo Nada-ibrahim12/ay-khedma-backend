@@ -74,7 +74,6 @@ public class ChatController {
     public ResponseEntity<ChatMessageResponse> send(
             @RequestPart(required = false) String content,
             @RequestPart(required = false) List<MultipartFile> mediaFiles,
-            @RequestPart(required = false) String type,
             @RequestPart(required = false) String roomId,
             @AuthenticationPrincipal CustomUserDetails user
     ) throws IOException {
@@ -88,20 +87,9 @@ public class ChatController {
             throw new BadRequestException("Message must contain content or media");
         }
 
-        MessageType messageType;
-
-        try {
-            messageType = (type != null && !type.isBlank())
-                    ? MessageType.valueOf(type.toUpperCase())
-                    : MessageType.TEXT;
-        } catch (IllegalArgumentException e) {
-            throw new BadRequestException("Invalid message type");
-        }
-
         ChatMessageRequest request = new ChatMessageRequest();
         request.setContent(content);
         request.setMediaFiles(mediaFiles);
-        request.setType(messageType);
         request.setRoomId(roomId);
 
         return ResponseEntity.ok(

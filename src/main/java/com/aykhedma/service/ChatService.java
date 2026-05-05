@@ -107,8 +107,9 @@ public class ChatService {
     @Transactional
     public ChatMessageResponse sendMessage(User sender, ChatMessageRequest request) throws IOException {
 
-        if (sender == null)
+        if (sender == null) {
             throw new UnauthorizedException("User not authenticated");
+        }
 
         ChatRoom room = chatRoomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
@@ -116,8 +117,9 @@ public class ChatService {
         boolean allowed = room.getParticipants().stream()
                 .anyMatch(u -> u.getId().equals(sender.getId()));
 
-        if (!allowed)
+        if (!allowed) {
             throw new ForbiddenException("You are not allowed in this room");
+        }
 
         if ((request.getContent() == null || request.getContent().isBlank())
                 && (request.getMediaFiles() == null || request.getMediaFiles().isEmpty())) {
@@ -125,15 +127,28 @@ public class ChatService {
         }
 
         List<String> mediaUrls = new ArrayList<>();
+        MessageType detectedType = MessageType.TEXT;
 
-        if (request.getMediaFiles() != null) {
+        if (request.getMediaFiles() != null && !request.getMediaFiles().isEmpty()) {
+
+            MultipartFile firstFile = request.getMediaFiles().get(0);
+            String contentType = firstFile.getContentType();
+
+            if (contentType != null) {
+                if (contentType.startsWith("image/")) {
+                    detectedType = MessageType.IMAGE;
+                } else if (contentType.startsWith("video/")) {
+                    detectedType = MessageType.VIDEO;
+                } else if (contentType.startsWith("audio/")) {
+                    detectedType = MessageType.VOICE;
+                } else {
+                    detectedType = MessageType.FILE;
+                }
+            }
 
             for (MultipartFile file : request.getMediaFiles()) {
-
                 if (file != null && !file.isEmpty()) {
-
-                    var result = mediaStorageService.storeMedia(file, room.getId());
-
+                    String result = mediaStorageService.storeMedia(file, room.getId());
                     mediaUrls.add(result);
                 }
             }
@@ -145,7 +160,7 @@ public class ChatService {
                 .senderRole(MessageRole.USER)
                 .content(request.getContent() != null ? request.getContent() : "")
                 .mediaUrls(mediaUrls)
-                .type(request.getType())
+                .type(detectedType)
                 .timestamp(LocalDateTime.now())
                 .isRead(false)
                 .build();
