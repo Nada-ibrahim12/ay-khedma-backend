@@ -124,7 +124,7 @@ public class BookingServiceImpl implements BookingService {
         if (!providerId.equals(booking.getProvider().getId()))
             throw new ForbiddenException("Booking does not belong to this provider");
 
-        if (!booking.getStatus().equals(BookingStatus.PENDING))
+        if (booking.getStatus() != BookingStatus.PENDING)
             throw new BadRequestException("Booking cannot be accepted, it has already been " + booking.getStatus());
 
         LocalDateTime bookingStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
@@ -220,7 +220,7 @@ public class BookingServiceImpl implements BookingService {
         if (!providerId.equals(booking.getProvider().getId()))
             throw new ForbiddenException("Booking does not belong to this provider");
 
-        if (!booking.getStatus().equals(BookingStatus.PENDING))
+        if (booking.getStatus() != BookingStatus.PENDING)
             throw new BadRequestException("Booking cannot be declined, it has already been " + booking.getStatus());
 
         LocalDateTime bookingStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
@@ -273,12 +273,12 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
         boolean isConsumer;
-        if (user.getRole().equals(UserType.CONSUMER)) {
+        if (user.getRole() == UserType.CONSUMER) {
             if (!userId.equals(booking.getConsumer().getId()))
                 throw new ForbiddenException("Booking does not belong to this consumer");
 
             isConsumer = true;
-        } else if (user.getRole().equals(UserType.PROVIDER)) {
+        } else if (user.getRole() == UserType.PROVIDER) {
             if (!userId.equals(booking.getProvider().getId()))
                 throw new ForbiddenException("Booking does not belong to this provider");
 
@@ -286,7 +286,7 @@ public class BookingServiceImpl implements BookingService {
         } else
             throw new ForbiddenException("User is not a provider or a consumer");
 
-        if (!booking.getStatus().equals(BookingStatus.ACCEPTED))
+        if (booking.getStatus() != BookingStatus.ACCEPTED)
             throw new BadRequestException("Booking cannot be cancelled, it has already been " + booking.getStatus());
 
         LocalDateTime bookingStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
@@ -351,12 +351,12 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Page<Booking> bookings;
-        if (user.getRole().equals(UserType.CONSUMER)) {
+        if (user.getRole() == UserType.CONSUMER) {
             if (status == null)
                 bookings = bookingRepository.findByConsumerId(userId, pageable);
             else
                 bookings = bookingRepository.findByConsumerIdAndStatus(userId, status, pageable);
-        } else if (user.getRole().equals(UserType.PROVIDER)) {
+        } else if (user.getRole() == UserType.PROVIDER) {
             if (status == null)
                 bookings = bookingRepository.findByProviderId(userId, pageable);
             else
@@ -372,11 +372,11 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         List<Booking> bookings;
-        if (user.getRole().equals(UserType.CONSUMER)) {
+        if (user.getRole() == UserType.CONSUMER) {
             bookings = bookingRepository
                     .findByConsumerIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(userId, BookingStatus.ACCEPTED,
                             LocalDate.now(), LocalTime.now());
-        } else if (user.getRole().equals(UserType.PROVIDER)) {
+        } else if (user.getRole() == UserType.PROVIDER) {
             bookings = bookingRepository
                     .findByProviderIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(userId, BookingStatus.ACCEPTED,
                             LocalDate.now(), LocalTime.now());

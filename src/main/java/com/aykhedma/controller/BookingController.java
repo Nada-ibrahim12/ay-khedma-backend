@@ -57,7 +57,7 @@ public class BookingController
     // =================================== Provider Side ===================================
 
     @PreAuthorize("hasRole('PROVIDER')")
-    @PostMapping("/accept-booking")
+    @PutMapping("/accept-booking")
     @Operation(summary = "Accept a consumer's booking")
     @ApiResponses(value =
             {
@@ -85,7 +85,7 @@ public class BookingController
     }
 
     @PreAuthorize("hasRole('PROVIDER')")
-    @PostMapping("/decline-booking/{bookingId}")
+    @PutMapping("/decline-booking/{bookingId}")
     @Operation(summary = "Decline a consumer's booking")
     @ApiResponses(value =
             {
@@ -108,7 +108,7 @@ public class BookingController
     // =================================== User Side ===================================
 
     @PreAuthorize("hasAnyRole('PROVIDER','CONSUMER')")
-    @PostMapping("/cancel-booking")
+    @PutMapping("/cancel-booking")
     @Operation(summary = "Cancel user's booking")
     @ApiResponses(value =
             {
@@ -153,7 +153,7 @@ public class BookingController
 
     @PreAuthorize("hasAnyRole('PROVIDER','CONSUMER')")
     @GetMapping("/upcoming-bookings")
-    @Operation(summary = "Get user's upcoming bookings for the day")
+    @Operation(summary = "Get user's upcoming bookings for the nearest tow days")
         @ApiResponses(value =
             {
                    @ApiResponse(responseCode = "200", description = "Bookings retrieved successfully",
