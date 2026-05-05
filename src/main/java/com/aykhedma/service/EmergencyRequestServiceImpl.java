@@ -321,7 +321,7 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
             throw new BadRequestException("Provider response cannot be accepted, the emergency request has already been " + emergencyRequest.getStatus());
 
         if (providerResponse.getResponseType() != ProviderResponseType.ACCEPTED_REQUEST)
-            throw new BadRequestException("Provider response cannot be accepted, it has already been " + providerResponse.getResponseType());
+            throw new BadRequestException("Provider response cannot be accepted, provider already " + providerResponse.getResponseType());
 
         emergencyRequest.setPrice(providerResponse.getProposedPrice());
         emergencyRequest.setStatus(EmergencyRequestStatus.ACCEPTED);
@@ -363,7 +363,7 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
             throw new ForbiddenException("Provider response does not belong to an emergency request that belongs to this consumer");
 
         if (providerResponse.getResponseType() != ProviderResponseType.ACCEPTED_REQUEST)
-            throw new BadRequestException("Provider response cannot be declined, it has already been " + providerResponse.getResponseType());
+            throw new BadRequestException("Provider response cannot be declined, provider already " + providerResponse.getResponseType());
 
         if (providerResponse.getSelected() && emergencyRequest.getAcceptedProviders() == providerResponse.getProvider())
             throw new BadRequestException("Provider response cannot be declined, it has already been selected");
