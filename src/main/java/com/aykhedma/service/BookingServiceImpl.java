@@ -367,20 +367,16 @@ public class BookingServiceImpl implements BookingService {
         return bookings.map(bookingMapper::toBookingResponse);
     }
 
-    public List<BookingResponse> getUpcomingBookings(Long userId) {
+    public List<BookingResponse> getUpcomingBookings(Long userId)
+    {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         List<Booking> bookings;
-        if (user.getRole() == UserType.CONSUMER) {
-            bookings = bookingRepository
-                    .findByConsumerIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(userId, BookingStatus.ACCEPTED,
-                            LocalDate.now(), LocalTime.now());
-        } else if (user.getRole() == UserType.PROVIDER) {
-            bookings = bookingRepository
-                    .findByProviderIdAndStatusAndRequestedDateAndRequestedStartTimeAfter(userId, BookingStatus.ACCEPTED,
-                            LocalDate.now(), LocalTime.now());
-        } else
+
+        if (user.getRole() == UserType.CONSUMER || user.getRole() == UserType.PROVIDER)
+            bookings = bookingRepository.findUpcomingBookings(userId);
+        else
             throw new ForbiddenException("User is not a provider or a consumer");
 
         return bookings.stream().map(bookingMapper::toBookingResponse).toList();

@@ -67,7 +67,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
             "   (status = 'PENDING' " +
             "    AND :newStartTime <= requested_start_time " +
             "    AND requested_start_time < :newEndTime)" +
-            ")" +
+            ") " +
             "ORDER BY status",
             nativeQuery = true)
     List<Booking> findConflictingBookings(@Param("providerId") Long providerId,
@@ -80,9 +80,36 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
     @Query("UPDATE Booking b " +
             "SET b.status = 'EXPIRED', b.expiredAt = CURRENT_TIMESTAMP " +
             "WHERE b.status = 'PENDING' " +
-            "AND (b.requestedDate < :date " +
-            "OR (b.requestedDate = :date AND b.requestedStartTime < :time))")
-    void expirePendingBookings(@Param("date") LocalDate date, @Param("time") LocalTime time);
+            "AND " +
+            "(" +
+                "b.requestedDate < CURRENT_DATE " +
+                "OR (b.requestedDate = CURRENT_DATE AND b.requestedStartTime < CURRENT_TIME)" +
+            ")")
+    void expirePendingBookings();
+
+    @Query(value = "SELECT * FROM bookings " +
+            "WHERE (provider_id = :userId OR consumer_id = :userId) " +
+            "AND status = 'ACCEPTED' " +
+            "AND requested_date IN " +
+            "(" +
+            "   SELECT DISTINCT requested_date FROM bookings " +
+                "WHERE (provider_id = :userId OR consumer_id = :userId) " +
+                "AND status = 'ACCEPTED' " +
+                "AND " +
+                "(" +
+                    "requested_date > CURRENT_DATE " +
+                    "OR (requested_date = CURRENT_DATE AND requested_start_time > CURRENT_TIME)" +
+                ")" +
+                "ORDER BY requested_date ASC LIMIT 2" +
+            ") " +
+            "AND " +
+            "(" +
+                "requested_date > CURRENT_DATE " +
+                "OR (requested_date = CURRENT_DATE AND requested_start_time > CURRENT_TIME)" +
+            ") " +
+            "ORDER BY requested_date, requested_start_time",
+            nativeQuery = true)
+    List<Booking> findUpcomingBookings(@Param("userId") Long userId);
 
     @Query("SELECT b FROM Booking b WHERE b.status = 'ACCEPTED' " +
             "AND (b.consumerRating IS NULL OR b.providerRating IS NULL) " +

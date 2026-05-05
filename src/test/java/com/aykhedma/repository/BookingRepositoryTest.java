@@ -175,7 +175,7 @@ class BookingRepositoryTest {
             Booking expiring = buildBooking(BookingStatus.PENDING, date, time);
             bookingRepository.save(expiring);
 
-            bookingRepository.expirePendingBookings(LocalDate.now(), LocalTime.now());
+            bookingRepository.expirePendingBookings();
             entityManager.flush();
             entityManager.clear();
 
@@ -196,7 +196,7 @@ class BookingRepositoryTest {
             Booking pending = buildBooking(BookingStatus.PENDING, date, time);
             bookingRepository.save(pending);
 
-            bookingRepository.expirePendingBookings(LocalDate.now(), LocalTime.now());
+            bookingRepository.expirePendingBookings();
             entityManager.flush();
             entityManager.clear();
 

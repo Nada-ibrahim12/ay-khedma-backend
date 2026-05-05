@@ -19,6 +19,6 @@ public class BookingExpiryScheduler
     @Transactional
     public void expirePendingBookings ()
     {
-        bookingRepository.expirePendingBookings(LocalDate.now(), LocalTime.now());
+        bookingRepository.expirePendingBookings();
     }
 }
