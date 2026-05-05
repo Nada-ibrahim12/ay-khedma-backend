@@ -57,6 +57,8 @@ public class ProviderResponse {
     //@Column(precision = 10, scale = 2)
     private Double distance;
 
+    @Builder.Default
+    @NotNull
     private Boolean selected = false;
 
     public boolean isAccepted() {

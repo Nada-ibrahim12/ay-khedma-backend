@@ -63,6 +63,12 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
         ServiceType serviceType = serviceTypeRepository.findById(request.getServiceTypeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Service type not found"));
 
+        EmergencyRequest currentEmergencyRequest = emergencyRequestRepository.findTopByConsumerIdAndStatusInOrderByCreatedAtDesc
+                (consumerId, List.of(EmergencyRequestStatus.BROADCASTING, EmergencyRequestStatus.WAITING_ACCEPTANCE));
+
+        if (currentEmergencyRequest != null)
+            return emergencyRequestMapper.toEmergencyRequestResponse(currentEmergencyRequest);
+
         LocationDTO locationDTO = request.getLocation();
         Location location = Location.builder()
                 .latitude(locationDTO.getLatitude())

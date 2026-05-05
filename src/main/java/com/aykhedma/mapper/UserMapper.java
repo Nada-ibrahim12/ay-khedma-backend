@@ -77,10 +77,8 @@ public interface UserMapper {
     @Mapping(source = "profileImage", target = "profileImage")
     @Mapping(source = "serviceType", target = "serviceType", qualifiedByName = "mapServiceTypeToString")
     @Mapping(source = "averageRating", target = "averageRating")
-    @Mapping(source = "completedJobs", target = "completedJobs")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "priceType", target = "priceType")
-    @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")
     ProviderSummaryResponse toSummaryResponse(Provider provider);
 
     // UserResponse mapping

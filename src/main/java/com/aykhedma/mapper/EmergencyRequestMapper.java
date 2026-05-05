@@ -17,7 +17,7 @@ public interface EmergencyRequestMapper
     @Mapping(source = "price", target = "price")
     @Mapping(source = "description", target = "description")
     @Mapping(source = "status", target = "status")
-    @Mapping(source = "selectedProvider", target = "selectedProvider")
+    @Mapping(source = "selectedProvider", target = "selectedProvider", qualifiedByName = "providerSummary")
     @Mapping(source = "createdAt", target = "createdAt")
     EmergencyRequestResponse toEmergencyRequestResponse(EmergencyRequest emergencyRequest);
 }

@@ -11,28 +11,16 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProviderSummaryResponse {
-
+public class ProviderSummaryResponse
+{
     private Long id;
     private String name;
     private String profileImage;
     private String serviceType;
-    private Integer yearsOfExperience;
-    private Double averagePunctualityRating;
-    private Double averageCommitmentRating;
-    private Double averageQualityOfWorkRating;
     private Double averageRating;
-    private Integer completedJobs;
-    private Integer totalBookings;
-    private Integer cancelledBookings;
-    private Double cancellationRate;
-    private Double averageInteractionRating;
-    private Integer interactionRatingCount;
     private Double price;
     private PriceType priceType;
-    private Double distance; // in km
-    private Integer estimatedArrivalTime; // in minutes
-    private boolean emergencyEnabled;
     private LocationDTO location;
-    private String area;
+    private Double distance; // In KM
+    private Integer estimatedArrivalTime; // In minutes
 }

@@ -22,6 +22,8 @@ public interface EmergencyRequestRepository extends JpaRepository<EmergencyReque
     @Query("SELECT er FROM EmergencyRequest er JOIN er.providerResponses pr WHERE pr.provider.id = :providerId")
     List<EmergencyRequest> findRequestsWithProviderResponse(@Param("providerId") Long providerId);
 
+    EmergencyRequest findTopByConsumerIdAndStatusInOrderByCreatedAtDesc(Long consumerId, List<EmergencyRequestStatus> statuses);
+
     List<EmergencyRequest> findByConsumerIdAndStatusOrderByCreatedAtDesc(Long consumerId, EmergencyRequestStatus status);
 
     List<EmergencyRequest> findBySelectedProviderIdAndStatusOrderByCreatedAtDesc(Long providerId, EmergencyRequestStatus status);
