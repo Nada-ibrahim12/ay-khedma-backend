@@ -40,6 +40,9 @@ public class ProviderProfileRequest {
     @Size(max = 255, message = "Works at information cannot exceed 255 characters")
     private String worksAt;
 
+    @Size(max = 255, message = "Work location cannot exceed 255 characters")
+    private String workLocation;
+
     @DecimalMin(value = "0.0", inclusive = false, message = "Price must be greater than 0")
     @DecimalMax(value = "100000.0", message = "Price cannot exceed 100,000")
     private Double price;

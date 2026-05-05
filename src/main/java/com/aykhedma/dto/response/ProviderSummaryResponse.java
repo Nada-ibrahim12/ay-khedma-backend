@@ -22,6 +22,7 @@ public class ProviderSummaryResponse {
     private Double averageCommitmentRating;
     private Double averageQualityOfWorkRating;
     private Double averageRating;
+    private Double averageJobs;
     private Integer completedJobs;
     private Integer totalBookings;
     private Integer cancelledBookings;

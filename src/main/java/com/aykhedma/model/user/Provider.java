@@ -71,6 +71,10 @@ public class Provider extends User {
     @Column(length = 255)
     private String worksAt;
 
+    @Size(max = 255, message = "Work location cannot exceed 255 characters")
+    @Column(length = 255)
+    private String workLocation;
+
     @OneToMany(mappedBy = "provider", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Size(max = 20, message = "Cannot have more than 20 documents")
     @Builder.Default
@@ -178,5 +182,20 @@ public class Provider extends User {
             return 0.0;
         }
         return Math.round(((double) cancelledBookings / totalBookings) * 100.0 * 10.0) / 10.0;
+    }
+
+    public Double getAverageJobs() {
+        if (completedJobs == null || completedJobs == 0 || super.getCreatedAt() == null) {
+            return 0.0;
+        }
+        java.time.LocalDateTime created = super.getCreatedAt();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        long months = java.time.temporal.ChronoUnit.MONTHS.between(
+                java.time.LocalDate.of(created.getYear(), created.getMonth(), 1),
+                java.time.LocalDate.of(now.getYear(), now.getMonth(), 1));
+        if (months <= 0)
+            months = 1;
+        double avg = (double) completedJobs / (double) months;
+        return Math.round(avg * 10.0) / 10.0;
     }
 }
