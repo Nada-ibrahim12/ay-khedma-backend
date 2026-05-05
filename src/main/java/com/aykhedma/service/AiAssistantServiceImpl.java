@@ -284,11 +284,18 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
                 ## AVAILABLE ACTIONS (MUST USE ONE OF THESE):
                 1. SEARCH_PROVIDERS - When user wants to FIND or SEARCH for providers (e.g., "دكتور", "سباك", "عايز حد يصلح التكييف", "جيبلي دكاترة", "فين اقرب سباك")
-                2. CHECK_AVAILABILITY - When user wants to SEE AVAILABLE TIME SLOTS for a SPECIFIC provider (e.g., "وريني المواعيد عند دكتور أحمد", "طارق أحمد متاح امتى", "عندي عنده مواعيد", "شوفيلي جدول دكتور محمد")
-                3. CREATE_BOOKING - When user wants to BOOK or RESERVE an appointment with specific provider, date, and time
-                4. ASK_CLARIFICATION - When missing critical information needed to proceed
-                5. GENERAL - For casual conversation, greetings, or questions not related to finding/booking services
+                2. SUGGEST_SOLUTIONS - When user describes a problem, fault, damage, or malfunction and needs quick troubleshooting steps first
+                3. CHECK_AVAILABILITY - When user wants to SEE AVAILABLE TIME SLOTS for a SPECIFIC provider (e.g., "وريني المواعيد عند دكتور أحمد", "طارق أحمد متاح امتى", "عندي عنده مواعيد", "شوفيلي جدول دكتور محمد")
+                4. CREATE_BOOKING - When user wants to BOOK or RESERVE an appointment with specific provider, date, and time
+                5. ASK_CLARIFICATION - When missing critical information needed to proceed
+                6. GENERAL - For casual conversation, greetings, or questions not related to finding/booking services
 
+                ## CRITICAL RULES FOR SUGGEST_SOLUTIONS:
+                - Use SUGGEST_SOLUTIONS for simple, DIY issues (loose screw, stuck door, dripping tap)
+                - Offer 2-4 practical steps the user can try themselves
+                - Always include safety warnings if needed (electricity, gas, water)
+                - Ask at the end if they want provider search
+                - If issue seems dangerous/complex (broken pipe, electrical spark, gas leak), prioritize safety and suggest professional help immediately
                 ## CRITICAL RULES FOR CHECK_AVAILABILITY:
                 - Use CHECK_AVAILABILITY when user wants to VIEW available time slots for a SPECIFIC provider
                 - Keywords: "وريني المواعيد", "متاح امتى", "available slots", "show me schedule", "شوفيلي جدول", "عندي عنده مواعيد"
@@ -320,8 +327,8 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 Return ONLY valid JSON. No extra text, no explanation, no markdown.
 
                 {
-                  "action": "SEARCH_PROVIDERS | CHECK_AVAILABILITY | CREATE_BOOKING | ASK_CLARIFICATION | GENERAL",
-                  "intent": "SEARCH_PROVIDERS | GET_AVAILABILITY | CREATE_BOOKING | CLARIFICATION | GENERAL",
+                  "action": "SEARCH_PROVIDERS | SUGGEST_SOLUTIONS | CHECK_AVAILABILITY | CREATE_BOOKING | ASK_CLARIFICATION | GENERAL",
+                  "intent": "SEARCH_PROVIDERS | SUGGEST_SOLUTIONS | GET_AVAILABILITY | CREATE_BOOKING | CLARIFICATION | GENERAL",
                   "reply": "natural language response to user (Arabic if user message is Arabic, otherwise English)",
                   "providerId": number or null,
                   "providerName": string or null,
@@ -335,6 +342,24 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 }
 
                 ## EXAMPLES:
+
+                ## EXAMPLES FOR SUGGEST_SOLUTIONS:
+
+                ### Example: Electrical Issue
+                User: "اللمبة مش شغالة"
+                → {"action":"SUGGEST_SOLUTIONS","intent":"SUGGEST_SOLUTIONS","reply":"جرب: 1) غير اللمبة، 2) تأكد من الفيشة، 3) راجع القاطع. لو لسة مش شغالة، أقدر أدورلك على كهربائي.","needsClarification":false}
+
+                ### Example: Plumbing Issue
+                User: "الحنفية بتقطر"
+                → {"action":"SUGGEST_SOLUTIONS","intent":"SUGGEST_SOLUTIONS","reply":"جرب شد الصامولة أو غير الجلدة. لو القطر مستمر، أقدر أدورلك على سباك.","needsClarification":false}
+
+                ### Example: When user directly asks for provider
+                User: "جيبلي سباك"
+                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، بدورلك على سباكين في منطقتك...","serviceTypeName":"سباك"}
+
+                ### Example: Complex issue that needs professional
+                User: "الدولاب كله متكسر"
+                → {"action":"SUGGEST_SOLUTIONS","intent":"SUGGEST_SOLUTIONS","reply":"دي مشكلة أكبر من إصلاح بسيط. الأفضل تستعين بنجار محترف. عايز أدورلك على نجارين في منطقتك؟"}
 
                 ### Example 1: CHECK_AVAILABILITY (with date provided)
                 User: "وريني المواعيد عند طارق أحمد يوم الأحد"
@@ -529,36 +554,9 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             return response;
         }
 
-        if (containsAny(normalized, "تعبان", "مرض", "sick", "doctor", "طبيب", "دكتور", "صحتي")) {
-            response.action = Action.SEARCH_PROVIDERS;
-            response.intent = Intent.SEARCH_PROVIDERS;
-            response.serviceTypeName = "طبيب";
-            response.reply = "ممكن توصفلي الأعراض عشان أقترح دكتور مناسب؟";
-            response.needsClarification = true;
-            response.missingFields = List.of("symptoms");
-            return response;
-        }
-
-        if (containsAny(normalized, "سباك", "plumb", "مواسير", "مطبخ", "حمام", "تسريب")) {
-            response.action = Action.SEARCH_PROVIDERS;
-            response.intent = Intent.SEARCH_PROVIDERS;
-            response.serviceTypeName = "سباك";
-            response.reply = "بدورلك على سباكين موثوقين في منطقتك...";
-            return response;
-        }
-
-        if (containsAny(normalized, "حجز", "book", "موعد", "appointment")) {
-            response.action = Action.CREATE_BOOKING;
-            response.intent = Intent.CREATE_BOOKING;
-            response.reply = "تمام، هساعدك تحجز. محتاج منك: نوع الخدمة، المزود، التاريخ والوقت، ووصف المشكلة.";
-            response.needsClarification = true;
-            response.missingFields = List.of("serviceType", "provider", "date", "time", "problemDescription");
-            return response;
-        }
-
         response.action = Action.ASK_CLARIFICATION;
         response.intent = Intent.CLARIFICATION;
-        response.reply = "كيف يمكنني مساعدتك؟ ممكن تطلب: دكتور، سباك، كهربائي، أو حجز موعد.";
+        response.reply = "كيف أقدر أساعدك؟ ممكن توصف المشكلة بالتفصيل، وهحاول ألاقي حل مناسب أو أرشحلك مختص.";
         return response;
     }
 
@@ -575,6 +573,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
         return switch (unified.action) {
             case SEARCH_PROVIDERS -> handleProviderSearchAction(request, currentUser, unified, responseBuilder);
+            case SUGGEST_SOLUTIONS -> handleSuggestionAction(request, unified, responseBuilder);
             case CHECK_AVAILABILITY -> handleAvailabilityAction(unified, responseBuilder);
             case CREATE_BOOKING -> handleBookingAction(request, currentUser, unified, responseBuilder);
             default -> responseBuilder.responseType(ChatResponseType.TEXT).build();
@@ -611,6 +610,21 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .responseType(ChatResponseType.PROVIDER_LIST)
                 .providers(providers)
                 .message(replyMessage)
+                .build();
+    }
+
+    private ChatResponse handleSuggestionAction(AiChatRequest request,
+            UnifiedAssistantResponse unified, ChatResponse.ChatResponseBuilder responseBuilder) {
+
+        String suggestionReply = unified.reply;
+
+        if (!StringUtils.hasText(suggestionReply)) {
+            suggestionReply = "ممكن توضح المشكلة بالتفصيل عشان أقدر أساعدك بشكل أفضل.";
+        }
+
+        return responseBuilder
+                .responseType(ChatResponseType.SUGGESTION)
+                .message(suggestionReply)
                 .build();
     }
 
@@ -1272,6 +1286,26 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         return false;
     }
 
+    private String buildSolutionSuggestionReply(String normalizedMessage) {
+        if (containsAny(normalizedMessage, "كهرب", "electric", "power", "نور", "لمبة", "فيشة", "breaker", "قاطع")) {
+            return "جرب أولاً: 1) تأكد إن القاطع الرئيسي شغال، 2) راجع الفيشة والريموت، 3) افصل الجهاز 5 دقائق ورجعه تاني، 4) لو في شرر أو سخونة، افصل الكهرباء فوراً. لو المشكلة مستمرة أقدر أدورلك على كهربائي.";
+        }
+
+        if (containsAny(normalizedMessage, "تكييف", "ac", "air", "cool", "برد")) {
+            return "جرب أولاً: 1) تأكد من وضع التبريد والحرارة، 2) نظف الفلتر، 3) راجع البطاريات والريموت، 4) افصل التكييف 5 دقائق ثم شغله. لو ما اتحلّش أقدر أدورلك على فني تكييف.";
+        }
+
+        if (containsAny(normalizedMessage, "مياه", "water", "تسريب", "بيسرب", "حنفية", "ماسورة", "صرف")) {
+            return "جرب أولاً: 1) اقفل مصدر المياه، 2) راقب مكان التسريب، 3) تأكد إن الوصلات مش مفكوكة، 4) لو في كسر واضح أو التسريب كبير أقدر أدورلك على سباك.";
+        }
+
+        if (containsAny(normalizedMessage, "باب", "قفل", "lock", "مفتاح", "handle")) {
+            return "جرب أولاً: 1) تأكد إن الباب مش عالق، 2) استخدم زيت خفيف للمفصلة لو بتحتك، 3) راجع المفتاح/القفل، 4) لو القفل مكسور أقدر أدورلك على فني.";
+        }
+
+        return "ممكن نبدأ بخطوات بسيطة: 1) تأكد من مصدر المشكلة، 2) افصل/شغّل الجهاز لو ده آمن، 3) راقب إذا كان في جزء مفكوك أو توقف مفاجئ. لو المشكلة مستمرة أقدر أدورلك على مختص مناسب.";
+    }
+
     // ===== INNER CLASSES =====
 
     @Data
@@ -1295,10 +1329,10 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     private enum Intent {
-        GENERAL, SEARCH_PROVIDERS, GET_AVAILABILITY, CREATE_BOOKING, CLARIFICATION
+        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, GET_AVAILABILITY, CREATE_BOOKING, CLARIFICATION
     }
 
     private enum Action {
-        GENERAL, SEARCH_PROVIDERS, CHECK_AVAILABILITY, CREATE_BOOKING, ASK_CLARIFICATION
+        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, CHECK_AVAILABILITY, CREATE_BOOKING, ASK_CLARIFICATION
     }
 }
