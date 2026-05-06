@@ -51,6 +51,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
 
     long countByConsumerIdAndProviderRatingIsNotNull(Long consumerId);
 
+    List<Booking> findByConsumerIdAndProviderRatingIsNotNull(Long consumerId);
+
     @Query("SELECT b FROM Booking b WHERE b.provider.id = :providerId AND b.status = 'COMPLETED' ORDER BY b.completedAt DESC")
     List<Booking> findRecentCompletedBookings(@Param("providerId") Long providerId, Pageable pageable);
 

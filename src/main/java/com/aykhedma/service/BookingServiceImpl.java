@@ -590,4 +590,22 @@ public class BookingServiceImpl implements BookingService {
     private int clampRate(int value) {
         return Math.max(0, Math.min(100, value));
     }
+
+    @Override
+    public List<com.aykhedma.dto.response.ConsumerReviewResponse> getConsumerReviews(Long consumerId) {
+        if (!consumerRepository.existsById(consumerId)) {
+            throw new ResourceNotFoundException("Consumer not found");
+        }
+        List<Booking> bookings = bookingRepository.findByConsumerIdAndProviderRatingIsNotNull(consumerId);
+        return bookings.stream()
+                .map(booking -> com.aykhedma.dto.response.ConsumerReviewResponse.builder()
+                        .id(booking.getId())
+                        .providerId(booking.getProvider().getId())
+                        .providerName(booking.getProvider().getName())
+                        .rating(booking.getProviderRating())
+                        .review(booking.getProviderReview())
+                        .completedAt(booking.getCompletedAt())
+                        .build())
+                .toList();
+    }
 }
