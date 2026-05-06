@@ -173,6 +173,16 @@ public class Provider extends User {
     @Column(length = 500)
     private String rejectionReason;
 
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private boolean isNidVerified = false;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private boolean isFaceMatched = false;
+
+    private Double faceMatchConfidence;
+
     public Double getCancellationRate() {
         if (totalBookings == null || totalBookings == 0) {
             return 0.0;

@@ -41,3 +41,29 @@ src/main/resources/firebase-service-account.json
 
 # Migration
 src/main/resources/db/migration/*
+
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+
+# Model/cache files
+*.pt
+*.pth
+*.h5
+
+# IDE files
+.vscode/
+.idea/
+
+
+# OCR images
+*.jpg
+*.jpeg
+*.png
