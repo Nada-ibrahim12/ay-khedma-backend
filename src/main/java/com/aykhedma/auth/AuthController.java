@@ -76,17 +76,17 @@ public class AuthController {
     }
 
     @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "User registration (Multipart)", description = "Register new consumer or provider with profile picture and documents")
+    @Operation(summary = "User registration (Multipart)", description = "Register new consumer or provider with optional profile picture and documents")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Registration successful, OTP sent to email"),
-            @ApiResponse(responseCode = "400", description = "Validation error - invalid fields or missing required files"),
+            @ApiResponse(responseCode = "400", description = "Validation error - invalid fields"),
             @ApiResponse(responseCode = "409", description = "Conflict - email or phone already registered"),
             @ApiResponse(responseCode = "413", description = "File too large - exceeds size limit"),
             @ApiResponse(responseCode = "415", description = "Unsupported media type - invalid file format")
     })
     public ResponseEntity<String> registerWithNationalIdImages(
             @Valid @ModelAttribute RegisterRequest request,
-            @RequestParam(value = "profilePicture", required = true) MultipartFile profilePicture,
+            @RequestParam(value = "profilePicture", required = false) MultipartFile profilePicture,
             @RequestParam(value = "nationalIdFrontImage", required = false) MultipartFile nationalIdFrontImage,
             @RequestParam(value = "nationalIdBackImage", required = false) MultipartFile nationalIdBackImage,
             @RequestParam(value = "documents", required = false) List<MultipartFile> documents) {
