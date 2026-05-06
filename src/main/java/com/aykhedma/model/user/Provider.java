@@ -169,6 +169,11 @@ public class Provider extends User {
     @Max(value = 100, message = "Acceptance rate cannot exceed 100")
     private Integer acceptanceRate = 100;
 
+    @Builder.Default
+    @DecimalMin(value = "0.0", message = "Cancellation rate cannot be negative")
+    @DecimalMax(value = "100.0", message = "Cancellation rate cannot exceed 100.0")
+    private Double cancellationRate = 0.0;
+
     @Min(value = 0, message = "Response time cannot be negative")
     @Max(value = 60, message = "Response time cannot exceed 60 minutes")
     private Integer responseTime;

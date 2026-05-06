@@ -49,6 +49,11 @@ public class Consumer extends User {
     @Min(value = 0, message = "Total bookings cannot be negative")
     @Column(nullable = false)
     private Integer cancelledBookings = 0;
+    
+    @Builder.Default
+    @DecimalMin(value = "0.0", message = "Cancellation rate cannot be negative")
+    @DecimalMax(value = "100.0", message = "Cancellation rate cannot exceed 100.0")
+    private Double cancellationRate = 0.0;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "location_id")

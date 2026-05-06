@@ -811,8 +811,12 @@ public class ProviderServiceImpl implements ProviderService {
         if (booking != null) {
             restoreAvailabilityForCancelledBooking(booking);
 
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime bookingStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
+            boolean applyPenalty = now.isAfter(bookingStartTime.minusHours(2));
+
             booking.setStatus(BookingStatus.CANCELLED);
-            booking.setCancelledAt(LocalDateTime.now());
+            booking.setCancelledAt(now);
             booking.setCancelledBy("P");
 
             if (booking.getCancellationReason() == null || booking.getCancellationReason().isBlank()) {
@@ -820,7 +824,16 @@ public class ProviderServiceImpl implements ProviderService {
             }
 
             bookingRepository.save(booking);
-            providerRepository.incrementCancelledBookings(booking.getProvider().getId());
+            
+            Provider provider = booking.getProvider();
+            provider.setCancelledBookings((provider.getCancelledBookings() != null ? provider.getCancelledBookings() : 0) + 1);
+            
+            if (applyPenalty) {
+                double currentRating = provider.getAverageRating() != null ? provider.getAverageRating() : 0.0;
+                double newRating = Math.max(0.0, currentRating - 0.2);
+                provider.setAverageRating(Math.round(newRating * 10.0) / 10.0);
+            }
+            providerRepository.save(provider);
         } else {
             timeSlot.setStatus(TimeSlotStatus.AVAILABLE);
             timeSlotRepository.save(timeSlot);
