@@ -6,6 +6,7 @@ import com.aykhedma.dto.request.CancelBookingRequest;
 import com.aykhedma.dto.response.AcceptBookingResponse;
 import com.aykhedma.dto.response.BookingResponse;
 import com.aykhedma.dto.response.MonthlyBookingStatsResponse;
+import com.aykhedma.dto.response.WeeklyBookingStatsResponse;
 import com.aykhedma.model.booking.BookingStatus;
 import com.aykhedma.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -107,7 +108,24 @@ public class BookingController
     }
 
     @PreAuthorize("hasRole('PROVIDER')")
-    @GetMapping("/booking-stats")
+    @GetMapping("/weekly-booking-stats")
+    @Operation(summary = "Get provider's booking stats for the current week")
+        @ApiResponses(value =
+            {
+                   @ApiResponse(responseCode = "200", description = "Booking stats retrieved successfully",
+                           content = @Content(schema = @Schema(implementation = BookingResponse.class))),
+                   @ApiResponse(responseCode = "404", description = "Provider not found")
+            })
+    public ResponseEntity<WeeklyBookingStatsResponse> getWeeklyBookingStats(
+            @Parameter(description = "ID of the provider", required = true)
+            @AuthenticationPrincipal(expression = "user.id") Long providerId)
+    {
+        WeeklyBookingStatsResponse response = bookingService.getWeeklyBookingStats(providerId);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @PreAuthorize("hasRole('PROVIDER')")
+    @GetMapping("/monthly-booking-stats")
     @Operation(summary = "Get provider's booking stats for the last six months")
         @ApiResponses(value =
             {

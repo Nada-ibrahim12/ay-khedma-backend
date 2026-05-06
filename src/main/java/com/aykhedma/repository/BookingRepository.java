@@ -87,6 +87,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
             ")")
     void expirePendingBookings();
 
+    @Query(value = "SELECT " +
+            "SUM(CASE WHEN status IN ('COMPLETED', 'ACCEPTED') THEN 1 ELSE 0 END) AS completed_and_accepted, " +
+            "SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled " +
+            "FROM bookings " +
+            "WHERE provider_id = :providerId " +
+            "AND requested_date BETWEEN " +
+            "(date_trunc('week', CURRENT_DATE) - INTERVAL '2 days') " +
+            "AND (date_trunc('week', CURRENT_DATE) + INTERVAL '5 days')",
+            nativeQuery = true)
+    Object findBookingStatsCurrentWeek(@Param("providerId") Long providerId);
+
     @Query(value = "SELECT TO_CHAR(requested_date, 'Mon') AS month, " +
             "SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed, " +
             "SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled " +

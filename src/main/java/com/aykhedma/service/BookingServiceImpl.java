@@ -6,6 +6,7 @@ import com.aykhedma.dto.request.CancelBookingRequest;
 import com.aykhedma.dto.response.AcceptBookingResponse;
 import com.aykhedma.dto.response.BookingResponse;
 import com.aykhedma.dto.response.MonthlyBookingStatsResponse;
+import com.aykhedma.dto.response.WeeklyBookingStatsResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ForbiddenException;
 import com.aykhedma.exception.ResourceNotFoundException;
@@ -273,6 +274,23 @@ public class BookingServiceImpl implements BookingService
     }
 
     @Override
+    public WeeklyBookingStatsResponse getWeeklyBookingStats(Long providerId)
+    {
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        Object[] result = (Object[]) bookingRepository.findBookingStatsCurrentWeek(providerId);
+
+        Integer acceptedAndCompletedBookings = result[0] != null ? ((Number) result[0]).intValue() : 0;
+        Integer cancelledBookings = result[1] != null ? ((Number) result[1]).intValue() : 0;
+
+        return WeeklyBookingStatsResponse.builder()
+                .acceptedAndCompletedBookings(acceptedAndCompletedBookings)
+                .cancelledBookings(cancelledBookings)
+                .build();
+    }
+
+    @Override
     public MonthlyBookingStatsResponse getMonthlyBookingStats(Long providerId)
     {
         Provider provider = providerRepository.findById(providerId)
@@ -280,13 +298,13 @@ public class BookingServiceImpl implements BookingService
 
         List<Object[]> results = bookingRepository.findBookingStatsLastSixMonths(providerId);
         List<String> months = new ArrayList<>();
-        List<Long> completedBookings = new ArrayList<>(), cancelledBookings = new ArrayList<>();
+        List<Integer> completedBookings = new ArrayList<>(), cancelledBookings = new ArrayList<>();
 
         for (Object[] row : results)
         {
             months.add((String) row[0]);
-            completedBookings.add(((Number) row[1]).longValue());
-            cancelledBookings.add(((Number) row[2]).longValue());
+            completedBookings.add(row[1] != null ? ((Number) row[1]).intValue() : 0);
+            cancelledBookings.add(row[2] != null ? ((Number) row[2]).intValue() : 0);
         }
 
         return MonthlyBookingStatsResponse.builder()

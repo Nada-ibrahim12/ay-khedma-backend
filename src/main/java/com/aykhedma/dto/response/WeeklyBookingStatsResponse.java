@@ -5,16 +5,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MonthlyBookingStatsResponse
+public class WeeklyBookingStatsResponse
 {
-    private List<String> months;
-    private List<Integer> completedBookings;
-    private List<Integer> cancelledBookings;
-
+    private Integer acceptedAndCompletedBookings;
+    private Integer cancelledBookings;
 }
