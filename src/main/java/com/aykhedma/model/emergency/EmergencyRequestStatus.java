@@ -5,5 +5,6 @@ public enum EmergencyRequestStatus {
     WAITING_ACCEPTANCE,
     ACCEPTED,
     CANCELLED,
-    NO_PROVIDERS
+    NO_PROVIDERS,
+    EXPIRED
 }

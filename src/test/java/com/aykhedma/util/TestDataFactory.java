@@ -160,7 +160,6 @@ public class TestDataFactory {
                 .profileImage("http://test.com/provider.jpg")
                 .serviceType("Plumbing")
                 .averageRating(4.8)
-                .completedJobs(50)
                 .price(100.0)
                 .priceType(PriceType.valueOf("HOUR"))
                 .build();

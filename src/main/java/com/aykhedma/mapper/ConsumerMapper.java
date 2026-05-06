@@ -86,9 +86,6 @@ public interface ConsumerMapper {
     @Mapping(source = "profileImage", target = "profileImage")
     @Mapping(source = "serviceType.name", target = "serviceType")
     @Mapping(source = "averageRating", target = "averageRating")
-    @Mapping(source = "completedJobs", target = "completedJobs")
-    @Mapping(source = "totalBookings", target = "totalBookings")
-    @Mapping(source = "cancelledBookings", target = "cancelledBookings")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "priceType", target = "priceType")
     ProviderSummaryResponse toProviderSummary(Provider provider);
