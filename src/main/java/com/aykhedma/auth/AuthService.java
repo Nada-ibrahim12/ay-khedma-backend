@@ -97,6 +97,7 @@ public class AuthService {
             MultipartFile profilePicture,
             MultipartFile nationalIdFrontImage,
             MultipartFile nationalIdBackImage,
+            MultipartFile selfie,
             List<MultipartFile> documents) {
 
         String profileImageUrl = null;
@@ -185,9 +186,10 @@ public class AuthService {
 
             String frontImageUrl = null;
             String backImageUrl = null;
+            String selfieImageUrl = null;
 
             try {
-                validateProviderDocuments(serviceType, nationalIdFrontImage, nationalIdBackImage, documents);
+                validateProviderDocuments(serviceType, nationalIdFrontImage, nationalIdBackImage, selfie, documents);
 
                 // Build provider first to generate ID
                 Provider provider = Provider.builder()
@@ -223,8 +225,13 @@ public class AuthService {
                     backImageUrl = fileStorageService.storeFile(nationalIdBackImage, folderName);
                 }
 
+                if (selfie != null && !selfie.isEmpty()) {
+                    selfieImageUrl = fileStorageService.storeFile(selfie, folderName);
+                }
+
                 savedProvider.setNationalIdFrontImage(frontImageUrl);
                 savedProvider.setNationalIdBackImage(backImageUrl);
+                savedProvider.setSelfieImage(selfieImageUrl);
                 savedProvider = (Provider) userRepository.save(savedProvider);
 
                 saveNationalIdDocument(savedProvider, nationalIdFrontImage, frontImageUrl, "NATIONAL_ID",
@@ -233,8 +240,8 @@ public class AuthService {
                         "National ID Back");
 
                 // 🛡️ Automatic Verification using OCR & Face Matching (STRICT)
-                if (nationalIdFrontImage != null && !nationalIdFrontImage.isEmpty() && profilePicture != null && !profilePicture.isEmpty()) {
-                    String verificationError = verifyProviderStrictly(savedProvider, request.getNationalId(), nationalIdFrontImage, profilePicture);
+                if (nationalIdFrontImage != null && !nationalIdFrontImage.isEmpty() && selfie != null && !selfie.isEmpty()) {
+                    String verificationError = verifyProviderStrictly(savedProvider, request.getNationalId(), nationalIdFrontImage, selfie);
                     if (verificationError != null) {
                         // This will trigger rollback because of @Transactional
                         throw new BadRequestException(verificationError);
@@ -268,6 +275,9 @@ public class AuthService {
                 if (backImageUrl != null) {
                     fileStorageService.deleteFile(backImageUrl);
                 }
+                if (selfieImageUrl != null) {
+                    fileStorageService.deleteFile(selfieImageUrl);
+                }
                 throw new BadRequestException("Failed to upload national ID images");
             } catch (RuntimeException e) {
                 if (profileImageUrl != null) {
@@ -279,6 +289,9 @@ public class AuthService {
                 if (backImageUrl != null) {
                     fileStorageService.deleteFile(backImageUrl);
                 }
+                if (selfieImageUrl != null) {
+                    fileStorageService.deleteFile(selfieImageUrl);
+                }
                 throw e;
             }
         }
@@ -287,6 +300,7 @@ public class AuthService {
     private void validateProviderDocuments(ServiceType serviceType,
             MultipartFile front,
             MultipartFile back,
+            MultipartFile selfie,
             List<MultipartFile> documents) {
 
         if (front == null || front.isEmpty()) {
@@ -295,6 +309,10 @@ public class AuthService {
 
         if (back == null || back.isEmpty()) {
             throw new BadRequestException("National ID back image is required");
+        }
+
+        if (selfie == null || selfie.isEmpty()) {
+            throw new BadRequestException("Selfie image is required for verification");
         }
 
         if (serviceType.getRiskLevel() == RiskLevel.HIGH) {
@@ -360,7 +378,7 @@ public class AuthService {
         userRepository.updatePassword(email, passwordEncoder.encode(newPassword));
     }
 
-    private String verifyProviderStrictly(Provider provider, String expectedNid, MultipartFile idImage, MultipartFile profilePicture) {
+    private String verifyProviderStrictly(Provider provider, String expectedNid, MultipartFile idImage, MultipartFile selfie) {
         try {
             // 1. Extract NID and compare
             NidExtractionResponse nidResult = verificationService.extractNid(idImage);
@@ -368,7 +386,7 @@ public class AuthService {
             provider.setNidVerified(nidMatched);
 
             // 2. Match faces
-            FaceMatchResponse faceResult = verificationService.matchFaces(idImage, profilePicture);
+            FaceMatchResponse faceResult = verificationService.matchFaces(idImage, selfie);
             provider.setFaceMatched(faceResult.isMatch());
             provider.setFaceMatchConfidence(faceResult.getDistance());
 

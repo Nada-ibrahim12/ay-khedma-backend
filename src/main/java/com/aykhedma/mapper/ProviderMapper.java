@@ -23,6 +23,7 @@ public interface ProviderMapper {
     @Mapping(source = "yearsOfExperience", target = "yearsOfExperience")
     @Mapping(source = "nationalIdFrontImage", target = "nationalIdFrontImage")
     @Mapping(source = "nationalIdBackImage", target = "nationalIdBackImage")
+    @Mapping(source = "selfieImage", target = "selfieImage")
     @Mapping(source = "verificationStatus", target = "verificationStatus")
     @Mapping(source = "completedJobs", target = "completedJobs")
     @Mapping(source = "totalBookings", target = "totalBookings")

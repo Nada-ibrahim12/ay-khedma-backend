@@ -177,6 +177,31 @@ public class ProviderServiceImpl implements ProviderService {
         }
     }
 
+    @Override
+    @CacheEvict(value = { "searchProvidersCache", "allProvidersCache" }, allEntries = true)
+    public ProviderResponse deleteProfilePicture(Long providerId) {
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        String profileImage = provider.getProfileImage();
+
+        if (profileImage != null && !profileImage.isEmpty()) {
+            try {
+                fileStorageService.deleteFile(profileImage);
+            } catch (Exception e) {
+                // Log error but continue with deletion
+                throw new BadRequestException("Failed to delete profile picture: " + e.getMessage());
+            }
+        }
+
+        providerRepository.updateProfileImage(providerId, null);
+
+        Provider updatedProvider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
+
+        return providerMapper.toProviderResponse(updatedProvider);
+    }
+
     // @Override
     // public ProfileResponse updateProviderLocation(Long providerId, LocationDTO
     // request) {
@@ -358,10 +383,16 @@ public class ProviderServiceImpl implements ProviderService {
                         "Additional documents (certificates) are required for HIGH risk services. Please upload them before updating your service type.");
             }
 
-            provider.setVerificationStatus(VerificationStatus.PENDING);
+            // Only set to PENDING if not already VERIFIED
+            if (provider.getVerificationStatus() != VerificationStatus.VERIFIED) {
+                provider.setVerificationStatus(VerificationStatus.PENDING);
+            }
 
         } else {
-            provider.setVerificationStatus(VerificationStatus.VERIFIED);
+            // Only auto-verify if not already VERIFIED or REJECTED
+            if (provider.getVerificationStatus() == VerificationStatus.PENDING) {
+                provider.setVerificationStatus(VerificationStatus.VERIFIED);
+            }
         }
     }
 
@@ -1130,6 +1161,9 @@ public class ProviderServiceImpl implements ProviderService {
 
         document = documentRepository.save(document);
 
+        // Re-validate high risk status (will update status to PENDING if not already VERIFIED)
+        validateHighRiskProvider(provider);
+
         return DocumentResponse.builder()
                 .id(document.getId())
                 .title(document.getTitle())
@@ -1144,6 +1178,9 @@ public class ProviderServiceImpl implements ProviderService {
         List<Document> documents = documentRepository.findByProviderId(providerId);
 
         return documents.stream()
+                .filter(doc -> !doc.getType().equalsIgnoreCase("NATIONAL_ID")
+                        && !doc.getType().equalsIgnoreCase("PROFILE_IMAGE")
+                        && !doc.getType().equalsIgnoreCase("SELFIE"))
                 .map(doc -> DocumentResponse.builder()
                         .id(doc.getId())
                         .title(doc.getTitle())
@@ -1168,6 +1205,9 @@ public class ProviderServiceImpl implements ProviderService {
         }
 
         documentRepository.delete(document);
+
+        // Re-validate high risk status (ensure required documents still exist)
+        validateHighRiskProvider(document.getProvider());
 
         return ProfileResponse.builder()
                 .success(true)

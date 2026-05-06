@@ -25,6 +25,7 @@ public class ProviderResponse {
     private Integer yearsOfExperience;
     private String nationalIdFrontImage;
     private String nationalIdBackImage;
+    private String selfieImage;
     private VerificationStatus verificationStatus;
     private Integer completedJobs;
     private Integer totalBookings;

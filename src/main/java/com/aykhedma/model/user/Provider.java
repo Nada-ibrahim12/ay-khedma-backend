@@ -99,6 +99,10 @@ public class Provider extends User {
     @Column(length = 500)
     private String nationalIdBackImage;
 
+    @Size(max = 500, message = "Selfie image URL cannot exceed 500 characters")
+    @Column(length = 500)
+    private String selfieImage;
+
     @NotNull(message = "Schedule is required")
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "schedule_id", nullable = false)

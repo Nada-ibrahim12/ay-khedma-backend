@@ -46,7 +46,7 @@ src/main/resources/db/migration/*
 venv/
 .venv/
 
-# Python cache
+# Python cache-
 __pycache__/
 *.pyc
 
