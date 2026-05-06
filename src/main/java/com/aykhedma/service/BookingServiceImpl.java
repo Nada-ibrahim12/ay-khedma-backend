@@ -5,6 +5,7 @@ import com.aykhedma.dto.request.BookingRequest;
 import com.aykhedma.dto.request.CancelBookingRequest;
 import com.aykhedma.dto.response.AcceptBookingResponse;
 import com.aykhedma.dto.response.BookingResponse;
+import com.aykhedma.dto.response.MonthlyBookingStatsResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ForbiddenException;
 import com.aykhedma.exception.ResourceNotFoundException;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +35,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class BookingServiceImpl implements BookingService {
+public class BookingServiceImpl implements BookingService
+{
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final ConsumerRepository consumerRepository;
@@ -46,7 +49,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public BookingResponse requestBooking(Long consumerId, BookingRequest bookingRequest) {
+    public BookingResponse requestBooking(Long consumerId, BookingRequest bookingRequest)
+    {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
 
@@ -114,7 +118,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public AcceptBookingResponse acceptBooking(Long providerId, AcceptBookingRequest acceptBookingRequest) {
+    public AcceptBookingResponse acceptBooking(Long providerId, AcceptBookingRequest acceptBookingRequest)
+    {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -144,11 +149,13 @@ public class BookingServiceImpl implements BookingService {
         else
             scheduleId = schedule.getId();
 
-        if (!acceptBookingRequest.isOverrideWorkingHours()) {
+        if (!acceptBookingRequest.isOverrideWorkingHours())
+        {
             WorkingDay workingDay = workingDayRepository.findByScheduleIdAndDate(scheduleId, date)
                     .orElseThrow(() -> new ResourceNotFoundException("Working day by the booking date is not found"));
 
-            if (endTime.isAfter(workingDay.getEndTime())) {
+            if (endTime.isAfter(workingDay.getEndTime()))
+            {
                 return AcceptBookingResponse.builder()
                         .status("WARNING")
                         .warningMessage("The booking end time will exceed the end time of the working day")
@@ -156,9 +163,10 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        List<Booking> conflictingBookings = bookingRepository.findConflictingBookings(providerId, bookingId, date,
-                startTime, endTime);
-        if (!conflictingBookings.isEmpty()) {
+        List<Booking> conflictingBookings = bookingRepository.findConflictingBookings
+                (providerId, bookingId, date, startTime, endTime);
+        if (!conflictingBookings.isEmpty())
+        {
             return AcceptBookingResponse.builder()
                     .status("CONFLICT")
                     .conflictingBookings(conflictingBookings.stream()
@@ -210,7 +218,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public BookingResponse declineBooking(Long providerId, Long bookingId) {
+    public BookingResponse declineBooking(Long providerId, Long bookingId)
+    {
         providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -264,8 +273,33 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    public MonthlyBookingStatsResponse getMonthlyBookingStats(Long providerId)
+    {
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        List<Object[]> results = bookingRepository.findBookingStatsLastSixMonths(providerId);
+        List<String> months = new ArrayList<>();
+        List<Long> completedBookings = new ArrayList<>(), cancelledBookings = new ArrayList<>();
+
+        for (Object[] row : results)
+        {
+            months.add((String) row[0]);
+            completedBookings.add(((Number) row[1]).longValue());
+            cancelledBookings.add(((Number) row[2]).longValue());
+        }
+
+        return MonthlyBookingStatsResponse.builder()
+                .months(months)
+                .completedBookings(completedBookings)
+                .cancelledBookings(cancelledBookings)
+                .build();
+    }
+
+    @Override
     @Transactional
-    public BookingResponse cancelBooking(Long userId, CancelBookingRequest cancelBookingRequest) {
+    public BookingResponse cancelBooking(Long userId, CancelBookingRequest cancelBookingRequest)
+    {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -273,17 +307,21 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
 
         boolean isConsumer;
-        if (user.getRole() == UserType.CONSUMER) {
+        if (user.getRole() == UserType.CONSUMER)
+        {
             if (!userId.equals(booking.getConsumer().getId()))
                 throw new ForbiddenException("Booking does not belong to this consumer");
 
             isConsumer = true;
-        } else if (user.getRole() == UserType.PROVIDER) {
+        }
+        else if (user.getRole() == UserType.PROVIDER)
+        {
             if (!userId.equals(booking.getProvider().getId()))
                 throw new ForbiddenException("Booking does not belong to this provider");
 
             isConsumer = false;
-        } else
+        }
+        else
             throw new ForbiddenException("User is not a provider or a consumer");
 
         if (booking.getStatus() != BookingStatus.ACCEPTED)
@@ -304,11 +342,14 @@ public class BookingServiceImpl implements BookingService {
             booking.setCancelledBy("P");
         bookingRepository.save(booking);
 
-        if (isConsumer) {
+        if (isConsumer)
+        {
             Consumer consumer = booking.getConsumer();
             consumer.setCancelledBookings((consumer.getCancelledBookings() != null ? consumer.getCancelledBookings() : 0) + 1);
             consumerRepository.save(consumer);
-        } else {
+        }
+        else
+        {
             Provider provider = booking.getProvider();
             provider.setCancelledBookings((provider.getCancelledBookings() != null ? provider.getCancelledBookings() : 0) + 1);
             providerRepository.save(provider);
@@ -351,17 +392,21 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Page<Booking> bookings;
-        if (user.getRole() == UserType.CONSUMER) {
+        if (user.getRole() == UserType.CONSUMER)
+        {
             if (status == null)
                 bookings = bookingRepository.findByConsumerId(userId, pageable);
             else
                 bookings = bookingRepository.findByConsumerIdAndStatus(userId, status, pageable);
-        } else if (user.getRole() == UserType.PROVIDER) {
+        }
+        else if (user.getRole() == UserType.PROVIDER)
+        {
             if (status == null)
                 bookings = bookingRepository.findByProviderId(userId, pageable);
             else
                 bookings = bookingRepository.findByProviderIdAndStatus(userId, status, pageable);
-        } else
+        }
+        else
             throw new ForbiddenException("User is not a provider or a consumer");
 
         return bookings.map(bookingMapper::toBookingResponse);

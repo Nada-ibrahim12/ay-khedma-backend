@@ -5,6 +5,7 @@ import com.aykhedma.dto.request.BookingRequest;
 import com.aykhedma.dto.request.CancelBookingRequest;
 import com.aykhedma.dto.response.AcceptBookingResponse;
 import com.aykhedma.dto.response.BookingResponse;
+import com.aykhedma.dto.response.MonthlyBookingStatsResponse;
 import com.aykhedma.model.booking.BookingStatus;
 import com.aykhedma.service.BookingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -102,6 +103,23 @@ public class BookingController
             @PathVariable Long bookingId)
     {
         BookingResponse response = bookingService.declineBooking(providerId, bookingId);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @PreAuthorize("hasRole('PROVIDER')")
+    @GetMapping("/booking-stats")
+    @Operation(summary = "Get provider's booking stats for the last six months")
+        @ApiResponses(value =
+            {
+                   @ApiResponse(responseCode = "200", description = "Booking stats retrieved successfully",
+                           content = @Content(schema = @Schema(implementation = BookingResponse.class))),
+                   @ApiResponse(responseCode = "404", description = "Provider not found")
+            })
+    public ResponseEntity<MonthlyBookingStatsResponse> getMonthlyBookingStats(
+            @Parameter(description = "ID of the provider", required = true)
+            @AuthenticationPrincipal(expression = "user.id") Long providerId)
+    {
+        MonthlyBookingStatsResponse response = bookingService.getMonthlyBookingStats(providerId);
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 

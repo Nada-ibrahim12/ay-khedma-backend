@@ -87,6 +87,18 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
             ")")
     void expirePendingBookings();
 
+    @Query(value = "SELECT TO_CHAR(requested_date, 'Mon') AS month, " +
+            "SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed, " +
+            "SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled " +
+            "FROM bookings " +
+            "WHERE provider_id = :providerId " +
+            "AND requested_date >= date_trunc('month', CURRENT_DATE - INTERVAL '6 months') " +
+            "AND requested_date < date_trunc('month', CURRENT_DATE) " +
+            "GROUP BY TO_CHAR(requested_date, 'Mon'), date_trunc('month', requested_date) " +
+            "ORDER BY date_trunc('month', requested_date)",
+            nativeQuery = true)
+    List<Object[]> findBookingStatsLastSixMonths(@Param("providerId") Long providerId);
+
     @Query(value = "SELECT * FROM bookings " +
             "WHERE (provider_id = :userId OR consumer_id = :userId) " +
             "AND status = 'ACCEPTED' " +

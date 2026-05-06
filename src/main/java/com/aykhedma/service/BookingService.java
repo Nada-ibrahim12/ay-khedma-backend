@@ -5,6 +5,7 @@ import com.aykhedma.dto.request.BookingRequest;
 import com.aykhedma.dto.request.CancelBookingRequest;
 import com.aykhedma.dto.response.AcceptBookingResponse;
 import com.aykhedma.dto.response.BookingResponse;
+import com.aykhedma.dto.response.MonthlyBookingStatsResponse;
 import com.aykhedma.model.booking.BookingStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +19,8 @@ public interface BookingService
     AcceptBookingResponse acceptBooking (Long providerId, AcceptBookingRequest acceptBookingRequest);
 
     BookingResponse declineBooking (Long providerId, Long bookingId);
+
+    MonthlyBookingStatsResponse getMonthlyBookingStats (Long providerId);
 
     BookingResponse cancelBooking (Long userId, CancelBookingRequest cancelBookingRequest);
 
