@@ -66,29 +66,28 @@ public class NotificationController {
         request.forInAppChannel(userId);
 
         NotificationRequest notificationRequest = NotificationRequest.builder()
-                                .userId(userId)
-                                .type(request.getType() != null ? request.getType() : NotificationType.GENERAL)
-                                .title(request.getTitle() != null ? request.getTitle() : "Real-time Notification")
-                                .content(request.getContent() != null ? request.getContent()
-                                                : "This is a test WebSocket message")
-                                .sendInApp(true)
-                                .sendPush(false)
-                                .sendEmail(false)
-                                .sendSms(false)
-                                .data(Map.of(
-                                                "source", "ay khedma app",
-                                                "timestamp", String.valueOf(System.currentTimeMillis())))
-                                .build();
+                .userId(userId)
+                .type(request.getType() != null ? request.getType() : NotificationType.GENERAL)
+                .title(request.getTitle() != null ? request.getTitle() : "Real-time Notification")
+                .content(request.getContent() != null ? request.getContent()
+                        : "This is a test WebSocket message")
+                .sendInApp(true)
+                .sendPush(false)
+                .sendEmail(false)
+                .sendSms(false)
+                .data(Map.of(
+                        "source", "ay khedma app",
+                        "timestamp", String.valueOf(System.currentTimeMillis())))
+                .build();
 
-        notificationService.sendNotification(request);
+        notificationService.sendNotification(notificationRequest);
         return ResponseEntity.ok(buildSuccessResponse(
                 "In-app notification sent successfully",
                 userId,
-                request,
+                notificationRequest,
                 Map.of()));
     }
 
-    
     /**
      * Send a test notification (for development only)
      *
@@ -97,17 +96,17 @@ public class NotificationController {
      */
     // @PostMapping("/test/send")
     // public ResponseEntity<Map<String, Object>> sendTestNotification(
-    //         @RequestBody NotificationRequest request) {
+    // @RequestBody NotificationRequest request) {
 
-    //     log.info("Sending test notification to user: {}", request.getUserId());
+    // log.info("Sending test notification to user: {}", request.getUserId());
 
-    //     notificationService.sendNotification(request);
+    // notificationService.sendNotification(request);
 
-    //     return ResponseEntity.ok(buildSuccessResponse(
-    //             "Test notification sent",
-    //             request.getUserId(),
-    //             request.getType(),
-    //             Map.of()));
+    // return ResponseEntity.ok(buildSuccessResponse(
+    // "Test notification sent",
+    // request.getUserId(),
+    // request.getType(),
+    // Map.of()));
     // }
 
     @GetMapping
@@ -126,6 +125,40 @@ public class NotificationController {
         log.info("Fetching notifications for user: {}", userId);
         Page<NotificationDTO> notifications = notificationService.getUserNotifications(userId, pageable);
         return ResponseEntity.ok(notifications);
+    }
+
+    @GetMapping("/{notificationId}/delivery-status")
+    public ResponseEntity<com.aykhedma.dto.response.DeliveryStatusDTO> getDeliveryStatus(
+            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
+            @RequestParam(value = "userId", required = false) Long paramUserId,
+            @PathVariable Long notificationId) {
+
+        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        if (userId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        try {
+            com.aykhedma.dto.response.DeliveryStatusDTO dto = notificationService.getNotificationDeliveryStatus(userId,
+                    notificationId);
+            return ResponseEntity.ok(dto);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    @GetMapping("/failed")
+    public ResponseEntity<java.util.List<NotificationDTO>> getFailedNotifications(
+            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
+            @RequestParam(value = "userId", required = false) Long paramUserId) {
+
+        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        if (userId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        java.util.List<NotificationDTO> list = notificationService.listFailedNotifications(userId);
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/unread/count")

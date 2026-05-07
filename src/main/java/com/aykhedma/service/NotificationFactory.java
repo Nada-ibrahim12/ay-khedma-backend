@@ -11,6 +11,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.EnumSet;
+import java.util.Set;
+import com.aykhedma.model.notification.NotificationChannel;
 
 @Component
 @RequiredArgsConstructor
@@ -38,16 +41,30 @@ public class NotificationFactory {
     }
 
     private void sendNow(Long userId, NotificationType type, Map<String, Object> params) {
-        // Ensure userName is available for email templates
         if (!params.containsKey("userName")) {
             String userName = userRepository.findById(userId)
                     .map(user -> user.getName())
                     .orElse("User");
-            params = new HashMap<>(params); // Create mutable copy
+            params = new HashMap<>(params);
             params.put("userName", userName);
         }
 
         NotificationRequest request = createRequest(userId, type, params);
+
+        if (request.getMethods() == null || request.getMethods().isEmpty()) {
+            Set<NotificationChannel> methods = EnumSet.noneOf(NotificationChannel.class);
+            if (request.isSendPush())
+                methods.add(NotificationChannel.PUSH);
+            if (request.isSendEmail())
+                methods.add(NotificationChannel.EMAIL);
+            if (request.isSendInApp())
+                methods.add(NotificationChannel.IN_APP);
+            if (request.isSendSms())
+                methods.add(NotificationChannel.SMS);
+            if (!methods.isEmpty()) {
+                request.setMethods(methods);
+            }
+        }
         notificationService.sendNotification(request);
     }
 
@@ -75,7 +92,7 @@ public class NotificationFactory {
         };
     }
 
-    // general 
+    // general
     private NotificationRequest createGeneralNotification(Long userId, Map<String, Object> params) {
         return NotificationRequest.builder()
                 .userId(userId)

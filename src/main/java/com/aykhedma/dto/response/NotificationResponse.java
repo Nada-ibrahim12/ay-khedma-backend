@@ -1,6 +1,7 @@
 package com.aykhedma.dto.response;
 
 import com.aykhedma.model.notification.NotificationType;
+import com.aykhedma.model.notification.NotificationChannel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -8,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Set;
 
 @Data
 @Builder
@@ -19,6 +21,7 @@ public class NotificationResponse {
     private String title;
     private String body;
     private NotificationType type;
+    private Set<NotificationChannel> methods;
     private Map<String, String> data;
     private LocalDateTime sentAt;
     private boolean isRead;
