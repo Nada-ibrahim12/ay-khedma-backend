@@ -7,6 +7,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -51,9 +52,7 @@ public class ChatMessage {
     private LocalDateTime timestamp;
 
     @Size(max = 500, message = "Media URL cannot exceed 500 characters")
-    @ElementCollection
-    //@Pattern(regexp = "^(http|https|ftp)://.*$", message = "Invalid media URL format")
-    private List<String> mediaUrls;
+    private List<String> mediaUrls = new ArrayList<>();
 
     @Size(max = 64, message = "Audio hash must be 64 characters or less")
     private String originalAudioHash;

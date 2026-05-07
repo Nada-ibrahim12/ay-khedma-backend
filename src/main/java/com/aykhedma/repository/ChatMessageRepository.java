@@ -17,6 +17,14 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, String
 
   List<ChatMessage> findByChatSessionSessionIdOrderByTimestampAsc(String sessionId);
 
+  @Query("""
+SELECT m
+FROM ChatMessage m
+WHERE m.chatRoom.id = :roomId
+ORDER BY m.timestamp DESC
+""")
+  List<ChatMessage> findLastMessages(@Param("roomId") String roomId, Pageable pageable);
+
   @Modifying
   @Query("""
       UPDATE ChatMessage m
