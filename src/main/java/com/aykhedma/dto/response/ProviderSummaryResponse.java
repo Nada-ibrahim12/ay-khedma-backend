@@ -11,8 +11,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProviderSummaryResponse
-{
+public class ProviderSummaryResponse {
     private Long id;
     private String name;
     private String profileImage;
@@ -23,4 +22,6 @@ public class ProviderSummaryResponse
     private LocationDTO location;
     private Double distance; // In KM
     private Integer estimatedArrivalTime; // In minutes
+    private String area;
+    private Double cancellationRate;
 }

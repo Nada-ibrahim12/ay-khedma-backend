@@ -88,11 +88,13 @@ public interface ConsumerMapper {
     @Mapping(source = "averageRating", target = "averageRating")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "priceType", target = "priceType")
+    @Mapping(source = "location.area", target = "area")
     @Mapping(source = "cancellationRate", target = "cancellationRate")
     ProviderSummaryResponse toProviderSummary(Provider provider);
 
     default List<ProviderSummaryResponse> mapSavedProviders(List<Provider> providers) {
-        if (providers == null) return null;
+        if (providers == null)
+            return null;
         return providers.stream()
                 .map(this::toProviderSummary)
                 .toList();
@@ -101,13 +103,17 @@ public interface ConsumerMapper {
     List<ConsumerResponse> toConsumerResponseList(List<Consumer> consumers);
 
     default List<CancellationResponse> mapCancellationHistory(List<com.aykhedma.model.booking.Booking> bookings) {
-        if (bookings == null) return null;
+        if (bookings == null)
+            return null;
         return bookings.stream()
                 .filter(b -> b.getStatus() == BookingStatus.CANCELLED)
                 .sorted((b1, b2) -> {
-                    if (b1.getCancelledAt() == null && b2.getCancelledAt() == null) return 0;
-                    if (b1.getCancelledAt() == null) return 1;
-                    if (b2.getCancelledAt() == null) return -1;
+                    if (b1.getCancelledAt() == null && b2.getCancelledAt() == null)
+                        return 0;
+                    if (b1.getCancelledAt() == null)
+                        return 1;
+                    if (b2.getCancelledAt() == null)
+                        return -1;
                     return b2.getCancelledAt().compareTo(b1.getCancelledAt());
                 })
                 .limit(10)
