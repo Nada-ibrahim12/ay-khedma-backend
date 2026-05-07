@@ -80,6 +80,7 @@ public class NotificationFactory {
             case BOOKING_CANCELLED -> createBookingCancelledNotification(userId, params);
             case BOOKING_COMPLETED -> createBookingCompletedNotification(userId, params);
             case REVIEW_RECEIVED -> createReviewReceivedNotification(userId, params);
+            case RATING_RECEIVED -> createRatingReceivedNotification(userId, params);
             case NEW_MESSAGE -> createNewMessageNotification(userId, params);
             case PROVIDER_ACCEPTED -> createProviderAcceptedNotification(userId, params);
             case PROVIDER_REJECTED -> createProviderRejectedNotification(userId, params);
@@ -260,6 +261,20 @@ public class NotificationFactory {
                 .type(NotificationType.REVIEW_RECEIVED)
                 .title((String) params.getOrDefault("title", "New Review Received"))
                 .content((String) params.getOrDefault("content", "A customer has left a review for you"))
+                .imageUrl((String) params.get("imageUrl"))
+                .data(extractDataMap(params))
+                .sendEmail(false)
+                .sendInApp(true)
+                .sendPush(true)
+                .build();
+    }
+
+    private NotificationRequest createRatingReceivedNotification(Long userId, Map<String, Object> params) {
+        return NotificationRequest.builder()
+                .userId(userId)
+                .type(NotificationType.RATING_RECEIVED)
+                .title((String) params.getOrDefault("title", "New Rating Received"))
+                .content((String) params.getOrDefault("content", "You have received a new rating"))
                 .imageUrl((String) params.get("imageUrl"))
                 .data(extractDataMap(params))
                 .sendEmail(false)

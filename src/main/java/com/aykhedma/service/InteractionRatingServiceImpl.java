@@ -5,6 +5,7 @@ import com.aykhedma.dto.response.InteractionRatingResponse;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.InteractionRatingMapper;
 import com.aykhedma.model.rating.InteractionRating;
+import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.repository.ConsumerRepository;
@@ -24,6 +25,7 @@ public class InteractionRatingServiceImpl implements InteractionRatingService {
     private final ProviderRepository providerRepository;
     private final ConsumerRepository consumerRepository;
     private final InteractionRatingMapper interactionRatingMapper;
+    private final NotificationFactory notificationFactory;
 
     @Override
     @Transactional
@@ -45,6 +47,18 @@ public class InteractionRatingServiceImpl implements InteractionRatingService {
 
         // Update provider interaction metrics
         updateProviderInteractionMetrics(provider, request.getRating().doubleValue());
+
+        try {
+            notificationFactory.send(provider.getId(),
+                NotificationType.RATING_RECEIVED,
+                java.util.Map.of(
+                    "title", "New Rating Received",
+                    "message", consumer.getName() + " rated you " + request.getRating(),
+                    "rating", String.valueOf(request.getRating()),
+                    "comment", request.getComment(),
+                    "interactionRatingId", savedRating.getId().toString()));
+        } catch (Exception ignored) {
+        }
 
         return interactionRatingMapper.toResponse(savedRating);
     }
