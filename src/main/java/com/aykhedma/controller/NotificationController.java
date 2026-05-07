@@ -76,6 +76,7 @@ public class NotificationController {
                 .title(request.getTitle() != null ? request.getTitle() : "Real-time Notification")
                 .content(request.getContent() != null ? request.getContent()
                         : "This is a test WebSocket message")
+                .deepLink(request.getDeepLink())
                 .sendInApp(true)
                 .sendPush(false)
                 .sendEmail(false)

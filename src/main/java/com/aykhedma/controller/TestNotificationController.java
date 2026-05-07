@@ -129,6 +129,7 @@ public class TestNotificationController {
                                 .title(request.getTitle() != null ? request.getTitle() : "Real-time Notification")
                                 .content(request.getMessage() != null ? request.getMessage()
                                                 : "This is a test WebSocket message")
+                                .deepLink(request.getDeepLink())
                                 .sendInApp(true)
                                 .sendPush(false)
                                 .sendEmail(false)
@@ -165,6 +166,7 @@ public class TestNotificationController {
                                 .title(request.getTitle() != null ? request.getTitle() : "Multi-Channel Test")
                                 .content(request.getMessage() != null ? request.getMessage()
                                                 : "This notification was sent to all channels")
+                                .deepLink(request.getDeepLink())
                                 .sendInApp(true)
                                 .sendPush(true)
                                 .sendEmail(request.getEmail() != null)
@@ -202,6 +204,9 @@ public class TestNotificationController {
                                                 "Your booking with %s for %s has been confirmed. Amount: %.2f EGP",
                                                 request.getProviderName(), request.getServiceType(),
                                                 request.getAmount()))
+                                .deepLink(request.getBookingId() != null
+                                                ? "ay-khedma://booking/" + request.getBookingId()
+                                                : null)
                                 .sendInApp(true)
                                 .sendPush(true)
                                 .sendEmail(true)
@@ -238,6 +243,7 @@ public class TestNotificationController {
                                 .title("🚨 EMERGENCY ALERT")
                                 .content(String.format("Emergency services have been notified. Type: %s, Location: %s",
                                                 request.getEmergencyType(), request.getLocation()))
+                                .deepLink("ay-khedma://emergency")
                                 .sendInApp(true)
                                 .sendPush(true)
                                 .sendEmail(true)
@@ -271,6 +277,8 @@ public class TestNotificationController {
                                 .type(NotificationType.NEW_MESSAGE)
                                 .title("💬 New Message")
                                 .content(String.format("%s: %s", request.getSenderName(), request.getMessagePreview()))
+                                .deepLink(request.getChatId() != null ? "ay-khedma://chat/" + request.getChatId()
+                                                : null)
                                 .sendInApp(true)
                                 .sendPush(true)
                                 .sendEmail(false)
@@ -408,6 +416,7 @@ class TestSmsRequest {
 class TestInAppRequest {
         private String title;
         private String message;
+        private String deepLink;
 
         // Getters and setters
         public String getTitle() {
@@ -425,6 +434,14 @@ class TestInAppRequest {
         public void setMessage(String message) {
                 this.message = message;
         }
+
+        public String getDeepLink() {
+                return deepLink;
+        }
+
+        public void setDeepLink(String deepLink) {
+                this.deepLink = deepLink;
+        }
 }
 
 class TestAllChannelsRequest {
@@ -432,6 +449,7 @@ class TestAllChannelsRequest {
         private String message;
         private String email;
         private String phoneNumber;
+        private String deepLink;
 
         // Getters and setters
         public String getTitle() {
@@ -464,6 +482,14 @@ class TestAllChannelsRequest {
 
         public void setPhoneNumber(String phoneNumber) {
                 this.phoneNumber = phoneNumber;
+        }
+
+        public String getDeepLink() {
+                return deepLink;
+        }
+
+        public void setDeepLink(String deepLink) {
+                this.deepLink = deepLink;
         }
 }
 

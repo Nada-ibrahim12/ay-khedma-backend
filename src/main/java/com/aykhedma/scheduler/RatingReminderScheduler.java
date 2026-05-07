@@ -18,7 +18,8 @@ import java.util.Map;
 
 /**
  * Scheduler for sending rating reminders to users.
- * Runs daily at midnight to remind users of pending reviews for services that have started.
+ * Runs daily at midnight to remind users of pending reviews for services that
+ * have started.
  */
 @Component
 @RequiredArgsConstructor
@@ -32,7 +33,7 @@ public class RatingReminderScheduler {
     @Transactional
     public void sendRatingReminders() {
         log.info("Running daily rating reminders...");
-        
+
         // Find bookings that are ACCEPTED and have started at least 30 minutes ago
         // but are missing one or both ratings.
         LocalDate today = LocalDate.now();
@@ -58,7 +59,9 @@ public class RatingReminderScheduler {
                 .userId(booking.getConsumer().getId())
                 .type(NotificationType.RATING_REMINDER)
                 .title("Rate Your Service")
-                .content("Don't forget to rate your service for " + booking.getServiceType().getName() + " by " + booking.getProvider().getName())
+                .content("Don't forget to rate your service for " + booking.getServiceType().getName() + " by "
+                        + booking.getProvider().getName())
+                .deepLink("ay-khedma://booking/" + booking.getId())
                 .sendInApp(true)
                 .sendPush(true)
                 .data(Map.of("bookingId", booking.getId().toString(), "type", "CONSUMER_RATING"))
@@ -71,7 +74,9 @@ public class RatingReminderScheduler {
                 .userId(booking.getProvider().getId())
                 .type(NotificationType.RATING_REMINDER)
                 .title("Rate Your Consumer")
-                .content("Don't forget to rate your consumer " + booking.getConsumer().getName() + " for the service " + booking.getServiceType().getName())
+                .content("Don't forget to rate your consumer " + booking.getConsumer().getName() + " for the service "
+                        + booking.getServiceType().getName())
+                .deepLink("ay-khedma://booking/" + booking.getId())
                 .sendInApp(true)
                 .sendPush(true)
                 .data(Map.of("bookingId", booking.getId().toString(), "type", "PROVIDER_RATING"))

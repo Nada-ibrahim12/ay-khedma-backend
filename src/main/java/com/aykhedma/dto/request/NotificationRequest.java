@@ -16,6 +16,7 @@ public class NotificationRequest {
     private String title;
     private String content;
     private String imageUrl;
+    private String deepLink;
     private Map<String, Object> data;
 
     private boolean sendPush;

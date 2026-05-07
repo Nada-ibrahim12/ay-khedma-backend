@@ -153,6 +153,8 @@ public class NotificationService {
     }
 
     private Notification saveNotification(NotificationRequest request, Set<NotificationChannel> methods) {
+        log.info("Persisting notification type={} userId={} deepLink={}", request.getType(), request.getUserId(),
+                request.getDeepLink());
         Notification notification = Notification.builder()
                 .userId(request.getUserId())
                 .type(request.getType())
@@ -160,6 +162,7 @@ public class NotificationService {
                 .title(request.getTitle())
                 .body(request.getContent())
                 .imageUrl(request.getImageUrl())
+                .deepLink(request.getDeepLink())
                 .build();
 
         return notificationRepository.saveAndFlush(notification);

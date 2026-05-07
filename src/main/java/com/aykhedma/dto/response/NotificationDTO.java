@@ -15,6 +15,7 @@ public class NotificationDTO {
     private String title;
     private String content;
     private String imageUrl;
+    private String deepLink;
     private boolean read;
     private LocalDateTime createdAt;
 
@@ -26,6 +27,7 @@ public class NotificationDTO {
         dto.setTitle(notification.getTitle());
         dto.setContent(notification.getBody());
         dto.setImageUrl(notification.getImageUrl());
+        dto.setDeepLink(notification.getDeepLink());
         dto.setRead(notification.isRead());
         dto.setCreatedAt(notification.getCreatedAt());
         return dto;
