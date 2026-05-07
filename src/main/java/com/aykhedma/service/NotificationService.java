@@ -2,11 +2,14 @@ package com.aykhedma.service;
 
 import com.aykhedma.dto.response.NotificationDTO;
 import com.aykhedma.dto.request.NotificationRequest;
+import com.aykhedma.dto.response.NotificationPreferenceDTO;
 import com.aykhedma.model.notification.Notification;
 import com.aykhedma.model.notification.NotificationChannel;
 import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.notification.NotificationStatus;
+import com.aykhedma.model.notification.NotificationPreference;
 import com.aykhedma.repository.NotificationRepository;
+import com.aykhedma.repository.NotificationPreferenceRepository;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.service.notification.EmailService;
 import com.aykhedma.service.notification.FirebaseService;
@@ -37,6 +40,7 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationPreferenceRepository notificationPreferenceRepository;
     private final FirebaseService firebaseService;
     private final EmailService emailService;
     private final SimpMessagingTemplate messagingTemplate;
@@ -91,6 +95,8 @@ public class NotificationService {
         log.info("Sending notification to user: {}, type: {}", request.getUserId(), request.getType());
 
         Set<NotificationChannel> requestedMethods = resolveRequestedMethods(request);
+
+        requestedMethods = applyUserPreferences(request.getUserId(), requestedMethods);
         Notification notification = saveNotification(request, requestedMethods);
 
         if (requestedMethods.contains(NotificationChannel.IN_APP)) {
@@ -281,7 +287,7 @@ public class NotificationService {
     public List<com.aykhedma.dto.response.NotificationDTO> listFailedNotifications(Long userId) {
         List<Notification> failed = notificationRepository.findFailedNotifications(userId);
         return failed.stream().map(com.aykhedma.dto.response.NotificationDTO::fromEntity)
-                .collect(stream.Collectors.toList());
+                .collect(Collectors.toList());
     }
 
     public long getUnreadCount(Long userId) {
@@ -290,7 +296,7 @@ public class NotificationService {
 
     public List<NotificationDTO> getNotificationsByType(Long userId, NotificationType type) {
         List<Notification> notifications = notificationRepository.findByUserIdAndTypeOrderBySentAtDesc(userId, type);
-        return notifications.stream().map(NotificationDTO::fromEntity).collect(stream.Collectors.toList());
+        return notifications.stream().map(NotificationDTO::fromEntity).collect(Collectors.toList());
     }
 
     @Transactional
@@ -377,6 +383,56 @@ public class NotificationService {
         if (request.getTitle() == null || request.getTitle().isBlank()) {
             throw new IllegalArgumentException("Notification title is required");
         }
+    }
+
+    public NotificationPreferenceDTO getUserPreferences(Long userId) {
+        NotificationPreference preference = notificationPreferenceRepository.findByUserId(userId)
+                .orElseGet(() -> createDefaultPreferences(userId));
+        return NotificationPreferenceDTO.fromEntity(preference);
+    }
+
+    @Transactional
+    public NotificationPreferenceDTO updateUserPreferences(Long userId, NotificationPreference updatedPreference) {
+        NotificationPreference preference = notificationPreferenceRepository.findByUserId(userId)
+                .orElseGet(() -> createDefaultPreferences(userId));
+
+        preference.setInAppEnabled(updatedPreference.isInAppEnabled());
+        preference.setEmailEnabled(updatedPreference.isEmailEnabled());
+        preference.setPushEnabled(updatedPreference.isPushEnabled());
+        preference.setUpdatedAt(LocalDateTime.now());
+
+        NotificationPreference saved = notificationPreferenceRepository.save(preference);
+        return NotificationPreferenceDTO.fromEntity(saved);
+    }
+
+    private NotificationPreference createDefaultPreferences(Long userId) {
+        NotificationPreference preference = NotificationPreference.builder()
+                .userId(userId)
+                .inAppEnabled(true)
+                .emailEnabled(true)
+                .pushEnabled(true)
+                .updatedAt(LocalDateTime.now())
+                .build();
+        return notificationPreferenceRepository.save(preference);
+    }
+
+    private Set<NotificationChannel> applyUserPreferences(Long userId, Set<NotificationChannel> requestedMethods) {
+        NotificationPreference preferences = notificationPreferenceRepository.findByUserId(userId)
+                .orElseGet(() -> createDefaultPreferences(userId));
+
+        Set<NotificationChannel> filteredMethods = EnumSet.noneOf(NotificationChannel.class);
+
+        if (requestedMethods.contains(NotificationChannel.IN_APP) && preferences.isInAppEnabled()) {
+            filteredMethods.add(NotificationChannel.IN_APP);
+        }
+        if (requestedMethods.contains(NotificationChannel.EMAIL) && preferences.isEmailEnabled()) {
+            filteredMethods.add(NotificationChannel.EMAIL);
+        }
+        if (requestedMethods.contains(NotificationChannel.PUSH) && preferences.isPushEnabled()) {
+            filteredMethods.add(NotificationChannel.PUSH);
+        }
+
+        return filteredMethods;
     }
 
 }

@@ -3,6 +3,9 @@ package com.aykhedma.controller;
 import com.aykhedma.dto.response.NotificationDTO;
 import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.dto.request.NotificationRequest;
+import com.aykhedma.dto.request.NotificationPreferenceRequest;
+import com.aykhedma.dto.response.NotificationPreferenceDTO;
+import com.aykhedma.model.notification.NotificationPreference;
 import com.aykhedma.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,9 +16,9 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.file.attribute.UserPrincipal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,7 +30,6 @@ import java.util.Map;
 public class NotificationController {
 
     private final NotificationService notificationService;
-
 
     @PostMapping("/send-email")
     public ResponseEntity<Map<String, Object>> sendEmailNotification(
@@ -62,8 +64,9 @@ public class NotificationController {
 
     @PostMapping("/send-inapp")
     public ResponseEntity<Map<String, Object>> sendInAppNotification(
-            @RequestHeader(value = "X-User-Id", required = true) Long userId,
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @RequestBody NotificationRequest request) {
+        Long userId = consumerId;
         log.info("Received request to send in-app notification to userId: {}", userId);
         request.forInAppChannel(userId);
 
@@ -92,11 +95,10 @@ public class NotificationController {
 
     @GetMapping
     public ResponseEntity<Page<NotificationDTO>> getUserNotifications(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId,
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
 
         if (userId == null) {
             return ResponseEntity.badRequest().build();
@@ -109,11 +111,10 @@ public class NotificationController {
 
     @GetMapping("/{notificationId}/delivery-status")
     public ResponseEntity<com.aykhedma.dto.response.DeliveryStatusDTO> getDeliveryStatus(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId,
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @PathVariable Long notificationId) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
         if (userId == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -129,10 +130,9 @@ public class NotificationController {
 
     @GetMapping("/failed")
     public ResponseEntity<java.util.List<NotificationDTO>> getFailedNotifications(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId) {
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
         if (userId == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -143,10 +143,9 @@ public class NotificationController {
 
     @GetMapping("/unread/count")
     public ResponseEntity<Map<String, Long>> getUnreadCount(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId) {
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
 
         if (userId == null) {
             return ResponseEntity.badRequest().build();
@@ -159,13 +158,47 @@ public class NotificationController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/preferences")
+    public ResponseEntity<NotificationPreferenceDTO> getPreferences(
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId) {
+
+        Long userId = consumerId;
+
+        if (userId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        NotificationPreferenceDTO preferences = notificationService.getUserPreferences(userId);
+        return ResponseEntity.ok(preferences);
+    }
+
+    @PutMapping("/preferences")
+    public ResponseEntity<NotificationPreferenceDTO> updatePreferences(
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+            @RequestBody NotificationPreferenceRequest request) {
+
+        Long userId = consumerId;
+
+        if (userId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        NotificationPreference preference = NotificationPreference.builder()
+                .inAppEnabled(request.isInAppEnabled())
+                .emailEnabled(request.isEmailEnabled())
+                .pushEnabled(request.isPushEnabled())
+                .build();
+
+        NotificationPreferenceDTO updated = notificationService.updateUserPreferences(userId, preference);
+        return ResponseEntity.ok(updated);
+    }
+
     @GetMapping("/{notificationId}")
     public ResponseEntity<NotificationDTO> getNotification(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId,
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @PathVariable Long notificationId) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
 
         if (userId == null) {
             return ResponseEntity.badRequest().build();
@@ -181,11 +214,10 @@ public class NotificationController {
 
     @PutMapping("/{notificationId}/read")
     public ResponseEntity<Map<String, Object>> markAsRead(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId,
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @PathVariable Long notificationId) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
 
         if (userId == null) {
             return ResponseEntity.badRequest().build();
@@ -212,11 +244,10 @@ public class NotificationController {
 
     @PutMapping("/read-batch")
     public ResponseEntity<Map<String, Object>> markMultipleAsRead(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId,
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @RequestBody Map<String, Object> request) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
 
         if (userId == null) {
             return ResponseEntity.badRequest().build();
@@ -245,10 +276,9 @@ public class NotificationController {
 
     @PutMapping("/read-all")
     public ResponseEntity<Map<String, Object>> markAllAsRead(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId) {
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
 
         if (userId == null) {
             return ResponseEntity.badRequest().build();
@@ -266,11 +296,10 @@ public class NotificationController {
 
     @DeleteMapping("/{notificationId}")
     public ResponseEntity<Map<String, Object>> deleteNotification(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId,
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @PathVariable Long notificationId) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
 
         if (userId == null) {
             return ResponseEntity.badRequest().build();
@@ -288,13 +317,12 @@ public class NotificationController {
 
     @GetMapping("/filter")
     public ResponseEntity<Page<NotificationDTO>> filterNotifications(
-            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(value = "userId", required = false) Long paramUserId,
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        Long userId = headerUserId != null ? headerUserId : paramUserId;
+        Long userId = consumerId;
 
         if (userId == null) {
             return ResponseEntity.badRequest().build();
@@ -306,28 +334,43 @@ public class NotificationController {
     }
 
     @GetMapping("/types/{type}")
-    public ResponseEntity<Page<NotificationDTO>> getByType(
-        @AuthenticationPrincipal UserPrincipal currentUser
-        @PathVariable NotificationType type, Pageable pageable) {
-        Page<NotificationDTO> notifications = notificationService.getNotificationsByType(type, pageable);
+    public ResponseEntity<java.util.List<NotificationDTO>> getByType(
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+            @PathVariable NotificationType type, Pageable pageable) {
+        Long userId = consumerId;
+
+        if (userId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        java.util.List<NotificationDTO> notifications = notificationService.getNotificationsByType(userId, type);
         return ResponseEntity.ok(notifications);
     }
+
     @DeleteMapping("/clear/all")
     public ResponseEntity<?> clearAllNotifications(
-            @AuthenticationPrincipal UserPrincipal currentUser) {
-        notificationService.clearAllNotifications();
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId) {
+        Long userId = consumerId;
+
+        if (userId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        int deleted = notificationService.deleteAllNotifications(userId);
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "All notifications cleared");
+        response.put("deletedCount", deleted);
         return ResponseEntity.ok(response);
     }
 
     // @PutMapping("/settings")
     // public ResponseEntity<?> updateNotificationSettings(
-    //     @AuthenticationPrincipal UserPrincipal currentUser
-    //     @RequestBody NotificationSettingsRequest settings) {
-    //     notificationService.updateNotificationSettings(currentUser.getName(), settings);
-    //     }
+    // @AuthenticationPrincipal(expression = "user.id") Long consumerId
+    // @RequestBody NotificationSettingsRequest settings) {
+    // notificationService.updateNotificationSettings(currentUser.getName(),
+    // settings);
+    // }
 
     private Map<String, Object> buildSuccessResponse(String message, Long userId, Object type,
             Map<String, Object> extraFields) {
