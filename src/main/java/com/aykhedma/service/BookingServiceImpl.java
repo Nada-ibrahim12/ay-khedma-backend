@@ -190,6 +190,7 @@ public class BookingServiceImpl implements BookingService
 
         Consumer consumer = booking.getConsumer();
         consumer.setTotalBookings((consumer.getTotalBookings() != null ? consumer.getTotalBookings() : 0) + 1);
+        updateConsumerRates(consumer);
         consumerRepository.save(consumer);
 
         Map<String, Object> notificationData = new HashMap<>();
@@ -345,15 +346,18 @@ public class BookingServiceImpl implements BookingService
         if (booking.getStatus() != BookingStatus.ACCEPTED)
             throw new BadRequestException("Booking cannot be cancelled, it has already been " + booking.getStatus());
 
+        LocalDateTime now = LocalDateTime.now();
         LocalDateTime bookingStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
-        if (bookingStartTime.isBefore(LocalDateTime.now()))
+        if (bookingStartTime.isBefore(now))
             throw new BadRequestException("Booking cannot be cancelled, its starting time has already passed");
+
+        boolean applyPenalty = now.isAfter(bookingStartTime.minusHours(2));
 
         providerService.restoreAvailabilityForCancelledBooking(booking);
 
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setCancellationReason(cancelBookingRequest.getCancellationReason());
-        booking.setCancelledAt(LocalDateTime.now());
+        booking.setCancelledAt(now);
         if (isConsumer)
             booking.setCancelledBy("C");
         else
@@ -364,12 +368,28 @@ public class BookingServiceImpl implements BookingService
         {
             Consumer consumer = booking.getConsumer();
             consumer.setCancelledBookings((consumer.getCancelledBookings() != null ? consumer.getCancelledBookings() : 0) + 1);
+            
+            if (applyPenalty) {
+                double currentRating = consumer.getAverageRating() != null ? consumer.getAverageRating() : 0.0;
+                double newRating = Math.max(0.0, currentRating - 0.2);
+                consumer.setAverageRating(Math.round(newRating * 10.0) / 10.0);
+            }
+
+            updateConsumerRates(consumer);
             consumerRepository.save(consumer);
         }
         else
         {
             Provider provider = booking.getProvider();
             provider.setCancelledBookings((provider.getCancelledBookings() != null ? provider.getCancelledBookings() : 0) + 1);
+            
+            if (applyPenalty) {
+                double currentRating = provider.getAverageRating() != null ? provider.getAverageRating() : 0.0;
+                double newRating = Math.max(0.0, currentRating - 0.2);
+                provider.setAverageRating(Math.round(newRating * 10.0) / 10.0);
+            }
+
+            updateProviderRates(provider);
             providerRepository.save(provider);
         }
 
@@ -619,9 +639,32 @@ public class BookingServiceImpl implements BookingService
 
         provider.setAcceptanceRate(acceptanceRate);
         provider.setBookingRate(bookingRate);
+        provider.setCancellationRate(provider.getCancellationRate()); // This uses the helper method to get the value
+    }
+
+    private void updateConsumerRates(Consumer consumer) {
+        consumer.setCancellationRate(consumer.getCancellationRate()); // This uses the helper method to get the value
     }
 
     private int clampRate(int value) {
         return Math.max(0, Math.min(100, value));
+    }
+
+    @Override
+    public List<com.aykhedma.dto.response.ConsumerReviewResponse> getConsumerReviews(Long consumerId) {
+        if (!consumerRepository.existsById(consumerId)) {
+            throw new ResourceNotFoundException("Consumer not found");
+        }
+        List<Booking> bookings = bookingRepository.findByConsumerIdAndProviderRatingIsNotNull(consumerId);
+        return bookings.stream()
+                .map(booking -> com.aykhedma.dto.response.ConsumerReviewResponse.builder()
+                        .id(booking.getId())
+                        .providerId(booking.getProvider().getId())
+                        .providerName(booking.getProvider().getName())
+                        .rating(booking.getProviderRating())
+                        .review(booking.getProviderReview())
+                        .completedAt(booking.getCompletedAt())
+                        .build())
+                .toList();
     }
 }

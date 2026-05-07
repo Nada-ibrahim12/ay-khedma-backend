@@ -51,4 +51,11 @@ public class RatingController {
         BookingResponse response = bookingService.submitConsumerRating(providerId, ratingRequest);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/consumer/{consumerId}")
+    @PreAuthorize("hasRole('PROVIDER')")
+    public ResponseEntity<List<com.aykhedma.dto.response.ConsumerReviewResponse>> getConsumerReviews(
+            @PathVariable Long consumerId) {
+        return ResponseEntity.ok(bookingService.getConsumerReviews(consumerId));
+    }
 }

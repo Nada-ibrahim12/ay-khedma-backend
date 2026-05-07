@@ -102,19 +102,19 @@ public class ProviderController {
                 return ResponseEntity.ok(response);
         }
 
-        // @DeleteMapping("/{providerId}/profile-picture")
-        // @Operation(summary = "Delete profile picture")
-        // @ApiResponses(value = {
-        // @ApiResponse(responseCode = "204", description = "Successfully deleted
-        // profile picture"),
-        // @ApiResponse(responseCode = "404", description = "Provider not found")
-        // })
-        // public ResponseEntity<Void> deleteProfilePicture(
-        // @Parameter(description = "ID of the provider", required = true)
-        // @PathVariable Long providerId) throws IOException {
-        // providerService.updateProfilePicture(providerId, null);
-        // return ResponseEntity.noContent().build();
-        // }
+        @PreAuthorize("hasRole('PROVIDER')")
+        @DeleteMapping("/me/profile-picture")
+        @Operation(summary = "Delete my profile picture")
+        @ApiResponses(value = {
+                @ApiResponse(responseCode = "200", description = "Successfully deleted profile picture", content = @Content(schema = @Schema(implementation = ProviderResponse.class))),
+                @ApiResponse(responseCode = "404", description = "Provider not found"),
+                @ApiResponse(responseCode = "400", description = "Failed to delete profile picture")
+        })
+        public ResponseEntity<ProviderResponse> deleteProfilePicture(
+                @AuthenticationPrincipal(expression = "user.id") Long providerId) {
+                ProviderResponse response = providerService.deleteProfilePicture(providerId);
+                return ResponseEntity.ok(response);
+        }
 
         // === SCHEDULE MANAGEMENT ===
 

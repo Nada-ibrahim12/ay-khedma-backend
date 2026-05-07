@@ -19,6 +19,9 @@ import com.aykhedma.repository.ServiceTypeRepository;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.service.FileStorageService;
 import com.aykhedma.security.JwtService;
+import com.aykhedma.service.verification.VerificationService;
+import com.aykhedma.dto.response.verification.NidExtractionResponse;
+import com.aykhedma.dto.response.verification.FaceMatchResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,6 +46,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final FileStorageService fileStorageService;
     private final OtpService otpService;
+    private final VerificationService verificationService;
 
     @Value("${jwt.expiration:3600000}")
     private long jwtExpirationMs;
@@ -93,6 +97,7 @@ public class AuthService {
             MultipartFile profilePicture,
             MultipartFile nationalIdFrontImage,
             MultipartFile nationalIdBackImage,
+            MultipartFile selfie,
             List<MultipartFile> documents) {
 
         String profileImageUrl = null;
@@ -181,9 +186,10 @@ public class AuthService {
 
             String frontImageUrl = null;
             String backImageUrl = null;
+            String selfieImageUrl = null;
 
             try {
-                validateProviderDocuments(serviceType, nationalIdFrontImage, nationalIdBackImage, documents);
+                validateProviderDocuments(serviceType, nationalIdFrontImage, nationalIdBackImage, selfie, documents);
 
                 // Build provider first to generate ID
                 Provider provider = Provider.builder()
@@ -219,14 +225,28 @@ public class AuthService {
                     backImageUrl = fileStorageService.storeFile(nationalIdBackImage, folderName);
                 }
 
+                if (selfie != null && !selfie.isEmpty()) {
+                    selfieImageUrl = fileStorageService.storeFile(selfie, folderName);
+                }
+
                 savedProvider.setNationalIdFrontImage(frontImageUrl);
                 savedProvider.setNationalIdBackImage(backImageUrl);
+                savedProvider.setSelfieImage(selfieImageUrl);
                 savedProvider = (Provider) userRepository.save(savedProvider);
 
                 saveNationalIdDocument(savedProvider, nationalIdFrontImage, frontImageUrl, "NATIONAL_ID",
                         "National ID Front");
                 saveNationalIdDocument(savedProvider, nationalIdBackImage, backImageUrl, "NATIONAL_ID",
                         "National ID Back");
+
+                // 🛡️ Automatic Verification using OCR & Face Matching (STRICT)
+                if (nationalIdFrontImage != null && !nationalIdFrontImage.isEmpty() && selfie != null && !selfie.isEmpty()) {
+                    String verificationError = verifyProviderStrictly(savedProvider, request.getNationalId(), nationalIdFrontImage, selfie);
+                    if (verificationError != null) {
+                        // This will trigger rollback because of @Transactional
+                        throw new BadRequestException(verificationError);
+                    }
+                }
 
                 if (documents != null && !documents.isEmpty()) {
                     for (MultipartFile file : documents) {
@@ -255,6 +275,9 @@ public class AuthService {
                 if (backImageUrl != null) {
                     fileStorageService.deleteFile(backImageUrl);
                 }
+                if (selfieImageUrl != null) {
+                    fileStorageService.deleteFile(selfieImageUrl);
+                }
                 throw new BadRequestException("Failed to upload national ID images");
             } catch (RuntimeException e) {
                 if (profileImageUrl != null) {
@@ -266,6 +289,9 @@ public class AuthService {
                 if (backImageUrl != null) {
                     fileStorageService.deleteFile(backImageUrl);
                 }
+                if (selfieImageUrl != null) {
+                    fileStorageService.deleteFile(selfieImageUrl);
+                }
                 throw e;
             }
         }
@@ -274,6 +300,7 @@ public class AuthService {
     private void validateProviderDocuments(ServiceType serviceType,
             MultipartFile front,
             MultipartFile back,
+            MultipartFile selfie,
             List<MultipartFile> documents) {
 
         if (front == null || front.isEmpty()) {
@@ -282,6 +309,10 @@ public class AuthService {
 
         if (back == null || back.isEmpty()) {
             throw new BadRequestException("National ID back image is required");
+        }
+
+        if (selfie == null || selfie.isEmpty()) {
+            throw new BadRequestException("Selfie image is required for verification");
         }
 
         if (serviceType.getRiskLevel() == RiskLevel.HIGH) {
@@ -347,4 +378,37 @@ public class AuthService {
         userRepository.updatePassword(email, passwordEncoder.encode(newPassword));
     }
 
+    private String verifyProviderStrictly(Provider provider, String expectedNid, MultipartFile idImage, MultipartFile selfie) {
+        try {
+            // 1. Extract NID and compare
+            NidExtractionResponse nidResult = verificationService.extractNid(idImage);
+            boolean nidMatched = nidResult.isValid() && expectedNid.equals(nidResult.getNid());
+            provider.setNidVerified(nidMatched);
+
+            // 2. Match faces
+            FaceMatchResponse faceResult = verificationService.matchFaces(idImage, selfie);
+            provider.setFaceMatched(faceResult.isMatch());
+            provider.setFaceMatchConfidence(faceResult.getDistance());
+
+            // 3. Set status and return specific error if failed
+            if (nidMatched && faceResult.isMatch()) {
+                provider.setVerificationStatus(VerificationStatus.VERIFIED);
+                providerRepository.save(provider);
+                return null; // Success
+            } else {
+                StringBuilder reason = new StringBuilder();
+                if (!nidMatched) reason.append("National ID mismatch: The ID on the card does not match the number provided. ");
+                if (!faceResult.isMatch()) reason.append("Face verification failed: The selfie does not match the photo on the ID card. ");
+                
+                String errorMsg = reason.toString().trim();
+                provider.setRejectionReason(errorMsg);
+                providerRepository.save(provider);
+                return errorMsg;
+            }
+        } catch (Exception e) {
+            // If the service is DOWN, we allow the registration to continue as PENDING 
+            // so an admin can verify manually later.
+            return null; 
+        }
+    }
 }

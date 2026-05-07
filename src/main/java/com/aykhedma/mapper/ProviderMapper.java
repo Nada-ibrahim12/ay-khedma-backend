@@ -23,6 +23,7 @@ public interface ProviderMapper {
     @Mapping(source = "yearsOfExperience", target = "yearsOfExperience")
     @Mapping(source = "nationalIdFrontImage", target = "nationalIdFrontImage")
     @Mapping(source = "nationalIdBackImage", target = "nationalIdBackImage")
+    @Mapping(source = "selfieImage", target = "selfieImage")
     @Mapping(source = "verificationStatus", target = "verificationStatus")
     @Mapping(source = "completedJobs", target = "completedJobs")
     @Mapping(source = "totalBookings", target = "totalBookings")
@@ -50,7 +51,7 @@ public interface ProviderMapper {
     @Mapping(source = "rejectionReason", target = "rejectionReason")
     @Mapping(source = "averageInteractionRating", target = "averageInteractionRating")
     @Mapping(source = "interactionRatingCount", target = "interactionRatingCount")
-    @Mapping(target = "cancellationRate", expression = "java(provider.getCancellationRate())")
+    @Mapping(source = "cancellationRate", target = "cancellationRate")
     @Mapping(target = "cancellationHistory", expression = "java(mapCancellationHistory(provider.getBookings()))")
     ProviderResponse toProviderResponse(Provider provider);
 
@@ -65,6 +66,9 @@ public interface ProviderMapper {
     @Mapping(source = "location", target = "location")
     @Mapping(target = "distance", ignore = true)
     @Mapping(target = "estimatedArrivalTime", ignore = true)
+    @Mapping(source = "location", target = "location")
+    @Mapping(source = "location.area", target = "area")
+    @Mapping(source = "cancellationRate", target = "cancellationRate")
     ProviderSummaryResponse toProviderSummaryResponse(Provider provider);
 
     @Mapping(source = "serviceType.name", target = "serviceType")

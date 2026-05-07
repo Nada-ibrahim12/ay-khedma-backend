@@ -34,4 +34,6 @@ public interface BookingService
     BookingResponse submitRating(Long consumerId, com.aykhedma.dto.request.RatingRequest ratingRequest);
 
     BookingResponse submitConsumerRating(Long providerId, com.aykhedma.dto.request.ProviderRatingRequest ratingRequest);
+
+    List<com.aykhedma.dto.response.ConsumerReviewResponse> getConsumerReviews(Long consumerId);
 }

@@ -103,6 +103,10 @@ public class Provider extends User {
     @Column(length = 500)
     private String nationalIdBackImage;
 
+    @Size(max = 500, message = "Selfie image URL cannot exceed 500 characters")
+    @Column(length = 500)
+    private String selfieImage;
+
     @NotNull(message = "Schedule is required")
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "schedule_id", nullable = false)
@@ -169,6 +173,11 @@ public class Provider extends User {
     @Max(value = 100, message = "Acceptance rate cannot exceed 100")
     private Integer acceptanceRate = 100;
 
+    @Builder.Default
+    @DecimalMin(value = "0.0", message = "Cancellation rate cannot be negative")
+    @DecimalMax(value = "100.0", message = "Cancellation rate cannot exceed 100.0")
+    private Double cancellationRate = 0.0;
+
     @Min(value = 0, message = "Response time cannot be negative")
     @Max(value = 60, message = "Response time cannot exceed 60 minutes")
     private Integer responseTime;
@@ -176,6 +185,16 @@ public class Provider extends User {
     @Size(max = 500, message = "Rejection reason cannot exceed 500 characters")
     @Column(length = 500)
     private String rejectionReason;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private boolean isNidVerified = false;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private boolean isFaceMatched = false;
+
+    private Double faceMatchConfidence;
 
     public Double getCancellationRate() {
         if (totalBookings == null || totalBookings == 0) {

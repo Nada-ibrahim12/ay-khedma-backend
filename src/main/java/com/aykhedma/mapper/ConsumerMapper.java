@@ -29,7 +29,7 @@ public interface ConsumerMapper {
     @Mapping(source = "averageRating", target = "averageRating")
     @Mapping(source = "totalBookings", target = "totalBookings")
     @Mapping(source = "cancelledBookings", target = "cancelledBookings")
-    @Mapping(target = "cancellationRate", expression = "java(consumer.getCancellationRate())")
+    @Mapping(source = "cancellationRate", target = "cancellationRate")
     @Mapping(target = "cancellationHistory", expression = "java(mapCancellationHistory(consumer.getBookings()))")
     @Mapping(target = "savedProviders", expression = "java(mapSavedProviders(consumer.getSavedProviders()))")
     @Mapping(source = "location", target = "location", qualifiedByName = "mapLocationToDTO")
@@ -88,6 +88,7 @@ public interface ConsumerMapper {
     @Mapping(source = "averageRating", target = "averageRating")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "priceType", target = "priceType")
+    @Mapping(source = "cancellationRate", target = "cancellationRate")
     ProviderSummaryResponse toProviderSummary(Provider provider);
 
     default List<ProviderSummaryResponse> mapSavedProviders(List<Provider> providers) {
