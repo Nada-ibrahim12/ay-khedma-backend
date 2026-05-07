@@ -87,4 +87,7 @@ public interface ProviderService {
     // Status & Verification
     // ProviderResponse updateEmergencyStatus(Long providerId, boolean enabled);
     VerificationStatus getVerificationStatus(Long providerId);
+
+    List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlotsForDateRange(Long providerId, LocalDate startDate,
+            LocalDate endDate);
 }

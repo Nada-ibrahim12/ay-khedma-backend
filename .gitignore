@@ -42,6 +42,8 @@ src/main/resources/firebase-service-account.json
 # Migration
 src/main/resources/db/migration/*
 
+# Inserted data
+Insert_Data.sql
 # Python virtual environment
 venv/
 .venv/

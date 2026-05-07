@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+import org.springframework.web.multipart.MultipartFile;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -17,6 +19,8 @@ import java.time.LocalTime;
 public class AiChatRequest {
 
     private String message;
+    
+    private MultipartFile voiceNote;
 
     private String sessionId;
 

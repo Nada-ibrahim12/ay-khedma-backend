@@ -2,6 +2,7 @@ package com.aykhedma.model.chat;
 
 public enum ChatResponseType {
     TEXT,
+    SUGGESTION,
     PROVIDER_LIST,
     AVAILABLE_SLOTS,
     BOOKING_CREATED,
