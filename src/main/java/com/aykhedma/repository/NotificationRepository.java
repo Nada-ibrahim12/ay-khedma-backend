@@ -46,6 +46,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("DELETE FROM Notification n WHERE n.createdAt < :expiryDate")
     int deleteOldNotifications(@Param("expiryDate") LocalDateTime expiryDate);
 
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Notification n WHERE n.userId = :userId")
+    int deleteByUserId(@Param("userId") Long userId);
+
     List<Notification> findByStatus(String status);
 
     @Query("SELECT COUNT(n) FROM Notification n WHERE n.userId = :userId AND n.isRead = false")

@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.file.attribute.UserPrincipal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,6 +27,7 @@ import java.util.Map;
 public class NotificationController {
 
     private final NotificationService notificationService;
+
 
     @PostMapping("/send-email")
     public ResponseEntity<Map<String, Object>> sendEmailNotification(
@@ -88,34 +90,12 @@ public class NotificationController {
                 Map.of()));
     }
 
-    /**
-     * Send a test notification (for development only)
-     *
-     * @param request Notification request
-     * @return Success response
-     */
-    // @PostMapping("/test/send")
-    // public ResponseEntity<Map<String, Object>> sendTestNotification(
-    // @RequestBody NotificationRequest request) {
-
-    // log.info("Sending test notification to user: {}", request.getUserId());
-
-    // notificationService.sendNotification(request);
-
-    // return ResponseEntity.ok(buildSuccessResponse(
-    // "Test notification sent",
-    // request.getUserId(),
-    // request.getType(),
-    // Map.of()));
-    // }
-
     @GetMapping
     public ResponseEntity<Page<NotificationDTO>> getUserNotifications(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
             @RequestParam(value = "userId", required = false) Long paramUserId,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        // Get userId from header or parameter
         Long userId = headerUserId != null ? headerUserId : paramUserId;
 
         if (userId == null) {
@@ -324,6 +304,30 @@ public class NotificationController {
                 startDate, endDate, pageable);
         return ResponseEntity.ok(filteredNotifications);
     }
+
+    @GetMapping("/types/{type}")
+    public ResponseEntity<Page<NotificationDTO>> getByType(
+        @AuthenticationPrincipal UserPrincipal currentUser
+        @PathVariable NotificationType type, Pageable pageable) {
+        Page<NotificationDTO> notifications = notificationService.getNotificationsByType(type, pageable);
+        return ResponseEntity.ok(notifications);
+    }
+    @DeleteMapping("/clear/all")
+    public ResponseEntity<?> clearAllNotifications(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        notificationService.clearAllNotifications();
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "All notifications cleared");
+        return ResponseEntity.ok(response);
+    }
+
+    // @PutMapping("/settings")
+    // public ResponseEntity<?> updateNotificationSettings(
+    //     @AuthenticationPrincipal UserPrincipal currentUser
+    //     @RequestBody NotificationSettingsRequest settings) {
+    //     notificationService.updateNotificationSettings(currentUser.getName(), settings);
+    //     }
 
     private Map<String, Object> buildSuccessResponse(String message, Long userId, Object type,
             Map<String, Object> extraFields) {

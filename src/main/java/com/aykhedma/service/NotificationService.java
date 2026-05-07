@@ -278,14 +278,19 @@ public class NotificationService {
     /**
      * List failed notifications for a user (any channel failed)
      */
-    public java.util.List<com.aykhedma.dto.response.NotificationDTO> listFailedNotifications(Long userId) {
-        java.util.List<Notification> failed = notificationRepository.findFailedNotifications(userId);
+    public List<com.aykhedma.dto.response.NotificationDTO> listFailedNotifications(Long userId) {
+        List<Notification> failed = notificationRepository.findFailedNotifications(userId);
         return failed.stream().map(com.aykhedma.dto.response.NotificationDTO::fromEntity)
-                .collect(java.util.stream.Collectors.toList());
+                .collect(stream.Collectors.toList());
     }
 
     public long getUnreadCount(Long userId) {
         return notificationRepository.countUnreadByUserId(userId);
+    }
+
+    public List<NotificationDTO> getNotificationsByType(Long userId, NotificationType type) {
+        List<Notification> notifications = notificationRepository.findByUserIdAndTypeOrderBySentAtDesc(userId, type);
+        return notifications.stream().map(NotificationDTO::fromEntity).collect(stream.Collectors.toList());
     }
 
     @Transactional
@@ -317,6 +322,19 @@ public class NotificationService {
         messagingTemplate.convertAndSend(
                 "/topic/notifications-count-" + userId,
                 Map.of("count", 0));
+    }
+
+    @Transactional
+    public int deleteAllNotifications(Long userId) {
+        int deleted = notificationRepository.deleteByUserId(userId);
+        log.info("Deleted {} notifications for user: {}", deleted, userId);
+
+        // Send updated count via WebSocket
+        messagingTemplate.convertAndSend(
+                "/topic/notifications-count-" + userId,
+                Map.of("count", 0));
+
+        return deleted;
     }
 
     @Transactional
