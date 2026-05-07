@@ -240,11 +240,11 @@ class NotificationServiceTest {
         @Test
         @DisplayName("Should mark all notifications as read")
         void shouldMarkAllAsRead() {
-            when(notificationRepository.markAllAsRead(USER_ID)).thenReturn(5);
+            when(notificationRepository.markAllAsRead(USER_ID, LocalDateTime.now())).thenReturn(5);
 
             notificationService.markAllAsRead(USER_ID);
 
-            verify(notificationRepository).markAllAsRead(USER_ID);
+            verify(notificationRepository).markAllAsRead(USER_ID, LocalDateTime.now());
             verify(messagingTemplate).convertAndSendToUser(
                     eq(USER_ID.toString()),
                     eq("/queue/notifications/count"),

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -33,6 +34,6 @@ public interface EmergencyRequestRepository extends JpaRepository<EmergencyReque
     @Query("UPDATE EmergencyRequest er " +
             "SET er.status = 'EXPIRED' " +
             "WHERE er.status = 'WAITING_ACCEPTANCE' " +
-            "AND er.createdAt + 1 hour < CURRENT_TIMESTAMP ")
-    void expireEmergencyRequests();
+            "AND er.createdAt + 1 hour < :currentTimestamp ")
+    void expireEmergencyRequests(@Param("currentTimestamp")LocalDateTime currentTimestamp);
 }

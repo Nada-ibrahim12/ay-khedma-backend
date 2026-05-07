@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Component
@@ -19,6 +20,6 @@ public class BookingExpiryScheduler
     @Transactional
     public void expirePendingBookings ()
     {
-        bookingRepository.expirePendingBookings();
+        bookingRepository.expirePendingBookings(LocalDateTime.now(), LocalDate.now(), LocalTime.now());
     }
 }

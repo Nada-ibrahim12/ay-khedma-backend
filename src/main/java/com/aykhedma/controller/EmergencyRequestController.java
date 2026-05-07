@@ -33,6 +33,23 @@ public class EmergencyRequestController
     // =================================== Consumer Side ===================================
 
     @PreAuthorize("hasRole('CONSUMER')")
+    @GetMapping("/get-current-emergency-request")
+    @Operation(summary = "Checks if there is a currently ongoing emergency request for this consumer")
+    @ApiResponses(value =
+            {
+                   @ApiResponse(responseCode = "200", description = "Emergency request retrieved successfully",
+                           content = @Content(schema = @Schema(implementation = EmergencyRequestResponse.class))),
+                   @ApiResponse(responseCode = "404", description = "consumer or emergency request not found")
+            })
+    public ResponseEntity<EmergencyRequestResponse> getCurrentEmergencyRequest(
+            @Parameter(description = "ID of the consumer", required = true)
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId)
+    {
+        EmergencyRequestResponse response = emergencyRequestService.getCurrentEmergencyRequest(consumerId);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @PreAuthorize("hasRole('CONSUMER')")
     @PostMapping("/request-emergency-request")
     @Operation(summary = "Request an emergency request")
     @ApiResponses(value =
@@ -49,7 +66,7 @@ public class EmergencyRequestController
             @Valid @RequestBody EmergencyRequestRequest request)
     {
         EmergencyRequestResponse response = emergencyRequestService.requestEmergencyRequest(consumerId, request);
-        return ResponseEntity.status(HttpStatus.OK).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PreAuthorize("hasRole('CONSUMER')")

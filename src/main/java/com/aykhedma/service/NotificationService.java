@@ -315,7 +315,7 @@ public class NotificationService {
 
     @Transactional
     public void markAllAsRead(Long userId) {
-        int updated = notificationRepository.markAllAsRead(userId);
+        int updated = notificationRepository.markAllAsRead(userId, LocalDateTime.now());
         log.info("Marked {} notifications as read for user: {}", updated, userId);
 
         // Send updated count via WebSocket

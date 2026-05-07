@@ -321,7 +321,7 @@ class NotificationRepositoryTest {
 
             assertEquals(3L, notificationRepository.countUnreadByUserId(testUser.getId()));
 
-            notificationRepository.markAllAsRead(testUser.getId());
+            notificationRepository.markAllAsRead(testUser.getId(), LocalDateTime.now());
 
             assertEquals(0L, notificationRepository.countUnreadByUserId(testUser.getId()));
         }

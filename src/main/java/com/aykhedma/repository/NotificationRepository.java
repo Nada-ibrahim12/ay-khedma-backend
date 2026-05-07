@@ -3,6 +3,7 @@ package com.aykhedma.repository;
 import com.aykhedma.model.notification.Notification;
 import com.aykhedma.model.notification.NotificationType;
 import jakarta.transaction.Transactional;
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -35,8 +36,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByUserIdAndTypeOrderBySentAtDesc(Long userId, NotificationType type);
 
     @Modifying
-    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP WHERE n.userId = :userId AND n.isRead = false")
-    int markAllAsRead(@Param("userId") Long userId);
+    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = :currentTimestamp WHERE n.userId = :userId AND n.isRead = false")
+    int markAllAsRead(@Param("userId") Long userId,
+                      @Param("currentTimestamp") LocalDateTime currentTimestamp);
 
     @Query("SELECT n FROM Notification n WHERE n.userId = :userId ORDER BY n.sentAt DESC")
     List<Notification> findRecentNotifications(@Param("userId") Long userId, Pageable pageable);

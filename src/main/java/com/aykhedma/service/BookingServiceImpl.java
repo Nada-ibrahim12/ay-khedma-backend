@@ -280,7 +280,7 @@ public class BookingServiceImpl implements BookingService
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
-        Object[] result = (Object[]) bookingRepository.findBookingStatsCurrentWeek(providerId);
+        Object[] result = (Object[]) bookingRepository.findBookingStatsCurrentWeek(providerId, LocalDate.now());
 
         Integer acceptedAndCompletedBookings = result[0] != null ? ((Number) result[0]).intValue() : 0;
         Integer cancelledBookings = result[1] != null ? ((Number) result[1]).intValue() : 0;
@@ -297,7 +297,7 @@ public class BookingServiceImpl implements BookingService
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
-        List<Object[]> results = bookingRepository.findBookingStatsLastSixMonths(providerId);
+        List<Object[]> results = bookingRepository.findBookingStatsLastSixMonths(providerId, LocalDate.now());
         List<String> months = new ArrayList<>();
         List<Integer> completedBookings = new ArrayList<>(), cancelledBookings = new ArrayList<>();
 
@@ -458,7 +458,7 @@ public class BookingServiceImpl implements BookingService
         List<Booking> bookings;
 
         if (user.getRole() == UserType.CONSUMER || user.getRole() == UserType.PROVIDER)
-            bookings = bookingRepository.findUpcomingBookings(userId);
+            bookings = bookingRepository.findUpcomingBookings(userId, LocalDate.now(), LocalTime.now());
         else
             throw new ForbiddenException("User is not a provider or a consumer");
 

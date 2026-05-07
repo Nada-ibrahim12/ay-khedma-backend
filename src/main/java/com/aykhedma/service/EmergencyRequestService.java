@@ -10,6 +10,8 @@ import java.util.List;
 
 public interface EmergencyRequestService
 {
+    EmergencyRequestResponse getCurrentEmergencyRequest (Long consumerId);
+
     EmergencyRequestResponse requestEmergencyRequest (Long consumerId, EmergencyRequestRequest request);
 
     void broadcastEmergencyRequest (Long requestId);

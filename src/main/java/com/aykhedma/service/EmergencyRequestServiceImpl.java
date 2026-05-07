@@ -52,6 +52,20 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
     private final RestTemplate restTemplate;
     private final SimpMessagingTemplate simpMessagingTemplate;
 
+    @Override
+    public EmergencyRequestResponse getCurrentEmergencyRequest (Long consumerId)
+    {
+        Consumer consumer = consumerRepository.findById(consumerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
+
+        EmergencyRequest currentEmergencyRequest = emergencyRequestRepository.findTopByConsumerIdAndStatusInOrderByCreatedAtDesc
+                (consumerId, List.of(EmergencyRequestStatus.BROADCASTING, EmergencyRequestStatus.WAITING_ACCEPTANCE));
+
+        if (currentEmergencyRequest == null)
+            throw new ResourceNotFoundException("No currently ongoing emergency request found for this consumer");
+
+        return emergencyRequestMapper.toEmergencyRequestResponse(currentEmergencyRequest);
+    }
 
     @Override
     @Transactional
@@ -67,7 +81,7 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
                 (consumerId, List.of(EmergencyRequestStatus.BROADCASTING, EmergencyRequestStatus.WAITING_ACCEPTANCE));
 
         if (currentEmergencyRequest != null)
-            return emergencyRequestMapper.toEmergencyRequestResponse(currentEmergencyRequest);
+            throw new BadRequestException("Cannot request an emergency request. A currently ongoing emergency request for this consumer already exists");
 
         LocationDTO locationDTO = request.getLocation();
         Location location = Location.builder()
