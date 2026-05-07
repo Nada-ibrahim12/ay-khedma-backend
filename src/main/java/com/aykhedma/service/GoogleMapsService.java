@@ -33,9 +33,9 @@ public class GoogleMapsService
     {
         DistanceAndTime distanceAndTime = new DistanceAndTime();
 
-        String url = "https://maps.googleapis.com/maps/api/distancematrix/json?origin="
+        String url = "https://maps.googleapis.com/maps/api/distancematrix/json?origins="
                 + originLat + "," + originLong
-                + "&destination=" + destLat + "," + destLong
+                + "&destinations=" + destLat + "," + destLong
                 + "&key=" + apiKey;
 
         ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
@@ -44,9 +44,18 @@ public class GoogleMapsService
         {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode root = mapper.readTree(response.getBody());
-            JsonNode element = root.path("rows").get(0).path("elements").get(0);
+
+            JsonNode rowsNode = root.path("rows");
+            if (!rowsNode.isArray() || rowsNode.isEmpty())
+                throw new RuntimeException("Invalid Google Maps response: rows missing or empty");
+
+            JsonNode elementsNode = rowsNode.get(0).path("elements");
+            if (!elementsNode.isArray() || elementsNode.isEmpty())
+                throw new RuntimeException("Invalid Google Maps response: elements missing or empty");
+
+            JsonNode element = elementsNode.get(0);
             distanceAndTime.distance = element.path("distance").path("value").asDouble() / 1000;
-            distanceAndTime.estimatedArrivalTime = element.path("duration").path("value").asInt() / 60;
+            distanceAndTime.estimatedArrivalTime= element.path("duration").path("value").asInt() / 60;
 
             return distanceAndTime;
         }

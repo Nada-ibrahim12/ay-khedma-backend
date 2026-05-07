@@ -49,7 +49,7 @@ public class EmergencyRequestController
             @Valid @RequestBody EmergencyRequestRequest request)
     {
         EmergencyRequestResponse response = emergencyRequestService.requestEmergencyRequest(consumerId, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
     @PreAuthorize("hasRole('CONSUMER')")

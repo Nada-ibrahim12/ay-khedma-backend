@@ -103,6 +103,10 @@ public class ProviderServiceImpl implements ProviderService {
             provider.setWorksAt(request.getWorksAt());
         }
 
+        if (request.getWorkLocation() != null) {
+            provider.setWorkLocation(request.getWorkLocation());
+        }
+
         if (request.getPrice() != null) {
             provider.setPrice(request.getPrice());
         }

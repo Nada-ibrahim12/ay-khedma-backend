@@ -1,24 +1,21 @@
 package com.aykhedma.scheduler;
 
-import com.aykhedma.repository.BookingRepository;
+import com.aykhedma.repository.EmergencyRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
-
 @Component
 @RequiredArgsConstructor
-public class BookingExpiryScheduler
+public class EmergencyRequestExpiryScheduler
 {
-    private final BookingRepository bookingRepository;
+    private final EmergencyRequestRepository emergencyRequestRepository;
 
     @Scheduled(fixedRate = 60000)
     @Transactional
-    public void expirePendingBookings ()
+    public void expireEmergencyRequests ()
     {
-        bookingRepository.expirePendingBookings();
+        emergencyRequestRepository.expireEmergencyRequests();
     }
 }

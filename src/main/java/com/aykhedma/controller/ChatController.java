@@ -78,18 +78,15 @@ public class ChatController {
             @RequestPart(required = false) String roomId,
             @AuthenticationPrincipal CustomUserDetails user
     ) throws IOException {
-
         if (roomId == null || roomId.isBlank()) {
             throw new BadRequestException("roomId is required");
         }
-
         if ((content == null || content.isBlank())
                 && (mediaFiles == null || mediaFiles.isEmpty())) {
             throw new BadRequestException("Message must contain content or media");
+
         }
-
         MessageType messageType;
-
         try {
             messageType = (type != null && !type.isBlank())
                     ? MessageType.valueOf(type.toUpperCase())
@@ -97,16 +94,15 @@ public class ChatController {
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Invalid message type");
         }
-
         ChatMessageRequest request = new ChatMessageRequest();
         request.setContent(content);
         request.setMediaFiles(mediaFiles);
         request.setType(messageType);
         request.setRoomId(roomId);
-
         return ResponseEntity.ok(
                 chatService.sendMessage(user.getUser(), request)
         );
+
     }
     @GetMapping("/messages")
     @ApiResponses({ @ApiResponse(responseCode = "200", description = "Messages returned"),
