@@ -151,7 +151,7 @@ public class AdminController {
             @ApiResponse(responseCode = "409", description = "Conflict - email or phone already exists")
     })
     public ResponseEntity<String> addUser(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request, null, null, null, null);
+        authService.register(request, null, null, null, null, null);
         return ResponseEntity.ok("User created successfully");
     }
 

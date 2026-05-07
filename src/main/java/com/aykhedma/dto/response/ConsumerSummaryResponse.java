@@ -1,5 +1,6 @@
 package com.aykhedma.dto.response;
 
+import com.aykhedma.dto.location.LocationDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,4 +16,5 @@ public class ConsumerSummaryResponse {
     private String name;
     private String profileImage;
     private String phoneNumber;
+    private LocationDTO location;
 }

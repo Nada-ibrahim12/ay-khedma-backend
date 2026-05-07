@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.locationtech.jts.geom.Point;
 import java.util.List;
 import java.util.Optional;
 
@@ -118,5 +119,17 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
 
         // for AI
         List<Provider> findByServiceTypeIdAndVerificationStatus(Long serviceTypeId, VerificationStatus status);
+  
+      @Query(value = "SELECT p.*, u.* FROM providers p " +
+            "JOIN users u ON p.id = u.id " +
+            "JOIN locations l ON p.location_id = l.id " +
+            "WHERE p.service_type_id = :serviceTypeId " +
+            "AND p.emergency_enabled = true " +
+            "AND p.verification_status = 'VERIFIED' " +
+            "AND ST_DWithin(l.coordinates, :requestCoordinates, :radiusMeters)",
+            nativeQuery = true)
+    List<Provider> findProvidersWithinRadius(@Param("serviceTypeId") Long serviceTypeId,
+                                             @Param("requestCoordinates") Point requestCoordinates,
+                                             @Param("radiusMeters") double radiusMeters);
 
 }

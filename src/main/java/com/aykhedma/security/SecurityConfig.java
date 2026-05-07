@@ -19,6 +19,8 @@ import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 public class SecurityConfig {
 
         private final JwtAuthenticationFilter jwtFilter;
+        private final CustomAccessDeniedHandler accessDeniedHandler;
+        private final CustomAuthenticationEntryPoint authenticationEntryPoint;
 
         // 🔐 Password Encoder
         @Bean
@@ -37,6 +39,11 @@ public class SecurityConfig {
                                 // We use JWT → no session
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                                // Custom error responses for 401/403
+                                .exceptionHandling(exceptions -> exceptions
+                                                .authenticationEntryPoint(authenticationEntryPoint)
+                                                .accessDeniedHandler(accessDeniedHandler))
 
                                 // Authorization rules
                                 .authorizeHttpRequests(auth -> auth

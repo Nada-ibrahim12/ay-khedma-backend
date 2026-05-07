@@ -5,6 +5,8 @@ import com.aykhedma.dto.request.BookingRequest;
 import com.aykhedma.dto.request.CancelBookingRequest;
 import com.aykhedma.dto.response.AcceptBookingResponse;
 import com.aykhedma.dto.response.BookingResponse;
+import com.aykhedma.dto.response.MonthlyBookingStatsResponse;
+import com.aykhedma.dto.response.WeeklyBookingStatsResponse;
 import com.aykhedma.model.booking.BookingStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +21,10 @@ public interface BookingService
 
     BookingResponse declineBooking (Long providerId, Long bookingId);
 
+    WeeklyBookingStatsResponse getWeeklyBookingStats (Long providerId);
+
+    MonthlyBookingStatsResponse getMonthlyBookingStats (Long providerId);
+
     BookingResponse cancelBooking (Long userId, CancelBookingRequest cancelBookingRequest);
 
     Page<BookingResponse> getBookingsByStatus (Long userId, BookingStatus status, Pageable pageable);
@@ -28,4 +34,6 @@ public interface BookingService
     BookingResponse submitRating(Long consumerId, com.aykhedma.dto.request.RatingRequest ratingRequest);
 
     BookingResponse submitConsumerRating(Long providerId, com.aykhedma.dto.request.ProviderRatingRequest ratingRequest);
+
+    List<com.aykhedma.dto.response.ConsumerReviewResponse> getConsumerReviews(Long consumerId);
 }

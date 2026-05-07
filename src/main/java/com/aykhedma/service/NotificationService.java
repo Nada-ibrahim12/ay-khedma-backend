@@ -120,16 +120,14 @@ public class NotificationService {
     private void sendWebSocketNotification(Notification notification) {
         NotificationDTO dto = NotificationDTO.fromEntity(notification);
 
-        messagingTemplate.convertAndSendToUser(
-                notification.getUserId().toString(),
-                "/queue/notifications",
+        messagingTemplate.convertAndSend(
+                "/topic/notifications-" + notification.getUserId(),
                 dto);
 
         long unreadCount = notificationRepository.countUnreadByUserId(notification.getUserId());
 
-        messagingTemplate.convertAndSendToUser(
-                notification.getUserId().toString(),
-                "/queue/notifications/count",
+        messagingTemplate.convertAndSend(
+                "/topic/notifications-count-" + notification.getUserId(),
                 Map.of("count", unreadCount));
 
         notification.setDelivered(true);
@@ -213,9 +211,8 @@ public class NotificationService {
 
         // Send updated count via WebSocket
         long unreadCount = notificationRepository.countUnreadByUserId(userId);
-        messagingTemplate.convertAndSendToUser(
-                userId.toString(),
-                "/queue/notifications/count",
+        messagingTemplate.convertAndSend(
+                "/topic/notifications-count-" + userId,
                 Map.of("count", unreadCount));
     }
 
@@ -225,9 +222,8 @@ public class NotificationService {
         log.info("Marked {} notifications as read for user: {}", updated, userId);
 
         // Send updated count via WebSocket
-        messagingTemplate.convertAndSendToUser(
-                userId.toString(),
-                "/queue/notifications/count",
+        messagingTemplate.convertAndSend(
+                "/topic/notifications-count-" + userId,
                 Map.of("count", 0));
     }
 

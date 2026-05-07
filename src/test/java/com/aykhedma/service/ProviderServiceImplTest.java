@@ -143,6 +143,7 @@ class ProviderServiceImplTest {
                                         .email("updated@example.com")
                                         .phoneNumber("01234567890")
                                         .bio("Updated bio")
+                                        .workLocation("Nasr City, Cairo")
                                         .serviceTypeId(10L)
                                         .price(120.0)
                                         .priceType("HOUR")
@@ -164,6 +165,7 @@ class ProviderServiceImplTest {
                         assertThat(provider.getEmail()).isEqualTo(request.getEmail());
                         assertThat(provider.getPhoneNumber()).isEqualTo(request.getPhoneNumber());
                         assertThat(provider.getBio()).isEqualTo(request.getBio());
+                        assertThat(provider.getWorkLocation()).isEqualTo(request.getWorkLocation());
                         assertThat(provider.getPrice()).isEqualTo(request.getPrice());
                         assertThat(provider.getPriceType()).isEqualTo(PriceType.HOUR);
                         assertThat(provider.getServiceAreaRadius()).isEqualTo(request.getServiceAreaRadius());

@@ -25,6 +25,8 @@ public interface ProviderService {
 
     ProviderResponse updateProfilePicture(Long providerId, MultipartFile file) throws IOException;
 
+    ProviderResponse deleteProfilePicture(Long providerId);
+
     // Location & Search
     // ProfileResponse updateProviderLocation(Long providerId, LocationDTO request);
     // List<ProviderSummaryResponse> findNearbyProviders(Double latitude, Double

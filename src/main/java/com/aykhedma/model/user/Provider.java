@@ -71,6 +71,10 @@ public class Provider extends User {
     @Column(length = 255)
     private String worksAt;
 
+    @Size(max = 255, message = "Work location cannot exceed 255 characters")
+    @Column(length = 255)
+    private String workLocation;
+
     @OneToMany(mappedBy = "provider", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Size(max = 20, message = "Cannot have more than 20 documents")
     @Builder.Default
@@ -98,6 +102,10 @@ public class Provider extends User {
     @Size(max = 500, message = "National ID back image URL cannot exceed 500 characters")
     @Column(length = 500)
     private String nationalIdBackImage;
+
+    @Size(max = 500, message = "Selfie image URL cannot exceed 500 characters")
+    @Column(length = 500)
+    private String selfieImage;
 
     @NotNull(message = "Schedule is required")
     @OneToOne(cascade = CascadeType.ALL)
@@ -165,6 +173,11 @@ public class Provider extends User {
     @Max(value = 100, message = "Acceptance rate cannot exceed 100")
     private Integer acceptanceRate = 100;
 
+    @Builder.Default
+    @DecimalMin(value = "0.0", message = "Cancellation rate cannot be negative")
+    @DecimalMax(value = "100.0", message = "Cancellation rate cannot exceed 100.0")
+    private Double cancellationRate = 0.0;
+
     @Min(value = 0, message = "Response time cannot be negative")
     @Max(value = 60, message = "Response time cannot exceed 60 minutes")
     private Integer responseTime;
@@ -173,10 +186,35 @@ public class Provider extends User {
     @Column(length = 500)
     private String rejectionReason;
 
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private boolean isNidVerified = false;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default false")
+    private boolean isFaceMatched = false;
+
+    private Double faceMatchConfidence;
+
     public Double getCancellationRate() {
         if (totalBookings == null || totalBookings == 0) {
             return 0.0;
         }
         return Math.round(((double) cancelledBookings / totalBookings) * 100.0 * 10.0) / 10.0;
+    }
+
+    public Double getAverageJobs() {
+        if (completedJobs == null || completedJobs == 0 || super.getCreatedAt() == null) {
+            return 0.0;
+        }
+        java.time.LocalDateTime created = super.getCreatedAt();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        long months = java.time.temporal.ChronoUnit.MONTHS.between(
+                java.time.LocalDate.of(created.getYear(), created.getMonth(), 1),
+                java.time.LocalDate.of(now.getYear(), now.getMonth(), 1));
+        if (months <= 0)
+            months = 1;
+        double avg = (double) completedJobs / (double) months;
+        return Math.round(avg * 10.0) / 10.0;
     }
 }

@@ -64,33 +64,46 @@ public class ChatController {
     }
 
     @PostMapping(value = "/send", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @ApiResponses({ @ApiResponse(responseCode = "200", description = "Message sent"),
-            @ApiResponse(responseCode = "400", description = "Invalid request"), @ApiResponse(responseCode = "403", description = "Forbidden"),
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Message sent"),
+            @ApiResponse(responseCode = "400", description = "Invalid request"),
+            @ApiResponse(responseCode = "403", description = "Forbidden"),
             @ApiResponse(responseCode = "404", description = "Room not found"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized") })
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
     public ResponseEntity<ChatMessageResponse> send(
             @RequestPart(required = false) String content,
             @RequestPart(required = false) List<MultipartFile> mediaFiles,
-            @RequestPart(required = false) MessageType type,
+            @RequestPart(required = false) String type,
             @RequestPart(required = false) String roomId,
             @AuthenticationPrincipal CustomUserDetails user
     ) throws IOException {
+        if (roomId == null || roomId.isBlank()) {
+            throw new BadRequestException("roomId is required");
+        }
+        if ((content == null || content.isBlank())
+                && (mediaFiles == null || mediaFiles.isEmpty())) {
+            throw new BadRequestException("Message must contain content or media");
 
-        if (roomId == null || roomId.isBlank()) { throw new BadRequestException("roomId is required"); }
-        if ((content == null || content.isBlank()) && (mediaFiles == null || mediaFiles.isEmpty())) {
-            throw new BadRequestException("Message must contain content or media"); }
-
+        }
+        MessageType messageType;
+        try {
+            messageType = (type != null && !type.isBlank())
+                    ? MessageType.valueOf(type.toUpperCase())
+                    : MessageType.TEXT;
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid message type");
+        }
         ChatMessageRequest request = new ChatMessageRequest();
         request.setContent(content);
         request.setMediaFiles(mediaFiles);
-        request.setType(type != null ? type : MessageType.TEXT);
+        request.setType(messageType);
         request.setRoomId(roomId);
-
         return ResponseEntity.ok(
                 chatService.sendMessage(user.getUser(), request)
         );
-    }
 
+    }
     @GetMapping("/messages")
     @ApiResponses({ @ApiResponse(responseCode = "200", description = "Messages returned"),
             @ApiResponse(responseCode = "403", description = "Forbidden"),

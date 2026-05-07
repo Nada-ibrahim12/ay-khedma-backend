@@ -1,9 +1,10 @@
 package com.aykhedma.model.emergency;
 
-public enum EmergencyStatus {
+public enum EmergencyRequestStatus {
     BROADCASTING,
     WAITING_ACCEPTANCE,
     ACCEPTED,
     CANCELLED,
-    NO_PROVIDERS
+    NO_PROVIDERS,
+    EXPIRED
 }

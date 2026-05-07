@@ -25,6 +25,7 @@ public class ProviderResponse {
     private Integer yearsOfExperience;
     private String nationalIdFrontImage;
     private String nationalIdBackImage;
+    private String selfieImage;
     private VerificationStatus verificationStatus;
     private Integer completedJobs;
     private Integer totalBookings;
@@ -33,12 +34,14 @@ public class ProviderResponse {
     private String serviceCategory;
     private Long serviceTypeId;
     private String worksAt;
+    private String workLocation;
     private LocationDTO location;
     private Boolean emergencyEnabled;
     private Double averagePunctualityRating;
     private Double averageCommitmentRating;
     private Double averageQualityOfWorkRating;
     private Double averageRating;
+    private Double averageJobs;
     private Double price;
     private PriceType priceType;
     private Integer averageTime;
