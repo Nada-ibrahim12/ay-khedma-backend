@@ -3,6 +3,7 @@ package com.aykhedma.repository;
 import com.aykhedma.model.notification.Notification;
 import com.aykhedma.model.notification.NotificationType;
 import jakarta.transaction.Transactional;
+import org.springframework.cglib.core.Local;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -35,9 +36,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByUserIdAndTypeOrderBySentAtDesc(Long userId, NotificationType type);
 
     @Modifying
-    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = CURRENT_TIMESTAMP WHERE n.userId = :userId AND n.isRead = false")
-    int markAllAsRead(@Param("userId") Long userId);
-
+    @Query("UPDATE Notification n SET n.isRead = true, n.readAt = :currentTimestamp WHERE n.userId = :userId AND n.isRead = false")
+    int markAllAsRead(@Param("userId") Long userId,
+                      @Param("currentTimestamp") LocalDateTime currentTimestamp);
 
     @Query("SELECT n FROM Notification n WHERE n.userId = :userId ORDER BY n.sentAt DESC")
     List<Notification> findRecentNotifications(@Param("userId") Long userId, Pageable pageable);
@@ -47,11 +48,20 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("DELETE FROM Notification n WHERE n.createdAt < :expiryDate")
     int deleteOldNotifications(@Param("expiryDate") LocalDateTime expiryDate);
 
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Notification n WHERE n.userId = :userId")
+    int deleteByUserId(@Param("userId") Long userId);
+
     List<Notification> findByStatus(String status);
 
     @Query("SELECT COUNT(n) FROM Notification n WHERE n.userId = :userId AND n.isRead = false")
     long getUnreadCount(@Param("userId") Long userId);
 
-        @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND n.createdAt BETWEEN :start AND :end ORDER BY n.createdAt DESC")
-    List<Notification> findByUserIdAndCreatedAtBetween(Long userId, LocalDateTime start, LocalDateTime end, Pageable pageable);
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND (n.pushFailed = true OR n.emailFailed = true OR n.inAppFailed = true) ORDER BY n.createdAt DESC")
+    List<Notification> findFailedNotifications(@Param("userId") Long userId);
+
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND n.createdAt BETWEEN :start AND :end ORDER BY n.createdAt DESC")
+    List<Notification> findByUserIdAndCreatedAtBetween(Long userId, LocalDateTime start, LocalDateTime end,
+            Pageable pageable);
 }

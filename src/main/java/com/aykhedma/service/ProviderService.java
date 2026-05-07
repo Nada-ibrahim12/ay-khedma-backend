@@ -18,76 +18,81 @@ import java.util.List;
 import java.util.Map;
 
 public interface ProviderService {
-    // Profile Management
-    ProviderResponse getProviderProfile(Long providerId);
+        // Profile Management
+        ProviderResponse getProviderProfile(Long providerId);
 
-    ProviderResponse updateProviderProfile(Long providerId, ProviderProfileRequest request);
+        ProviderResponse updateProviderProfile(Long providerId, ProviderProfileRequest request);
 
-    ProviderResponse updateProfilePicture(Long providerId, MultipartFile file) throws IOException;
+        ProviderResponse updateProfilePicture(Long providerId, MultipartFile file) throws IOException;
 
-    ProviderResponse deleteProfilePicture(Long providerId);
+        ProviderResponse deleteProfilePicture(Long providerId);
 
-    // Location & Search
-    // ProfileResponse updateProviderLocation(Long providerId, LocationDTO request);
-    // List<ProviderSummaryResponse> findNearbyProviders(Double latitude, Double
-    // longitude, Long serviceTypeId, Double radius);
-    List<ProviderSummaryResponse> allProviders();
+        // Location & Search
+        // ProfileResponse updateProviderLocation(Long providerId, LocationDTO request);
+        // List<ProviderSummaryResponse> findNearbyProviders(Double latitude, Double
+        // longitude, Long serviceTypeId, Double radius);
+        List<ProviderSummaryResponse> allProviders();
 
-    Page<SearchResponse> search(
-            String keyword,
-            Long categoryId,
-            String categoryName,
-            Long consumerId,
-            Double radius,
-            String sortBy,
-            Pageable pageable);
-    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable);
-    // Schedule Management
-    ScheduleResponse addWorkingDay(Long providerId, WorkingDayRequest request);
+        Page<SearchResponse> search(
+                        String keyword,
+                        Long categoryId,
+                        String categoryName,
+                        Long consumerId,
+                        Double radius,
+                        String sortBy,
+                        Pageable pageable);
 
-    ScheduleResponse removeWorkingDay(Long providerId, Long workingDayId);
+        public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable);
 
-    ScheduleResponse updateWorkingDay(Long providerId, Long workingDayId, WorkingDayRequest request);
+        // Schedule Management
+        ScheduleResponse addWorkingDay(Long providerId, WorkingDayRequest request);
 
-    ScheduleResponse getSchedule(Long providerId);
+        ScheduleResponse removeWorkingDay(Long providerId, Long workingDayId);
 
-    List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlots(Long providerId, LocalDate date);
+        ScheduleResponse updateWorkingDay(Long providerId, Long workingDayId, WorkingDayRequest request);
 
-    List<ScheduleResponse.TimeSlotResponse> getTimeSlotsByDate(Long providerId, LocalDate date);
+        WeeklyScheduleResponse getWeeklySchedule(Long providerId);
 
-    ScheduleResponse.TimeSlotResponse getTimeSlot(Long providerId, Long timeSlotId);
+        ScheduleResponse getSchedule(Long providerId);
 
-    // ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId, LocalDate
-    // date, LocalTime startTime,
-    // Integer durationMinutes);
+        List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlots(Long providerId, LocalDate date);
 
-    ScheduleResponse.TimeSlotResponse cancelBooking(Long timeSlotId);
+        List<ScheduleResponse.TimeSlotResponse> getTimeSlotsByDate(Long providerId, LocalDate date);
 
-    void validateHalfHourBoundary(LocalTime time);
+        ScheduleResponse.TimeSlotResponse getTimeSlot(Long providerId, Long timeSlotId);
 
-    TimeSlot reserveTimeSlotWithBuffer(Long scheduleId, LocalDate date, LocalTime bookingStart, LocalTime bookingEnd);
+        // ScheduleResponse.TimeSlotResponse bookTimeSlot(Long providerId, LocalDate
+        // date, LocalTime startTime,
+        // Integer durationMinutes);
 
-    void restoreAvailabilityForCancelledBooking(Booking booking);
+        ScheduleResponse.TimeSlotResponse cancelBooking(Long timeSlotId);
 
-    void mergeContiguousAvailableSlots(Long scheduleId, LocalDate date);
+        void validateHalfHourBoundary(LocalTime time);
 
-    LocalTime maxTime(LocalTime a, LocalTime b);
+        TimeSlot reserveTimeSlotWithBuffer(Long scheduleId, LocalDate date, LocalTime bookingStart,
+                        LocalTime bookingEnd);
 
-    LocalTime minTime(LocalTime a, LocalTime b);
+        void restoreAvailabilityForCancelledBooking(Booking booking);
 
-    List<ScheduleResponse.TimeSlotResponse> getUpcomingAvailableSlots(Long providerId, Integer days);
+        void mergeContiguousAvailableSlots(Long scheduleId, LocalDate date);
 
-    // Documents
-    DocumentResponse uploadDocument(Long providerId, MultipartFile file, String documentType) throws IOException;
+        LocalTime maxTime(LocalTime a, LocalTime b);
 
-    List<DocumentResponse> getProviderDocuments(Long providerId);
+        LocalTime minTime(LocalTime a, LocalTime b);
 
-    ProfileResponse deleteDocument(Long providerId, Long documentId);
+        List<ScheduleResponse.TimeSlotResponse> getUpcomingAvailableSlots(Long providerId, Integer days);
 
-    // Status & Verification
-    // ProviderResponse updateEmergencyStatus(Long providerId, boolean enabled);
-    VerificationStatus getVerificationStatus(Long providerId);
+        // Documents
+        DocumentResponse uploadDocument(Long providerId, MultipartFile file, String documentType) throws IOException;
 
-    List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlotsForDateRange(Long providerId, LocalDate startDate,
-            LocalDate endDate);
+        List<DocumentResponse> getProviderDocuments(Long providerId);
+
+        ProfileResponse deleteDocument(Long providerId, Long documentId);
+
+        // Status & Verification
+        // ProviderResponse updateEmergencyStatus(Long providerId, boolean enabled);
+        VerificationStatus getVerificationStatus(Long providerId);
+
+        List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlotsForDateRange(Long providerId, LocalDate startDate,
+                        LocalDate endDate);
 }

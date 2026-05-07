@@ -8,6 +8,7 @@ import com.aykhedma.exception.ForbiddenException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.exception.UnauthorizedException;
 import com.aykhedma.model.chat.*;
+import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.user.User;
 import com.aykhedma.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -31,186 +32,198 @@ public class ChatService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final MediaStorageService mediaStorageService;
+    private final NotificationFactory notificationFactory;
 
     public ChatRoom getOrCreateRoom(User sender, Long receiverId) {
 
-        if (sender == null)
-            throw new UnauthorizedException("User not authenticated");
+                if (sender == null)
+                        throw new UnauthorizedException("User not authenticated");
 
-        User receiver = userRepository.findById(receiverId)
-                .orElseThrow(() -> new ResourceNotFoundException("Receiver not found"));
+                User receiver = userRepository.findById(receiverId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Receiver not found"));
 
-        if (sender.getId().equals(receiver.getId())) {
-            throw new BadRequestException("Cannot create chat with yourself");
-        }
-
-        Optional<ChatRoom> existingRoom = chatRoomRepository.findRoomBetweenUsers(sender, receiver);
-
-        if (existingRoom.isPresent()) {
-            return existingRoom.get();
-        }
-
-        ChatRoom newRoom = ChatRoom.builder()
-                .participants(List.of(sender, receiver))
-                .isActive(true)
-                .roomName(sender.getName() + " & " + receiver.getName())
-                .build();
-
-        return chatRoomRepository.save(newRoom);
-    }
-    public Page<ChatRoomResponse> getUserRooms(User user, int page, int size) {
-
-        if (user == null)
-            throw new UnauthorizedException("User not authenticated");
-
-
-        Page<ChatRoom> rooms = chatRoomRepository.findUserRooms(
-                user.getId(),
-                PageRequest.of(page, size, Sort.by("lastMessageAt").descending())
-        );
-
-        return rooms.map(room -> {
-
-            User otherUser = room.getParticipants().stream()
-                    .filter(u -> !u.getId().equals(user.getId()))
-                    .findFirst()
-                    .orElse(null);
-
-            ChatMessage lastMsg = chatMessageRepository
-                    .findTopByChatRoomIdOrderByTimestampDesc(room.getId())
-                    .orElse(null);
-
-            return ChatRoomResponse.builder()
-                    .roomId(room.getId())
-                    .otherUserId(otherUser != null ? otherUser.getId() : null)
-                    .otherUserName(otherUser != null ? otherUser.getName() : "Unknown")
-                    .otherUserProfileImage(
-                            otherUser != null ? otherUser.getProfileImage() : null
-                    )
-                    .lastMessage(
-                            room.getLastMessage() != null
-                                    ? room.getLastMessage()
-                                    : (lastMsg != null ? lastMsg.getContent() : "")
-                    )
-                    .lastMessageTime(
-                            room.getLastMessageAt() != null
-                                    ? room.getLastMessageAt()
-                                    : (lastMsg != null ? lastMsg.getTimestamp() : null)
-                    )
-                    .unreadCount(
-                            chatMessageRepository.countUnreadMessages(room.getId(), user.getId())
-                    )
-                    .build();
-        });
-
-    }
-    @Transactional
-    public ChatMessageResponse sendMessage(User sender, ChatMessageRequest request) throws IOException {
-
-        if (sender == null)
-            throw new UnauthorizedException("User not authenticated");
-
-        ChatRoom room = chatRoomRepository.findById(request.getRoomId())
-                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
-
-        boolean allowed = room.getParticipants().stream()
-                .anyMatch(u -> u.getId().equals(sender.getId()));
-
-        if (!allowed)
-            throw new ForbiddenException("You are not allowed in this room");
-
-        if ((request.getContent() == null || request.getContent().isBlank())
-                && (request.getMediaFiles() == null || request.getMediaFiles().isEmpty())) {
-            throw new BadRequestException("Message cannot be empty");
-        }
-
-        List<String> mediaUrls = new ArrayList<>();
-
-        if (request.getMediaFiles() != null) {
-
-            for (MultipartFile file : request.getMediaFiles()) {
-
-                if (file != null && !file.isEmpty()) {
-
-                    var result = mediaStorageService.storeMedia(file, room.getId());
-
-                    mediaUrls.add(result);
+                if (sender.getId().equals(receiver.getId())) {
+                        throw new BadRequestException("Cannot create chat with yourself");
                 }
-            }
+
+                Optional<ChatRoom> existingRoom = chatRoomRepository.findRoomBetweenUsers(sender, receiver);
+
+                if (existingRoom.isPresent()) {
+                        return existingRoom.get();
+                }
+
+                ChatRoom newRoom = ChatRoom.builder()
+                                .participants(List.of(sender, receiver))
+                                .isActive(true)
+                                .roomName(sender.getName() + " & " + receiver.getName())
+                                .build();
+
+                return chatRoomRepository.save(newRoom);
         }
 
-        ChatMessage msg = ChatMessage.builder()
-                .chatRoom(room)
-                .senderId(sender.getId())
-                .senderRole(MessageRole.USER)
-                .content(request.getContent() != null ? request.getContent() : "")
-                .mediaUrls(mediaUrls)
-                .type(request.getType())
-                .timestamp(LocalDateTime.now())
-                .isRead(false)
-                .build();
+        public Page<ChatRoomResponse> getUserRooms(User user, int page, int size) {
 
-        ChatMessage saved = chatMessageRepository.save(msg);
+                if (user == null)
+                        throw new UnauthorizedException("User not authenticated");
 
-        ChatMessageResponse response =
-                ChatMessageResponse.fromEntity(saved, sender.getId(), userRepository);
+                Page<ChatRoom> rooms = chatRoomRepository.findUserRooms(
+                                user.getId(),
+                                PageRequest.of(page, size, Sort.by("lastMessageAt").descending()));
 
-        messagingTemplate.convertAndSend(
-                "/topic/chat/" + room.getId(),
-                response
-        );
+                return rooms.map(room -> {
 
-        return response;
-    }
+                        User otherUser = room.getParticipants().stream()
+                                        .filter(u -> !u.getId().equals(user.getId()))
+                                        .findFirst()
+                                        .orElse(null);
 
-    @Transactional
-    public List<ChatMessageResponse> getMessages(User currentUser, String roomId, int page, int size) {
+                        ChatMessage lastMsg = chatMessageRepository
+                                        .findTopByChatRoomIdOrderByTimestampDesc(room.getId())
+                                        .orElse(null);
 
-        var room = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+                        return ChatRoomResponse.builder()
+                                        .roomId(room.getId())
+                                        .otherUserId(otherUser != null ? otherUser.getId() : null)
+                                        .otherUserName(otherUser != null ? otherUser.getName() : "Unknown")
+                                        .otherUserProfileImage(
+                                                        otherUser != null ? otherUser.getProfileImage() : null)
+                                        .lastMessage(
+                                                        room.getLastMessage() != null
+                                                                        ? room.getLastMessage()
+                                                                        : (lastMsg != null ? lastMsg.getContent() : ""))
+                                        .lastMessageTime(
+                                                        room.getLastMessageAt() != null
+                                                                        ? room.getLastMessageAt()
+                                                                        : (lastMsg != null ? lastMsg.getTimestamp()
+                                                                                        : null))
+                                        .unreadCount(
+                                                        chatMessageRepository.countUnreadMessages(room.getId(),
+                                                                        user.getId()))
+                                        .build();
+                });
 
-        boolean isParticipant = room.getParticipants().stream()
-                .anyMatch(u -> u.getId().equals(currentUser.getId()));
+        }
 
-        if (!isParticipant) throw new ForbiddenException("You are not allowed in this room");
+        @Transactional
+        public ChatMessageResponse sendMessage(User sender, ChatMessageRequest request) throws IOException {
 
-        chatMessageRepository.markMessagesAsRead(roomId, currentUser.getId());
+                if (sender == null)
+                        throw new UnauthorizedException("User not authenticated");
 
-        var messages = chatMessageRepository.findByChatRoomId(
-                roomId,
-                PageRequest.of(page, size, Sort.by("timestamp").descending())
-        );
+                ChatRoom room = chatRoomRepository.findById(request.getRoomId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
 
-        return messages.stream()
-                .map(msg -> ChatMessageResponse.fromEntity(msg, currentUser.getId(), userRepository))
-                .toList();
-    }
-    public long getUnreadCount(String roomId, Long userId) {
+                boolean allowed = room.getParticipants().stream()
+                                .anyMatch(u -> u.getId().equals(sender.getId()));
 
-        var room = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+                if (!allowed)
+                        throw new ForbiddenException("You are not allowed in this room");
 
-        boolean isParticipant = room.getParticipants().stream()
-                .anyMatch(u -> u.getId().equals(userId));
+                if ((request.getContent() == null || request.getContent().isBlank())
+                                && (request.getMediaFiles() == null || request.getMediaFiles().isEmpty())) {
+                        throw new BadRequestException("Message cannot be empty");
+                }
 
-        if (!isParticipant)
-            throw new ForbiddenException("You are not allowed in this room");
+                List<String> mediaUrls = new ArrayList<>();
 
-        return chatMessageRepository.countUnreadMessages(roomId, userId);
-    }
+                if (request.getMediaFiles() != null) {
 
+                        for (MultipartFile file : request.getMediaFiles()) {
 
-    public void deleteMessage(String id, User user) {
+                                if (file != null && !file.isEmpty()) {
 
-        if (user == null)
-            throw new UnauthorizedException("User not authenticated");
+                                        var result = mediaStorageService.storeMedia(file, room.getId());
 
-        ChatMessage msg = chatMessageRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+                                        mediaUrls.add(result);
+                                }
+                        }
+                }
 
-        if (!msg.getSenderId().equals(user.getId()))
-            throw new ForbiddenException("You cannot delete this message");
+                ChatMessage msg = ChatMessage.builder()
+                                .chatRoom(room)
+                                .senderId(sender.getId())
+                                .senderRole(MessageRole.USER)
+                                .content(request.getContent() != null ? request.getContent() : "")
+                                .mediaUrls(mediaUrls)
+                                .type(request.getType())
+                                .timestamp(LocalDateTime.now())
+                                .isRead(false)
+                                .build();
 
-        chatMessageRepository.delete(msg);
-    }
+                ChatMessage saved = chatMessageRepository.save(msg);
+
+                ChatMessageResponse response = ChatMessageResponse.fromEntity(saved, sender.getId(), userRepository);
+
+                User recipient = room.getParticipants().stream()
+                                .filter(user -> !user.getId().equals(sender.getId()))
+                                .findFirst()
+                                .orElseThrow(() -> new ResourceNotFoundException("Recipient not found"));
+
+                notificationFactory.send(recipient.getId(), NotificationType.NEW_MESSAGE, java.util.Map.of(
+                                "title", sender.getName() + " sent you a message",
+                                "content", saved.getContent() != null && !saved.getContent().isBlank()
+                                                ? saved.getContent()
+                                                : "New media message",
+                                "roomId", room.getId(),
+                                "messageId", saved.getId(),
+                                "senderId", sender.getId(),
+                                "senderName", sender.getName()));
+
+                messagingTemplate.convertAndSend(
+                                "/topic/chat/" + room.getId(),
+                                response);
+
+                return response;
+        }
+
+        @Transactional
+        public List<ChatMessageResponse> getMessages(User currentUser, String roomId, int page, int size) {
+
+                var room = chatRoomRepository.findById(roomId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+
+                boolean isParticipant = room.getParticipants().stream()
+                                .anyMatch(u -> u.getId().equals(currentUser.getId()));
+
+                if (!isParticipant)
+                        throw new ForbiddenException("You are not allowed in this room");
+
+                chatMessageRepository.markMessagesAsRead(roomId, currentUser.getId(), LocalDateTime.now());
+
+                var messages = chatMessageRepository.findByChatRoomId(
+                                roomId,
+                                PageRequest.of(page, size, Sort.by("timestamp").descending()));
+
+                return messages.stream()
+                                .map(msg -> ChatMessageResponse.fromEntity(msg, currentUser.getId(), userRepository))
+                                .toList();
+        }
+
+        public long getUnreadCount(String roomId, Long userId) {
+
+                var room = chatRoomRepository.findById(roomId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+
+                boolean isParticipant = room.getParticipants().stream()
+                                .anyMatch(u -> u.getId().equals(userId));
+
+                if (!isParticipant)
+                        throw new ForbiddenException("You are not allowed in this room");
+
+                return chatMessageRepository.countUnreadMessages(roomId, userId);
+        }
+
+        public void deleteMessage(String id, User user) {
+
+                if (user == null)
+                        throw new UnauthorizedException("User not authenticated");
+
+                ChatMessage msg = chatMessageRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+
+                if (!msg.getSenderId().equals(user.getId()))
+                        throw new ForbiddenException("You cannot delete this message");
+
+                chatMessageRepository.delete(msg);
+        }
 }

@@ -717,6 +717,78 @@ public class ProviderServiceImpl implements ProviderService {
 
     @Override
     @Transactional(readOnly = true)
+    public WeeklyScheduleResponse getWeeklySchedule(Long providerId) {
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        if (provider.getSchedule() == null) {
+            return WeeklyScheduleResponse.builder()
+                    .workingDays(new ArrayList<>())
+                    .build();
+        }
+
+        LocalDate today = LocalDate.now();
+
+        // Calculate week boundaries (Saturday to Friday)
+        // DayOfWeek.SATURDAY = 6, DayOfWeek.FRIDAY = 5
+        int dayOfWeek = today.getDayOfWeek().getValue(); // 1 = Monday, 6 = Saturday, 7 = Sunday
+        LocalDate weekStart; // Saturday
+
+        if (dayOfWeek == 6) { // Saturday
+            weekStart = today;
+        } else if (dayOfWeek == 7) { // Sunday
+            weekStart = today.plusDays(6); // Next Saturday
+        } else {
+            // Monday to Friday: go back to previous Saturday
+            weekStart = today.minusDays(dayOfWeek + 1);
+        }
+
+        LocalDate weekEnd = weekStart.plusDays(6); // Friday of the same week
+
+        // Get all working days in this week
+        List<WorkingDay> workingDaysInWeek = provider.getSchedule().getWorkingDays().stream()
+                .filter(wd -> !wd.getDate().isBefore(weekStart) && !wd.getDate().isAfter(weekEnd))
+                .sorted(Comparator.comparing(WorkingDay::getDate))
+                .collect(Collectors.toList());
+
+        // Build working days with their time slots
+        List<WeeklyScheduleResponse.WorkingDayWithSlots> workingDaysWithSlots = workingDaysInWeek.stream()
+                .map(wd -> {
+                    List<TimeSlot> slotsForDay = provider.getSchedule().getTimeSlots().stream()
+                            .filter(ts -> ts.getDate().equals(wd.getDate()))
+                            .sorted(Comparator.comparing(TimeSlot::getStartTime))
+                            .collect(Collectors.toList());
+
+                    List<WeeklyScheduleResponse.TimeSlot> timeSlots = slotsForDay.stream()
+                            .map(ts -> WeeklyScheduleResponse.TimeSlot.builder()
+                                    .id(ts.getId())
+                                    .startTime(ts.getStartTime())
+                                    .endTime(ts.getEndTime())
+                                    .status(ts.getStatus().name())
+                                    .isBooked(ts.getStatus() == TimeSlotStatus.BOOKED)
+                                    .build())
+                            .collect(Collectors.toList());
+
+                    return WeeklyScheduleResponse.WorkingDayWithSlots.builder()
+                            .workingDayId(wd.getId())
+                            .date(wd.getDate())
+                            .startTime(wd.getStartTime())
+                            .endTime(wd.getEndTime())
+                            .dayOfWeek(wd.getDate().getDayOfWeek().toString())
+                            .timeSlots(timeSlots)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        return WeeklyScheduleResponse.builder()
+                .weekStartDate(weekStart)
+                .weekEndDate(weekEnd)
+                .workingDays(workingDaysWithSlots)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlots(Long providerId, LocalDate date) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
@@ -816,7 +888,8 @@ public class ProviderServiceImpl implements ProviderService {
             restoreAvailabilityForCancelledBooking(booking);
 
             LocalDateTime now = LocalDateTime.now();
-            LocalDateTime bookingStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
+            LocalDateTime bookingStartTime = LocalDateTime.of(booking.getRequestedDate(),
+                    booking.getRequestedStartTime());
             boolean applyPenalty = now.isAfter(bookingStartTime.minusHours(2));
 
             booking.setStatus(BookingStatus.CANCELLED);
@@ -828,10 +901,11 @@ public class ProviderServiceImpl implements ProviderService {
             }
 
             bookingRepository.save(booking);
-            
+
             Provider provider = booking.getProvider();
-            provider.setCancelledBookings((provider.getCancelledBookings() != null ? provider.getCancelledBookings() : 0) + 1);
-            
+            provider.setCancelledBookings(
+                    (provider.getCancelledBookings() != null ? provider.getCancelledBookings() : 0) + 1);
+
             if (applyPenalty) {
                 double currentRating = provider.getAverageRating() != null ? provider.getAverageRating() : 0.0;
                 double newRating = Math.max(0.0, currentRating - 0.2);
@@ -1205,7 +1279,8 @@ public class ProviderServiceImpl implements ProviderService {
 
         document = documentRepository.save(document);
 
-        // Re-validate high risk status (will update status to PENDING if not already VERIFIED)
+        // Re-validate high risk status (will update status to PENDING if not already
+        // VERIFIED)
         validateHighRiskProvider(provider);
 
         return DocumentResponse.builder()

@@ -12,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -83,7 +84,7 @@ class ChatMessageRepositoryTest {
         ChatMessage m1 = message(r, u1);
         ChatMessage m2 = message(r, u1);
 
-        chatMessageRepository.markMessagesAsRead(r.getId(), u2.getId());
+        chatMessageRepository.markMessagesAsRead(r.getId(), u2.getId(), LocalDateTime.now());
 
         em.flush();
         em.clear();

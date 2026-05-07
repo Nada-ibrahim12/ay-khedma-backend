@@ -22,18 +22,11 @@ public class NotificationPreference {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private NotificationType type;
-
     @Column(name = "in_app_enabled")
     private boolean inAppEnabled = true;
 
     @Column(name = "email_enabled")
     private boolean emailEnabled = true;
-
-    @Column(name = "sms_enabled")
-    private boolean smsEnabled = true;
 
     @Column(name = "push_enabled")
     private boolean pushEnabled = true;

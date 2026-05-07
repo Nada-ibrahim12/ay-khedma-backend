@@ -12,4 +12,5 @@ import java.util.List;
 
 @Repository
 public interface NotificationPreferenceRepository extends JpaRepository<NotificationPreference, Long> {
+    java.util.Optional<NotificationPreference> findByUserId(Long userId);
 }

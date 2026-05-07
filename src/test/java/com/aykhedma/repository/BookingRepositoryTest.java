@@ -28,6 +28,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -175,7 +176,7 @@ class BookingRepositoryTest {
             Booking expiring = buildBooking(BookingStatus.PENDING, date, time);
             bookingRepository.save(expiring);
 
-            bookingRepository.expirePendingBookings();
+            bookingRepository.expirePendingBookings(LocalDateTime.now(), LocalDate.now(), LocalTime.now());
             entityManager.flush();
             entityManager.clear();
 
@@ -196,7 +197,7 @@ class BookingRepositoryTest {
             Booking pending = buildBooking(BookingStatus.PENDING, date, time);
             bookingRepository.save(pending);
 
-            bookingRepository.expirePendingBookings();
+            bookingRepository.expirePendingBookings(LocalDateTime.now(), LocalDate.now(), LocalTime.now());
             entityManager.flush();
             entityManager.clear();
 

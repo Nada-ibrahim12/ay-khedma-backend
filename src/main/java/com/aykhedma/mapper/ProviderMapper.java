@@ -66,7 +66,6 @@ public interface ProviderMapper {
     @Mapping(source = "location", target = "location")
     @Mapping(target = "distance", ignore = true)
     @Mapping(target = "estimatedArrivalTime", ignore = true)
-    @Mapping(source = "location", target = "location")
     @Mapping(source = "location.area", target = "area")
     @Mapping(source = "cancellationRate", target = "cancellationRate")
     ProviderSummaryResponse toProviderSummaryResponse(Provider provider);

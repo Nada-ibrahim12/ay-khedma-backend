@@ -6,8 +6,8 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.*;
 import java.util.HashMap;
-import java.util.Map;
 
 @Entity
 @Table(name = "notifications")
@@ -38,6 +38,40 @@ public class Notification {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private NotificationType type;
+
+    @ElementCollection
+    @CollectionTable(name = "notification_methods", joinColumns = @JoinColumn(name = "notification_id"))
+    @Column(name = "method")
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private Set<NotificationChannel> methods = new HashSet<>();
+
+    @Column(name = "push_sent")
+    private boolean pushSent = false;
+
+    @Column(name = "push_sent_at")
+    private LocalDateTime pushSentAt;
+
+    @Column(name = "push_failed")
+    private boolean pushFailed = false;
+
+    @Column(name = "email_sent")
+    private boolean emailSent = false;
+
+    @Column(name = "email_sent_at")
+    private LocalDateTime emailSentAt;
+
+    @Column(name = "email_failed")
+    private boolean emailFailed = false;
+
+    @Column(name = "in_app_delivered")
+    private boolean inAppDelivered = false;
+
+    @Column(name = "in_app_delivered_at")
+    private LocalDateTime inAppDeliveredAt;
+
+    @Column(name = "in_app_failed")
+    private boolean inAppFailed = false;
 
     @ElementCollection
     @CollectionTable(name = "notification_data", joinColumns = @JoinColumn(name = "notification_id"))

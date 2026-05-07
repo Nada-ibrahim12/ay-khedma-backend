@@ -1,18 +1,22 @@
 package com.aykhedma.dto.request;
 
 import com.aykhedma.model.notification.NotificationType;
+import com.aykhedma.model.notification.NotificationChannel;
 import lombok.Data;
 import lombok.Builder;
 import java.util.Map;
+import java.util.Set;
 
 @Data
 @Builder
 public class NotificationRequest {
     private Long userId;
     private NotificationType type;
+    private Set<NotificationChannel> methods;
     private String title;
     private String content;
     private String imageUrl;
+    private String deepLink;
     private Map<String, Object> data;
 
     private boolean sendPush;

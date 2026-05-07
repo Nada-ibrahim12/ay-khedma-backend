@@ -43,6 +43,7 @@ public class ChatRoom {
     private LocalDateTime createdAt;
 
     @PastOrPresent(message = "Last message date cannot be in the future")
+    @Column(name = "last_message_at")
     private LocalDateTime lastMessageAt;
 
     @Size(max = 100, message = "Room name cannot exceed 100 characters")
@@ -52,6 +53,7 @@ public class ChatRoom {
     @Column(nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "last_message")
     private String lastMessage;
 
     @AssertTrue(message = "A direct chat room must have exactly 2 participants")

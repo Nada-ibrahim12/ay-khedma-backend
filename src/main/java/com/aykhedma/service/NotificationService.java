@@ -2,9 +2,14 @@ package com.aykhedma.service;
 
 import com.aykhedma.dto.response.NotificationDTO;
 import com.aykhedma.dto.request.NotificationRequest;
+import com.aykhedma.dto.response.NotificationPreferenceDTO;
 import com.aykhedma.model.notification.Notification;
+import com.aykhedma.model.notification.NotificationChannel;
 import com.aykhedma.model.notification.NotificationType;
+import com.aykhedma.model.notification.NotificationStatus;
+import com.aykhedma.model.notification.NotificationPreference;
 import com.aykhedma.repository.NotificationRepository;
+import com.aykhedma.repository.NotificationPreferenceRepository;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.service.notification.EmailService;
 import com.aykhedma.service.notification.FirebaseService;
@@ -20,10 +25,13 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +40,7 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationPreferenceRepository notificationPreferenceRepository;
     private final FirebaseService firebaseService;
     private final EmailService emailService;
     private final SimpMessagingTemplate messagingTemplate;
@@ -48,6 +57,20 @@ public class NotificationService {
         return NotificationDTO.fromEntity(notification);
     }
 
+    /**
+     * Returns delivery status details for a single notification (owner-only)
+     */
+    public com.aykhedma.dto.response.DeliveryStatusDTO getNotificationDeliveryStatus(Long userId, Long notificationId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+
+        if (!notification.getUserId().equals(userId)) {
+            throw new RuntimeException("Unauthorized");
+        }
+
+        return com.aykhedma.dto.response.DeliveryStatusDTO.fromEntity(notification);
+    }
+
     public void deleteNotification(Long userId, Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("Notification not found"));
@@ -59,8 +82,7 @@ public class NotificationService {
         notificationRepository.deleteById(notificationId);
     }
 
-    @Async
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendNotification(NotificationRequest request) {
         validateRequest(request);
 
@@ -72,46 +94,78 @@ public class NotificationService {
 
         log.info("Sending notification to user: {}, type: {}", request.getUserId(), request.getType());
 
-        Notification notification = saveNotification(request);
+        Set<NotificationChannel> requestedMethods = resolveRequestedMethods(request);
 
-        if (request.isSendInApp()) {
-            sendWebSocketNotification(notification);
-        }
+        requestedMethods = applyUserPreferences(request.getUserId(), requestedMethods);
+        Notification notification = saveNotification(request, requestedMethods);
 
-        if (request.isSendPush()) {
-            com.aykhedma.model.notification.NotificationStatus pushStatus = firebaseService.sendPushNotification(
-                    request.getUserId(),
-                    request.getTitle(),
-                    request.getContent(),
-                    request.getData());
-
-            // Update notification status in DB
-            notification.setStatus(pushStatus);
-            notificationRepository.save(notification);
-
-            if (pushStatus == com.aykhedma.model.notification.NotificationStatus.FAILED) {
-                log.warn("Failed to send push notification to user: {}", request.getUserId());
+        if (requestedMethods.contains(NotificationChannel.IN_APP)) {
+            try {
+                sendWebSocketNotification(notification);
+                notification.setInAppDelivered(true);
+                notification.setInAppDeliveredAt(LocalDateTime.now());
+            } catch (Exception e) {
+                notification.setInAppFailed(true);
+                log.error("In-app notification failed for user {}: {}", request.getUserId(), e.getMessage(), e);
             }
         }
 
-        if (request.isSendEmail()) {
+        if (requestedMethods.contains(NotificationChannel.PUSH)) {
+            try {
+                NotificationStatus pushStatus = firebaseService.sendPushNotification(
+                        request.getUserId(),
+                        request.getTitle(),
+                        request.getContent(),
+                        request.getData());
+
+                if (pushStatus == NotificationStatus.DELIVERED) {
+                    notification.setPushSent(true);
+                    notification.setPushSentAt(LocalDateTime.now());
+                } else {
+                    notification.setPushFailed(true);
+                    log.warn("Failed to send push notification to user: {}", request.getUserId());
+                }
+            } catch (Exception e) {
+                notification.setPushFailed(true);
+                log.error("Push notification failed for user {}: {}", request.getUserId(), e.getMessage(), e);
+            }
+        }
+
+        if (requestedMethods.contains(NotificationChannel.EMAIL)) {
             String email = request.getEmail() != null ? request.getEmail() : resolveUserEmail(request.getUserId());
             if (email != null) {
-                sendEmailNotification(email, request);
+                try {
+                    sendEmailNotification(email, request);
+                    notification.setEmailSent(true);
+                    notification.setEmailSentAt(LocalDateTime.now());
+                } catch (Exception e) {
+                    notification.setEmailFailed(true);
+                    log.error("Email notification failed for user {}: {}", request.getUserId(), e.getMessage(), e);
+                }
+            } else {
+                notification.setEmailFailed(true);
+                log.warn("No email address found for user {}", request.getUserId());
             }
         }
+
+        updateNotificationStatus(notification, requestedMethods);
+        notificationRepository.saveAndFlush(notification);
     }
 
-    private Notification saveNotification(NotificationRequest request) {
+    private Notification saveNotification(NotificationRequest request, Set<NotificationChannel> methods) {
+        log.info("Persisting notification type={} userId={} deepLink={}", request.getType(), request.getUserId(),
+                request.getDeepLink());
         Notification notification = Notification.builder()
                 .userId(request.getUserId())
                 .type(request.getType())
+                .methods(methods)
                 .title(request.getTitle())
                 .body(request.getContent())
                 .imageUrl(request.getImageUrl())
+                .deepLink(request.getDeepLink())
                 .build();
 
-        return notificationRepository.save(notification);
+        return notificationRepository.saveAndFlush(notification);
     }
 
     /**
@@ -132,7 +186,7 @@ public class NotificationService {
 
         notification.setDelivered(true);
         notification.setDeliveredAt(LocalDateTime.now());
-        notificationRepository.save(notification);
+        notificationRepository.saveAndFlush(notification);
     }
 
     private void sendEmailNotification(String email, NotificationRequest request) {
@@ -147,6 +201,44 @@ public class NotificationService {
 
         String templateName = getEmailTemplate(request.getType());
         emailService.sendHtmlEmail(email, request.getTitle(), templateName, templateVars);
+    }
+
+    private Set<NotificationChannel> resolveRequestedMethods(NotificationRequest request) {
+        if (request.getMethods() != null && !request.getMethods().isEmpty()) {
+            return request.getMethods();
+        }
+
+        Set<NotificationChannel> methods = EnumSet.noneOf(NotificationChannel.class);
+        if (request.isSendPush()) {
+            methods.add(NotificationChannel.PUSH);
+        }
+        if (request.isSendEmail()) {
+            methods.add(NotificationChannel.EMAIL);
+        }
+        if (request.isSendInApp()) {
+            methods.add(NotificationChannel.IN_APP);
+        }
+        return methods;
+    }
+
+    private void updateNotificationStatus(Notification notification, Set<NotificationChannel> requestedMethods) {
+        boolean anySuccess = notification.isPushSent() || notification.isEmailSent() || notification.isInAppDelivered();
+
+        if (anySuccess) {
+            notification.setStatus(NotificationStatus.DELIVERED);
+            return;
+        }
+
+        boolean anyRequested = requestedMethods != null && !requestedMethods.isEmpty();
+        boolean pushDone = !requestedMethods.contains(NotificationChannel.PUSH) || notification.isPushFailed();
+        boolean emailDone = !requestedMethods.contains(NotificationChannel.EMAIL) || notification.isEmailFailed();
+        boolean inAppDone = !requestedMethods.contains(NotificationChannel.IN_APP) || notification.isInAppFailed();
+
+        if (anyRequested && pushDone && emailDone && inAppDone) {
+            notification.setStatus(NotificationStatus.FAILED);
+        } else {
+            notification.setStatus(NotificationStatus.PENDING);
+        }
     }
 
     public void sendOtpEmail(String email, String otp) {
@@ -192,8 +284,22 @@ public class NotificationService {
         return notificationPage.map(NotificationDTO::fromEntity);
     }
 
+    /**
+     * List failed notifications for a user (any channel failed)
+     */
+    public List<com.aykhedma.dto.response.NotificationDTO> listFailedNotifications(Long userId) {
+        List<Notification> failed = notificationRepository.findFailedNotifications(userId);
+        return failed.stream().map(com.aykhedma.dto.response.NotificationDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+
     public long getUnreadCount(Long userId) {
         return notificationRepository.countUnreadByUserId(userId);
+    }
+
+    public List<NotificationDTO> getNotificationsByType(Long userId, NotificationType type) {
+        List<Notification> notifications = notificationRepository.findByUserIdAndTypeOrderBySentAtDesc(userId, type);
+        return notifications.stream().map(NotificationDTO::fromEntity).collect(Collectors.toList());
     }
 
     @Transactional
@@ -218,13 +324,26 @@ public class NotificationService {
 
     @Transactional
     public void markAllAsRead(Long userId) {
-        int updated = notificationRepository.markAllAsRead(userId);
+        int updated = notificationRepository.markAllAsRead(userId, LocalDateTime.now());
         log.info("Marked {} notifications as read for user: {}", updated, userId);
 
         // Send updated count via WebSocket
         messagingTemplate.convertAndSend(
                 "/topic/notifications-count-" + userId,
                 Map.of("count", 0));
+    }
+
+    @Transactional
+    public int deleteAllNotifications(Long userId) {
+        int deleted = notificationRepository.deleteByUserId(userId);
+        log.info("Deleted {} notifications for user: {}", deleted, userId);
+
+        // Send updated count via WebSocket
+        messagingTemplate.convertAndSend(
+                "/topic/notifications-count-" + userId,
+                Map.of("count", 0));
+
+        return deleted;
     }
 
     @Transactional
@@ -267,6 +386,56 @@ public class NotificationService {
         if (request.getTitle() == null || request.getTitle().isBlank()) {
             throw new IllegalArgumentException("Notification title is required");
         }
+    }
+
+    public NotificationPreferenceDTO getUserPreferences(Long userId) {
+        NotificationPreference preference = notificationPreferenceRepository.findByUserId(userId)
+                .orElseGet(() -> createDefaultPreferences(userId));
+        return NotificationPreferenceDTO.fromEntity(preference);
+    }
+
+    @Transactional
+    public NotificationPreferenceDTO updateUserPreferences(Long userId, NotificationPreference updatedPreference) {
+        NotificationPreference preference = notificationPreferenceRepository.findByUserId(userId)
+                .orElseGet(() -> createDefaultPreferences(userId));
+
+        preference.setInAppEnabled(updatedPreference.isInAppEnabled());
+        preference.setEmailEnabled(updatedPreference.isEmailEnabled());
+        preference.setPushEnabled(updatedPreference.isPushEnabled());
+        preference.setUpdatedAt(LocalDateTime.now());
+
+        NotificationPreference saved = notificationPreferenceRepository.save(preference);
+        return NotificationPreferenceDTO.fromEntity(saved);
+    }
+
+    private NotificationPreference createDefaultPreferences(Long userId) {
+        NotificationPreference preference = NotificationPreference.builder()
+                .userId(userId)
+                .inAppEnabled(true)
+                .emailEnabled(true)
+                .pushEnabled(true)
+                .updatedAt(LocalDateTime.now())
+                .build();
+        return notificationPreferenceRepository.save(preference);
+    }
+
+    private Set<NotificationChannel> applyUserPreferences(Long userId, Set<NotificationChannel> requestedMethods) {
+        NotificationPreference preferences = notificationPreferenceRepository.findByUserId(userId)
+                .orElseGet(() -> createDefaultPreferences(userId));
+
+        Set<NotificationChannel> filteredMethods = EnumSet.noneOf(NotificationChannel.class);
+
+        if (requestedMethods.contains(NotificationChannel.IN_APP) && preferences.isInAppEnabled()) {
+            filteredMethods.add(NotificationChannel.IN_APP);
+        }
+        if (requestedMethods.contains(NotificationChannel.EMAIL) && preferences.isEmailEnabled()) {
+            filteredMethods.add(NotificationChannel.EMAIL);
+        }
+        if (requestedMethods.contains(NotificationChannel.PUSH) && preferences.isPushEnabled()) {
+            filteredMethods.add(NotificationChannel.PUSH);
+        }
+
+        return filteredMethods;
     }
 
 }
