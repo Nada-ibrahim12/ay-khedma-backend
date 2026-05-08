@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
 @Repository
 public interface ChatRoomRepository extends JpaRepository<ChatRoom, String> {
 
@@ -24,22 +25,19 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, String> {
     List<ChatRoom> findAllByParticipant(User user);
 
     @Query("""
-    SELECT r FROM ChatRoom r
-    JOIN r.participants p1
-    JOIN r.participants p2
-    WHERE p1 = :u1 AND p2 = :u2
-    """)
+            SELECT r FROM ChatRoom r
+            JOIN r.participants p1
+            JOIN r.participants p2
+            WHERE p1 = :u1 AND p2 = :u2
+            """)
     Optional<ChatRoom> findRoomBetweenUsers(@Param("u1") User u1,
-                                            @Param("u2") User u2);
-
+            @Param("u2") User u2);
 
     @Query("""
-    SELECT r FROM ChatRoom r
-    JOIN r.messages m
-    JOIN r.participants p
-    WHERE p.id = :userId
-    GROUP BY r
-    ORDER BY MAX(m.timestamp) DESC
-""")
+                SELECT r FROM ChatRoom r
+                JOIN r.participants p
+                WHERE p.id = :userId
+                ORDER BY COALESCE(r.lastMessageAt, r.createdAt) DESC
+            """)
     Page<ChatRoom> findUserRooms(@Param("userId") Long userId, Pageable pageable);
 }

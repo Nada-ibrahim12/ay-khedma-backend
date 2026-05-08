@@ -27,14 +27,14 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ChatService {
 
-    private final ChatRoomRepository chatRoomRepository;
-    private final ChatMessageRepository chatMessageRepository;
-    private final UserRepository userRepository;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final MediaStorageService mediaStorageService;
-    private final NotificationFactory notificationFactory;
+        private final ChatRoomRepository chatRoomRepository;
+        private final ChatMessageRepository chatMessageRepository;
+        private final UserRepository userRepository;
+        private final SimpMessagingTemplate messagingTemplate;
+        private final MediaStorageService mediaStorageService;
+        private final NotificationFactory notificationFactory;
 
-    public ChatRoom getOrCreateRoom(User sender, Long receiverId) {
+        public ChatRoom getOrCreateRoom(User sender, Long receiverId) {
 
                 if (sender == null)
                         throw new UnauthorizedException("User not authenticated");
@@ -68,17 +68,13 @@ public class ChatService {
 
                 Page<ChatRoom> rooms = chatRoomRepository.findUserRooms(
                                 user.getId(),
-                                PageRequest.of(page, size, Sort.by("lastMessageAt").descending()));
+                                PageRequest.of(page, size));
 
                 return rooms.map(room -> {
 
                         User otherUser = room.getParticipants().stream()
                                         .filter(u -> !u.getId().equals(user.getId()))
                                         .findFirst()
-                                        .orElse(null);
-
-                        ChatMessage lastMsg = chatMessageRepository
-                                        .findTopByChatRoomIdOrderByTimestampDesc(room.getId())
                                         .orElse(null);
 
                         return ChatRoomResponse.builder()
@@ -88,14 +84,14 @@ public class ChatService {
                                         .otherUserProfileImage(
                                                         otherUser != null ? otherUser.getProfileImage() : null)
                                         .lastMessage(
-                                                        room.getLastMessage() != null
-                                                                        ? room.getLastMessage()
-                                                                        : (lastMsg != null ? lastMsg.getContent() : ""))
+                                                        (room.getLastMessage() != null
+                                                                        && !room.getLastMessage().isBlank())
+                                                                                        ? room.getLastMessage()
+                                                                                        : "No messages yet")
                                         .lastMessageTime(
                                                         room.getLastMessageAt() != null
                                                                         ? room.getLastMessageAt()
-                                                                        : (lastMsg != null ? lastMsg.getTimestamp()
-                                                                                        : null))
+                                                                        : room.getCreatedAt())
                                         .unreadCount(
                                                         chatMessageRepository.countUnreadMessages(room.getId(),
                                                                         user.getId()))
@@ -151,6 +147,13 @@ public class ChatService {
                                 .build();
 
                 ChatMessage saved = chatMessageRepository.save(msg);
+
+                String lastMessageText = (saved.getContent() != null && !saved.getContent().isBlank())
+                                ? saved.getContent()
+                                : (mediaUrls.isEmpty() ? "" : "📎 Media message");
+                room.setLastMessage(lastMessageText);
+                room.setLastMessageAt(saved.getTimestamp());
+                chatRoomRepository.save(room);
 
                 ChatMessageResponse response = ChatMessageResponse.fromEntity(saved, sender.getId(), userRepository);
 
