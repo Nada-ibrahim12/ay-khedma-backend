@@ -22,7 +22,7 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id", nullable = true)
     private ChatRoom chatRoom;
 
@@ -52,6 +52,7 @@ public class ChatMessage {
     private LocalDateTime timestamp;
 
     @Size(max = 500, message = "Media URL cannot exceed 500 characters")
+    @ElementCollection
     private List<String> mediaUrls = new ArrayList<>();
 
     @Size(max = 64, message = "Audio hash must be 64 characters or less")

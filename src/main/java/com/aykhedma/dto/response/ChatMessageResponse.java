@@ -30,7 +30,7 @@ public class ChatMessageResponse {
     private String content;
     private MessageType type;
 
-    private List<String> mediaUrls;
+    private List<String> mediaUrls = List.of();
     private LocalDateTime timestamp;
     private boolean isRead;
 
@@ -58,7 +58,7 @@ public class ChatMessageResponse {
                 .receiverName(receiver != null ? receiver.getName() : null)
                 .content(msg.getContent())
                 .type(msg.getType())
-                .mediaUrls(msg.getMediaUrls())
+                .mediaUrls(msg.getMediaUrls() != null ? msg.getMediaUrls() : List.of())
                 .isRead(Boolean.TRUE.equals(msg.getIsRead()))
                 .timestamp(msg.getTimestamp())
                 .build();

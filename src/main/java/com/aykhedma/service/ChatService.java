@@ -40,7 +40,7 @@ public class ChatService {
                         throw new UnauthorizedException("User not authenticated");
 
                 User receiver = userRepository.findById(receiverId)
-                                .orElseThrow(() -> new ResourceNotFoundException("Receiver not found"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Receiver not found"));
 
                 if (sender.getId().equals(receiver.getId())) {
                         throw new BadRequestException("Cannot create chat with yourself");
@@ -53,10 +53,10 @@ public class ChatService {
                 }
 
                 ChatRoom newRoom = ChatRoom.builder()
-                                .participants(List.of(sender, receiver))
-                                .isActive(true)
-                                .roomName(sender.getName() + " & " + receiver.getName())
-                                .build();
+                        .participants(List.of(sender, receiver))
+                        .isActive(true)
+                        .roomName(sender.getName() + " & " + receiver.getName())
+                        .build();
 
                 return chatRoomRepository.save(newRoom);
         }
@@ -67,35 +67,35 @@ public class ChatService {
                         throw new UnauthorizedException("User not authenticated");
 
                 Page<ChatRoom> rooms = chatRoomRepository.findUserRooms(
-                                user.getId(),
-                                PageRequest.of(page, size));
+                        user.getId(),
+                        PageRequest.of(page, size));
 
                 return rooms.map(room -> {
 
                         User otherUser = room.getParticipants().stream()
-                                        .filter(u -> !u.getId().equals(user.getId()))
-                                        .findFirst()
-                                        .orElse(null);
+                                .filter(u -> !u.getId().equals(user.getId()))
+                                .findFirst()
+                                .orElse(null);
 
                         return ChatRoomResponse.builder()
-                                        .roomId(room.getId())
-                                        .otherUserId(otherUser != null ? otherUser.getId() : null)
-                                        .otherUserName(otherUser != null ? otherUser.getName() : "Unknown")
-                                        .otherUserProfileImage(
-                                                        otherUser != null ? otherUser.getProfileImage() : null)
-                                        .lastMessage(
-                                                        (room.getLastMessage() != null
-                                                                        && !room.getLastMessage().isBlank())
-                                                                                        ? room.getLastMessage()
-                                                                                        : "No messages yet")
-                                        .lastMessageTime(
-                                                        room.getLastMessageAt() != null
-                                                                        ? room.getLastMessageAt()
-                                                                        : room.getCreatedAt())
-                                        .unreadCount(
-                                                        chatMessageRepository.countUnreadMessages(room.getId(),
-                                                                        user.getId()))
-                                        .build();
+                                .roomId(room.getId())
+                                .otherUserId(otherUser != null ? otherUser.getId() : null)
+                                .otherUserName(otherUser != null ? otherUser.getName() : "Unknown")
+                                .otherUserProfileImage(
+                                        otherUser != null ? otherUser.getProfileImage() : null)
+                                .lastMessage(
+                                        (room.getLastMessage() != null
+                                                && !room.getLastMessage().isBlank())
+                                                ? room.getLastMessage()
+                                                : "No messages yet")
+                                .lastMessageTime(
+                                        room.getLastMessageAt() != null
+                                                ? room.getLastMessageAt()
+                                                : room.getCreatedAt())
+                                .unreadCount(
+                                        chatMessageRepository.countUnreadMessages(room.getId(),
+                                                user.getId()))
+                                .build();
                 });
 
         }
@@ -107,16 +107,16 @@ public class ChatService {
                         throw new UnauthorizedException("User not authenticated");
 
                 ChatRoom room = chatRoomRepository.findById(request.getRoomId())
-                                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
 
                 boolean allowed = room.getParticipants().stream()
-                                .anyMatch(u -> u.getId().equals(sender.getId()));
+                        .anyMatch(u -> u.getId().equals(sender.getId()));
 
                 if (!allowed)
                         throw new ForbiddenException("You are not allowed in this room");
 
                 if ((request.getContent() == null || request.getContent().isBlank())
-                                && (request.getMediaFiles() == null || request.getMediaFiles().isEmpty())) {
+                        && (request.getMediaFiles() == null || request.getMediaFiles().isEmpty())) {
                         throw new BadRequestException("Message cannot be empty");
                 }
 
@@ -136,21 +136,21 @@ public class ChatService {
                 }
 
                 ChatMessage msg = ChatMessage.builder()
-                                .chatRoom(room)
-                                .senderId(sender.getId())
-                                .senderRole(MessageRole.USER)
-                                .content(request.getContent() != null ? request.getContent() : "")
-                                .mediaUrls(mediaUrls)
-                                .type(request.getType())
-                                .timestamp(LocalDateTime.now())
-                                .isRead(false)
-                                .build();
+                        .chatRoom(room)
+                        .senderId(sender.getId())
+                        .senderRole(MessageRole.USER)
+                        .content(request.getContent() != null ? request.getContent() : "")
+                        .mediaUrls(mediaUrls)
+                        .type(request.getType())
+                        .timestamp(LocalDateTime.now())
+                        .isRead(false)
+                        .build();
 
                 ChatMessage saved = chatMessageRepository.save(msg);
 
                 String lastMessageText = (saved.getContent() != null && !saved.getContent().isBlank())
-                                ? saved.getContent()
-                                : (mediaUrls.isEmpty() ? "" : "📎 Media message");
+                        ? saved.getContent()
+                        : (mediaUrls.isEmpty() ? "" : "📎 Media message");
                 room.setLastMessage(lastMessageText);
                 room.setLastMessageAt(saved.getTimestamp());
                 chatRoomRepository.save(room);
@@ -158,23 +158,23 @@ public class ChatService {
                 ChatMessageResponse response = ChatMessageResponse.fromEntity(saved, sender.getId(), userRepository);
 
                 User recipient = room.getParticipants().stream()
-                                .filter(user -> !user.getId().equals(sender.getId()))
-                                .findFirst()
-                                .orElseThrow(() -> new ResourceNotFoundException("Recipient not found"));
+                        .filter(user -> !user.getId().equals(sender.getId()))
+                        .findFirst()
+                        .orElseThrow(() -> new ResourceNotFoundException("Recipient not found"));
 
                 notificationFactory.send(recipient.getId(), NotificationType.NEW_MESSAGE, java.util.Map.of(
-                                "title", sender.getName() + " sent you a message",
-                                "content", saved.getContent() != null && !saved.getContent().isBlank()
-                                                ? saved.getContent()
-                                                : "New media message",
-                                "roomId", room.getId(),
-                                "messageId", saved.getId(),
-                                "senderId", sender.getId(),
-                                "senderName", sender.getName()));
+                        "title", sender.getName() + " sent you a message",
+                        "content", saved.getContent() != null && !saved.getContent().isBlank()
+                                ? saved.getContent()
+                                : "New media message",
+                        "roomId", room.getId(),
+                        "messageId", saved.getId(),
+                        "senderId", sender.getId(),
+                        "senderName", sender.getName()));
 
                 messagingTemplate.convertAndSend(
-                                "/topic/chat/" + room.getId(),
-                                response);
+                        "/topic/chat/" + room.getId(),
+                        response);
 
                 return response;
         }
@@ -183,10 +183,10 @@ public class ChatService {
         public List<ChatMessageResponse> getMessages(User currentUser, String roomId, int page, int size) {
 
                 var room = chatRoomRepository.findById(roomId)
-                                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
 
                 boolean isParticipant = room.getParticipants().stream()
-                                .anyMatch(u -> u.getId().equals(currentUser.getId()));
+                        .anyMatch(u -> u.getId().equals(currentUser.getId()));
 
                 if (!isParticipant)
                         throw new ForbiddenException("You are not allowed in this room");
@@ -194,21 +194,21 @@ public class ChatService {
                 chatMessageRepository.markMessagesAsRead(roomId, currentUser.getId(), LocalDateTime.now());
 
                 var messages = chatMessageRepository.findByChatRoomId(
-                                roomId,
-                                PageRequest.of(page, size, Sort.by("timestamp").descending()));
+                        roomId,
+                        PageRequest.of(page, size, Sort.by("timestamp").descending()));
 
                 return messages.stream()
-                                .map(msg -> ChatMessageResponse.fromEntity(msg, currentUser.getId(), userRepository))
-                                .toList();
+                        .map(msg -> ChatMessageResponse.fromEntity(msg, currentUser.getId(), userRepository))
+                        .toList();
         }
 
         public long getUnreadCount(String roomId, Long userId) {
 
                 var room = chatRoomRepository.findById(roomId)
-                                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
 
                 boolean isParticipant = room.getParticipants().stream()
-                                .anyMatch(u -> u.getId().equals(userId));
+                        .anyMatch(u -> u.getId().equals(userId));
 
                 if (!isParticipant)
                         throw new ForbiddenException("You are not allowed in this room");
@@ -222,7 +222,7 @@ public class ChatService {
                         throw new UnauthorizedException("User not authenticated");
 
                 ChatMessage msg = chatMessageRepository.findById(id)
-                                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
 
                 if (!msg.getSenderId().equals(user.getId()))
                         throw new ForbiddenException("You cannot delete this message");

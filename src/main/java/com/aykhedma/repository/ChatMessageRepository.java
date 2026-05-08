@@ -4,6 +4,7 @@ import com.aykhedma.model.chat.ChatMessage;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,18 +26,21 @@ ORDER BY m.timestamp DESC
 """)
   List<ChatMessage> findLastMessages(@Param("roomId") String roomId, Pageable pageable);
 
-  @Modifying
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Transactional
   @Query("""
-      UPDATE ChatMessage m
-      SET m.isRead = true,
-          m.readAt = :currentTimestamp
-      WHERE m.chatRoom.id = :roomId
-        AND m.senderId != :userId
-        AND m.isRead = false
-      """)
-  void markMessagesAsRead(@Param("roomId") String roomId,
-                          @Param("userId") Long userId,
-                          @Param("currentTimestamp")LocalDateTime currentTimestamp);
+        UPDATE ChatMessage m
+        SET m.isRead = true,
+            m.readAt = :currentTimestamp
+        WHERE m.chatRoom.id = :roomId
+          AND m.senderId <> :userId
+          AND m.isRead = false
+    """)
+  int markMessagesAsRead(
+          @Param("roomId") String roomId,
+          @Param("userId") Long userId,
+          @Param("currentTimestamp") LocalDateTime currentTimestamp
+  );
 
   @Query("""
       SELECT COUNT(m) FROM ChatMessage m
