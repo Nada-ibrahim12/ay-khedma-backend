@@ -157,7 +157,7 @@ class SearchCacheService {
     @Transactional(readOnly = true)
     @Cacheable(
             value = "topRatedNearMeCache",
-            key = "{#consumerId,#radius}"
+            key = "#consumerId + '_' + #radius"
     )
     public List<SearchResponse> topRatedNearMe(Long consumerId, Double radius) {
 
@@ -201,10 +201,20 @@ class SearchCacheService {
                 .toList();
     }
 
-    private double calculateScore(Provider provider, double distance) {
-        double ratingWeight = provider.getAverageRating() != null ? provider.getAverageRating() : 0;
-        double experienceWeight = provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0;
+    private double calculateScore(Provider p, double distance) {
 
-        return (ratingWeight * 0.6) + (experienceWeight * 0.3) - (distance * 0.1);
+        double ratingWeight = 0.5;
+        double distanceWeight = 0.3;
+        double experienceWeight = 0.2;
+
+        double ratingScore = (p.getAverageRating() != null ? p.getAverageRating() : 0) * 20;
+
+        double distanceScore = Math.max(0, 100 - (distance * 10));
+
+        double experienceScore = (p.getCompletedJobs() != null ? p.getCompletedJobs() : 0) / 10.0;
+
+        return (ratingScore * ratingWeight)
+                + (distanceScore * distanceWeight)
+                + (experienceScore * experienceWeight);
     }
 }

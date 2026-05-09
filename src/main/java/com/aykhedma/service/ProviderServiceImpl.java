@@ -273,12 +273,12 @@ public class ProviderServiceImpl implements ProviderService {
 
     @Transactional(readOnly = true)
     public Page<SearchResponse> search(String keyword,
-            Long categoryId,
-            String categoryName,
-            Long consumerId,
-            Double radius,
-            String sortBy,
-            Pageable pageable) {
+                                       Long categoryId,
+                                       String categoryName,
+                                       Long consumerId,
+                                       Double radius,
+                                       String sortBy,
+                                       Pageable pageable) {
 
         List<SearchResponse> fullList = searchCacheService.searchList(
                 keyword,
@@ -400,8 +400,8 @@ public class ProviderServiceImpl implements ProviderService {
     // }
     @Transactional(readOnly = true)
     public Page<SearchResponse> topRatedNearMe(Long consumerId,
-            Double radius,
-            Pageable pageable) {
+                                               Double radius,
+                                               Pageable pageable) {
 
         List<SearchResponse> ranked = searchCacheService.topRatedNearMe(consumerId, radius);
 
@@ -829,9 +829,9 @@ public class ProviderServiceImpl implements ProviderService {
 
     @Override
     public TimeSlot reserveTimeSlotWithBuffer(Long scheduleId,
-            LocalDate date,
-            LocalTime bookingStart,
-            LocalTime bookingEnd) {
+                                              LocalDate date,
+                                              LocalTime bookingStart,
+                                              LocalTime bookingEnd) {
         List<TimeSlot> availableSlots = timeSlotRepository
                 .findByScheduleIdAndDateAndStatus(scheduleId, date, TimeSlotStatus.AVAILABLE)
                 .stream()
@@ -1001,7 +1001,7 @@ public class ProviderServiceImpl implements ProviderService {
     @Override
     @Transactional(readOnly = true)
     public List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlotsForDateRange(Long providerId,
-            LocalDate startDate, LocalDate endDate) {
+                                                                                     LocalDate startDate, LocalDate endDate) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -1064,7 +1064,7 @@ public class ProviderServiceImpl implements ProviderService {
     // }
 
     private List<ScheduleResponse.TimeSlotResponse> toDiscreteStartTimeResponses(List<TimeSlot> availableSlots,
-            LocalDate fallbackDate) {
+                                                                                 LocalDate fallbackDate) {
         if (availableSlots == null || availableSlots.isEmpty()) {
             return List.of();
         }
