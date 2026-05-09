@@ -1,0 +1,210 @@
+package com.aykhedma.service;
+
+import com.aykhedma.dto.response.SearchResponse;
+import com.aykhedma.exception.BadRequestException;
+import com.aykhedma.exception.ResourceNotFoundException;
+import com.aykhedma.mapper.ProviderMapper;
+import com.aykhedma.model.user.Provider;
+import com.aykhedma.repository.ProviderRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+class SearchCacheService {
+
+    private final ProviderRepository providerRepository;
+    private final ProviderMapper providerMapper;
+    private final LocationService locationService;
+
+    @Transactional(readOnly = true)
+    @Cacheable(
+            value = "searchProvidersCache",
+            key = "#keyword + '-' + #categoryId + '-' + #categoryName + '-' + #consumerId + '-' + #radius + '-' + #sortBy"
+    )
+    public List<SearchResponse> searchList(String keyword,
+                                           Long categoryId,
+                                           String categoryName,
+                                           Long consumerId,
+                                           Double radius,
+                                           String sortBy) {
+
+        System.out.println("searchList executed from DB");
+
+        Page<Provider> providersPage =
+                providerRepository.searchProviders(
+                        keyword,
+                        categoryId,
+                        categoryName,
+                        Pageable.unpaged()
+                );
+
+        if (consumerId == null || radius == null) {
+            List<SearchResponse> responses = providersPage.getContent()
+                    .stream()
+                    .map(provider -> {
+                        SearchResponse response = providerMapper.toSearchResponse(provider);
+                        response.setDistance(null);
+                        response.setEstimatedArrivalTime(null);
+                        return response;
+                    })
+                    .collect(Collectors.toList());
+
+            return applySorting(responses, sortBy);
+        }
+
+        try {
+            List<SearchResponse> filteredList = providersPage.getContent()
+                    .stream()
+                    .filter(provider -> provider.getLocation() != null)
+                    .map(provider -> {
+                        try {
+                            double distance = locationService
+                                    .calculateDistanceBetweenConsumerAndProvider(
+                                            consumerId,
+                                            provider.getId()
+                                    )
+                                    .getDistanceKm();
+
+                            if (distance > radius) return null;
+
+                            SearchResponse response = providerMapper.toSearchResponse(provider);
+                            response.setDistance(Math.round(distance * 100.0) / 100.0);
+                            response.setEstimatedArrivalTime(
+                                    (int) Math.round((distance / 30.0) * 60)
+                            );
+                            response.setWithinServiceArea(
+                                    distance <= provider.getServiceAreaRadius()
+                            );
+
+                            return response;
+
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            return applySorting(filteredList, sortBy);
+
+        } catch (ResourceNotFoundException e) {
+            List<SearchResponse> responses = providersPage.getContent()
+                    .stream()
+                    .map(provider -> {
+                        SearchResponse response = providerMapper.toSearchResponse(provider);
+                        response.setDistance(null);
+                        response.setEstimatedArrivalTime(null);
+                        return response;
+                    })
+                    .collect(Collectors.toList());
+
+            return applySorting(responses, sortBy);
+        }
+    }
+
+    private List<SearchResponse> applySorting(List<SearchResponse> responses,
+                                              String sortBy) {
+
+        if (responses == null || responses.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        String sortField = sortBy != null ? sortBy.toLowerCase() : "rating";
+
+        switch (sortField) {
+
+            case "price_low":
+                return responses.stream()
+                        .sorted(Comparator.comparing(SearchResponse::getPrice))
+                        .collect(Collectors.toList());
+
+            case "price_high":
+                return responses.stream()
+                        .sorted(Comparator.comparing(SearchResponse::getPrice).reversed())
+                        .collect(Collectors.toList());
+
+            case "experience":
+                return responses.stream()
+                        .sorted(Comparator.comparing(SearchResponse::getCompletedJobs).reversed())
+                        .collect(Collectors.toList());
+
+            case "distance":
+                return responses.stream()
+                        .filter(r -> r.getDistance() != null)
+                        .sorted(Comparator.comparing(SearchResponse::getDistance))
+                        .collect(Collectors.toList());
+
+            case "rating":
+            default:
+                return responses.stream()
+                        .sorted(
+                                Comparator.comparing(
+                                        SearchResponse::getAverageRating,
+                                        Comparator.nullsLast(Comparator.reverseOrder())
+                                )
+                        )
+                        .collect(Collectors.toList());
+        }
+    }
+    @Transactional(readOnly = true)
+    @Cacheable(
+            value = "topRatedNearMeCache",
+            key = "{#consumerId,#radius}"
+    )
+    public List<SearchResponse> topRatedNearMe(Long consumerId, Double radius) {
+
+        if (consumerId == null) {
+            throw new BadRequestException("consumerId is required");
+        }
+        if (radius == null || radius <= 0) {
+            throw new BadRequestException("radius must be greater than 0");
+        }
+
+        Page<Provider> providersPage =
+                providerRepository.searchProviders(null, null, null, Pageable.unpaged());
+
+        return providersPage.getContent().stream()
+                .filter(p -> p.getLocation() != null)
+                .map(provider -> {
+
+                    try {
+                        double distance = locationService
+                                .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
+                                .getDistanceKm();
+
+                        if (distance > radius) return null;
+
+                        SearchResponse res = providerMapper.toSearchResponse(provider);
+
+                        res.setDistance(distance);
+                        res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
+
+                        double score = calculateScore(provider, distance);
+                        res.setScore(score);
+
+                        return res;
+
+                    } catch (Exception e) {
+                        throw new BadRequestException("Distance calculation failed");
+                    }
+                })
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
+                .toList();
+    }
+
+    private double calculateScore(Provider provider, double distance) {
+        double ratingWeight = provider.getAverageRating() != null ? provider.getAverageRating() : 0;
+        double experienceWeight = provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0;
+
+        return (ratingWeight * 0.6) + (experienceWeight * 0.3) - (distance * 0.1);
+    }
+}

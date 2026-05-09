@@ -131,5 +131,53 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
     List<Provider> findProvidersWithinRadius(@Param("serviceTypeId") Long serviceTypeId,
                                              @Param("requestCoordinates") Point requestCoordinates,
                                              @Param("radiusMeters") double radiusMeters);
+        @Query(value = """
+        SELECT p.*, u.*
+        FROM providers p
+        JOIN users u ON p.id = u.id
+        JOIN locations l ON p.location_id = l.id
+        JOIN consumers c ON c.id = :consumerId
+        JOIN locations cl ON c.location_id = cl.id
+        WHERE p.verification_status = 'VERIFIED'
+        AND ST_DWithin(
+            CAST(l.coordinates AS geography),
+            CAST(cl.coordinates AS geography),
+            :radiusMeters
+        )
+        ORDER BY (
+            (COALESCE(p.average_rating, 0) * 20 * 0.5) +
+            (
+                GREATEST(
+                    0,
+                    100 - (
+                        ST_Distance(
+                            CAST(l.coordinates AS geography),
+                            CAST(cl.coordinates AS geography)
+                        ) / 1000 * 10
+                    )
+                ) * 0.3
+            ) +
+            (COALESCE(p.completed_jobs, 0) / 10.0 * 0.2)
+        ) DESC
+        """,
+                countQuery = """
+        SELECT COUNT(*)
+        FROM providers p
+        JOIN locations l ON p.location_id = l.id
+        JOIN consumers c ON c.id = :consumerId
+        JOIN locations cl ON c.location_id = cl.id
+        WHERE p.verification_status = 'VERIFIED'
+        AND ST_DWithin(
+            CAST(l.coordinates AS geography),
+            CAST(cl.coordinates AS geography),
+            :radiusMeters
+        )
+        """,
+                nativeQuery = true)
+        Page<Provider> findTopRatedNearConsumer(
+                @Param("consumerId") Long consumerId,
+                @Param("radiusMeters") double radiusMeters,
+                Pageable pageable
+        );
 
 }

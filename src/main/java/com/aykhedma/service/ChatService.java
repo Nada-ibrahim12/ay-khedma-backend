@@ -12,6 +12,8 @@ import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.user.User;
 import com.aykhedma.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -99,7 +101,10 @@ public class ChatService {
                 });
 
         }
-
+        @CacheEvict(
+                value = "chatMessages",
+                key = "#room.id + '_' + sender.id + '_*'"
+        )
         @Transactional
         public ChatMessageResponse sendMessage(User sender, ChatMessageRequest request) throws IOException {
 
@@ -179,6 +184,10 @@ public class ChatService {
                 return response;
         }
 
+        @Cacheable(
+                value = "chatMessages",
+                key = "#roomId + '_' + #currentUser.id + '_' + #page + '_' + #size"
+        )
         @Transactional
         public List<ChatMessageResponse> getMessages(User currentUser, String roomId, int page, int size) {
 

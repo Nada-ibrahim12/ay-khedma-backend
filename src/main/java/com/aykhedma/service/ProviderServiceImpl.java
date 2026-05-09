@@ -54,6 +54,7 @@ public class ProviderServiceImpl implements ProviderService {
 
     private final ProviderRepository providerRepository;
     private final ServiceTypeRepository serviceTypeRepository;
+    private final SearchCacheService searchCacheService;
     private final BookingRepository bookingRepository;
     private final WorkingDayRepository workingDayRepository;
     private final TimeSlotRepository timeSlotRepository;
@@ -270,96 +271,33 @@ public class ProviderServiceImpl implements ProviderService {
     // return new PageImpl<>(pageContent, pageable, fullList.size());
     // }
 
-    @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy,#pageable.pageNumber,#pageable.pageSize,#pageable.sort}")
     public Page<SearchResponse> search(String keyword,
-            Long categoryId,
-            String categoryName,
-            Long consumerId,
-            Double radius,
-            String sortBy,
-            Pageable pageable) {
-        log.warn("CACHE MISS -> Fetching from DATABASE");
+                                       Long categoryId,
+                                       String categoryName,
+                                       Long consumerId,
+                                       Double radius,
+                                       String sortBy,
+                                       Pageable pageable) {
 
-        Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName,
-                Pageable.unpaged());
+        List<SearchResponse> fullList = searchCacheService.searchList(
+                keyword,
+                categoryId,
+                categoryName,
+                consumerId,
+                radius,
+                sortBy
+        );
 
-        if (consumerId == null || radius == null) {
-            List<SearchResponse> responses = providersPage.getContent()
-                    .stream()
-                    .filter(provider -> provider.getVerificationStatus() == VerificationStatus.VERIFIED)
-                    .map(provider -> {
-                        SearchResponse response = providerMapper.toSearchResponse(provider);
-                        response.setDistance(null);
-                        response.setEstimatedArrivalTime(null);
-                        return response;
-                    })
-                    .collect(Collectors.toList());
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), fullList.size());
 
-            List<SearchResponse> sortedResponses = applySorting(responses, sortBy, null);
+        List<SearchResponse> pageContent =
+                start >= fullList.size()
+                        ? Collections.emptyList()
+                        : fullList.subList(start, end);
 
-            return toPage(sortedResponses, pageable);
-        }
-
-        // === Location-based filtering ===
-        try {
-            // LocationDTO consumerLocation =
-            // locationService.getConsumerLocation(consumerId);
-
-            List<SearchResponse> filteredList = providersPage.getContent()
-                    .stream()
-                    .filter(provider -> provider.getVerificationStatus() == VerificationStatus.VERIFIED)
-                    .filter(provider -> provider.getLocation() != null)
-                    .map(provider -> {
-                        try {
-                            double distance = locationService
-                                    .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
-                                    .getDistanceKm();
-
-                            if (radius != null && distance > radius) {
-                                return null;
-                            }
-
-                            SearchResponse response = providerMapper.toSearchResponse(provider);
-                            response.setDistance(distance);
-
-                            // calc estimated arrival time (average speed 30 km/h in city)
-                            int estimatedMinutes = (int) Math.round((distance / 30.0) * 60);
-                            response.setEstimatedArrivalTime(estimatedMinutes);
-
-                            // Check if within provider's service area
-                            response.setWithinServiceArea(provider.getServiceAreaRadius() != null
-                                    && distance <= provider.getServiceAreaRadius());
-
-                            return response;
-                        } catch (Exception e) {
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-
-            List<SearchResponse> sortedList = applySorting(filteredList, sortBy, consumerId);
-
-            return toPage(sortedList, pageable);
-
-        } catch (ResourceNotFoundException e) {
-
-            // Return results without location filtering
-            List<SearchResponse> responses = providersPage.getContent()
-                    .stream()
-                    .map(provider -> {
-                        SearchResponse response = providerMapper.toSearchResponse(provider);
-                        response.setDistance(null);
-                        response.setEstimatedArrivalTime(null);
-                        return response;
-                    })
-                    .collect(Collectors.toList());
-
-            List<SearchResponse> sortedResponses = applySorting(responses, sortBy, null);
-            return toPage(sortedResponses, pageable);
-        }
+        return new PageImpl<>(pageContent, pageable, fullList.size());
     }
 
     private void validateHighRiskProvider(Provider provider) {
@@ -415,105 +353,70 @@ public class ProviderServiceImpl implements ProviderService {
         return new PageImpl<>(pageContent, pageable, responses.size());
     }
 
-    private List<SearchResponse> applySorting(List<SearchResponse> responses, String sortBy, Long consumerId) {
-        if (responses == null || responses.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        String sortField = sortBy != null ? sortBy.toLowerCase() : "rating";
-        switch (sortField) {
-            case "price_low":
-                return responses.stream()
-                        .sorted(Comparator.comparing(SearchResponse::getPrice))
-                        .collect(Collectors.toList());
-
-            case "price_high":
-                return responses.stream()
-                        .sorted(Comparator.comparing(SearchResponse::getPrice).reversed())
-                        .collect(Collectors.toList());
-
-            case "experience":
-                return responses.stream()
-                        .sorted(Comparator.comparing(SearchResponse::getCompletedJobs).reversed())
-                        .collect(Collectors.toList());
-
-            case "distance":
-                return responses.stream()
-                        .filter(r -> r.getDistance() != null)
-                        .sorted(Comparator.comparing(SearchResponse::getDistance))
-                        .collect(Collectors.toList());
-
-            case "rating":
-            default:
-                return responses.stream()
-                        .sorted(Comparator.comparing(SearchResponse::getAverageRating,
-                                Comparator.nullsLast(Comparator.reverseOrder())))
-                        .collect(Collectors.toList());
-        }
-    }
-
-    @Override
+//    @Override
+//    @Transactional(readOnly = true)
+//    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
+//
+//        if (consumerId == null) {
+//            throw new BadRequestException("consumerId is required");
+//        }
+//        if (radius == null || radius <= 0) {
+//            throw new BadRequestException("radius must be greater than 0");
+//        }
+//
+//        Page<Provider> providersPage = providerRepository.searchProviders(null, null, null, Pageable.unpaged());
+//
+//        List<SearchResponse> ranked = providersPage.getContent().stream()
+//                .filter(p -> p.getLocation() != null)
+//                .map(provider -> {
+//
+//                    try {
+//                        double distance = locationService
+//                                .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
+//                                .getDistanceKm();
+//
+//                        if (distance > radius)
+//                            return null;
+//
+//                        SearchResponse res = providerMapper.toSearchResponse(provider);
+//
+//                        res.setDistance(distance);
+//                        res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
+//
+//                        double score = calculateScore(provider, distance);
+//                        res.setScore(score);
+//
+//                        return res;
+//
+//                    } catch (Exception e) {
+//                        throw new BadRequestException("Distance calculation failed");
+//                    }
+//                })
+//                .filter(Objects::nonNull)
+//                .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
+//                .toList();
+//
+//        return toPage(ranked, pageable);
+//    }
     @Transactional(readOnly = true)
-    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
+    public Page<SearchResponse> topRatedNearMe(Long consumerId,
+                                               Double radius,
+                                               Pageable pageable) {
 
-        if (consumerId == null) {
-            throw new BadRequestException("consumerId is required");
-        }
-        if (radius == null || radius <= 0) {
-            throw new BadRequestException("radius must be greater than 0");
-        }
+        List<SearchResponse> ranked =
+                searchCacheService.topRatedNearMe(consumerId, radius);
 
-        Page<Provider> providersPage = providerRepository.searchProviders(null, null, null, Pageable.unpaged());
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), ranked.size());
 
-        List<SearchResponse> ranked = providersPage.getContent().stream()
-                .filter(p -> p.getLocation() != null)
-                .map(provider -> {
+        List<SearchResponse> pageContent =
+                start >= ranked.size()
+                        ? Collections.emptyList()
+                        : ranked.subList(start, end);
 
-                    try {
-                        double distance = locationService
-                                .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
-                                .getDistanceKm();
-
-                        if (distance > radius)
-                            return null;
-
-                        SearchResponse res = providerMapper.toSearchResponse(provider);
-
-                        res.setDistance(distance);
-                        res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
-
-                        double score = calculateScore(provider, distance);
-                        res.setScore(score);
-
-                        return res;
-
-                    } catch (Exception e) {
-                        throw new BadRequestException("Distance calculation failed");
-                    }
-                })
-                .filter(Objects::nonNull)
-                .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
-                .toList();
-
-        return toPage(ranked, pageable);
+        return new PageImpl<>(pageContent, pageable, ranked.size());
     }
 
-    private double calculateScore(Provider p, double distance) {
-
-        double ratingWeight = 0.5;
-        double distanceWeight = 0.3;
-        double experienceWeight = 0.2;
-
-        double ratingScore = (p.getAverageRating() != null ? p.getAverageRating() : 0) * 20;
-
-        double distanceScore = Math.max(0, 100 - (distance * 10));
-
-        double experienceScore = (p.getCompletedJobs() != null ? p.getCompletedJobs() : 0) / 10.0;
-
-        return (ratingScore * ratingWeight)
-                + (distanceScore * distanceWeight)
-                + (experienceScore * experienceWeight);
-    }
 
     @Override
     @Transactional
