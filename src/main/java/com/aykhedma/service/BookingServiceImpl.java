@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -87,6 +88,22 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         bookingRepository.save(booking);
 
+        // Reserve the requested time slot (default 30 minutes) with buffer so the
+        // requested
+        // start time and the half-hour before it become unavailable to others.
+        // Use 30 minutes as the default requested slot length.
+        try {
+            TimeSlot reservedForRequest = providerService.reserveTimeSlotWithBuffer(scheduleId,
+                    requestedDate,
+                    requestedTime,
+                    requestedTime.plusMinutes(30));
+            booking.setTimeSlot(reservedForRequest);
+            bookingRepository.save(booking);
+        } catch (Exception ignored) {
+            // If reserving fails, we keep the booking as PENDING without a reserved slot.
+            // This preserves existing behavior when a slot isn't available.
+        }
+
         // Update provider stats in memory
         provider.setTotalRequests((provider.getTotalRequests() != null ? provider.getTotalRequests() : 0) + 1);
         updateProviderRates(provider);
@@ -140,6 +157,25 @@ public class BookingServiceImpl implements BookingService {
         Long estimatedDuration = acceptBookingRequest.getEstimatedDuration();
         LocalTime endTime = booking.getRequestedStartTime().plusMinutes(estimatedDuration);
 
+        TimeSlot existingReservedSlot = null;
+        boolean canReuseExistingReservedSlot = false;
+        if (booking.getTimeSlot() != null) {
+            existingReservedSlot = timeSlotRepository.findById(booking.getTimeSlot().getId()).orElse(null);
+            if (existingReservedSlot != null) {
+                long existingMinutes = Duration.between(existingReservedSlot.getStartTime(),
+                        existingReservedSlot.getEndTime()).toMinutes();
+                canReuseExistingReservedSlot = existingReservedSlot.getStartTime().equals(startTime)
+                        && existingMinutes == estimatedDuration;
+
+                if (!canReuseExistingReservedSlot) {
+                    // Free request-time reservation before extending day/availability or reserving
+                    // a larger duration.
+                    providerService.restoreAvailabilityForCancelledBooking(booking);
+                    existingReservedSlot = null;
+                }
+            }
+        }
+
         Schedule schedule = provider.getSchedule();
         Long scheduleId;
         if (schedule == null)
@@ -157,6 +193,13 @@ public class BookingServiceImpl implements BookingService {
                         .warningMessage("The booking end time will exceed the end time of the working day")
                         .build();
             }
+        } else {
+            WorkingDay workingDay = workingDayRepository.findByScheduleIdAndDate(scheduleId, date)
+                    .orElseThrow(() -> new ResourceNotFoundException("Working day by the booking date is not found"));
+
+            if (endTime.isAfter(workingDay.getEndTime())) {
+                extendWorkingDayAndAvailability(scheduleId, date, startTime, workingDay, endTime);
+            }
         }
 
         List<Booking> conflictingBookings = bookingRepository.findConflictingBookings(providerId, bookingId, date,
@@ -170,7 +213,9 @@ public class BookingServiceImpl implements BookingService {
                     .build();
         }
 
-        TimeSlot reservedBookedSlot = providerService.reserveTimeSlotWithBuffer(scheduleId, date, startTime, endTime);
+        TimeSlot reservedBookedSlot = canReuseExistingReservedSlot
+                ? existingReservedSlot
+                : providerService.reserveTimeSlotWithBuffer(scheduleId, date, startTime, endTime);
 
         booking.setEstimatedDuration(estimatedDuration);
         booking.setStatus(BookingStatus.ACCEPTED);
@@ -210,6 +255,30 @@ public class BookingServiceImpl implements BookingService {
                 .status("ACCEPTED")
                 .booking(bookingMapper.toBookingResponse(booking))
                 .build();
+    }
+
+    private void extendWorkingDayAndAvailability(Long scheduleId,
+            LocalDate date,
+            LocalTime bookingStart,
+            WorkingDay workingDay,
+            LocalTime bookingEnd) {
+        LocalTime originalEndTime = workingDay.getEndTime();
+        workingDay.setEndTime(bookingEnd);
+        workingDayRepository.save(workingDay);
+
+        List<TimeSlot> availableSlots = timeSlotRepository.findByScheduleIdAndDateAndStatus(
+                scheduleId,
+                date,
+                TimeSlotStatus.AVAILABLE);
+
+        TimeSlot slotToExtend = availableSlots.stream()
+                .filter(slot -> slot.getStartTime().compareTo(bookingStart) <= 0)
+                .filter(slot -> slot.getEndTime().equals(originalEndTime))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Selected start time with duration is not available"));
+
+        slotToExtend.setEndTime(bookingEnd);
+        timeSlotRepository.save(slotToExtend);
     }
 
     @Override

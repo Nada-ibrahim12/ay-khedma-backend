@@ -273,12 +273,12 @@ public class ProviderServiceImpl implements ProviderService {
 
     @Transactional(readOnly = true)
     public Page<SearchResponse> search(String keyword,
-                                       Long categoryId,
-                                       String categoryName,
-                                       Long consumerId,
-                                       Double radius,
-                                       String sortBy,
-                                       Pageable pageable) {
+            Long categoryId,
+            String categoryName,
+            Long consumerId,
+            Double radius,
+            String sortBy,
+            Pageable pageable) {
 
         List<SearchResponse> fullList = searchCacheService.searchList(
                 keyword,
@@ -286,16 +286,14 @@ public class ProviderServiceImpl implements ProviderService {
                 categoryName,
                 consumerId,
                 radius,
-                sortBy
-        );
+                sortBy);
 
         int start = (int) pageable.getOffset();
         int end = Math.min(start + pageable.getPageSize(), fullList.size());
 
-        List<SearchResponse> pageContent =
-                start >= fullList.size()
-                        ? Collections.emptyList()
-                        : fullList.subList(start, end);
+        List<SearchResponse> pageContent = start >= fullList.size()
+                ? Collections.emptyList()
+                : fullList.subList(start, end);
 
         return new PageImpl<>(pageContent, pageable, fullList.size());
     }
@@ -353,70 +351,69 @@ public class ProviderServiceImpl implements ProviderService {
         return new PageImpl<>(pageContent, pageable, responses.size());
     }
 
-//    @Override
-//    @Transactional(readOnly = true)
-//    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
-//
-//        if (consumerId == null) {
-//            throw new BadRequestException("consumerId is required");
-//        }
-//        if (radius == null || radius <= 0) {
-//            throw new BadRequestException("radius must be greater than 0");
-//        }
-//
-//        Page<Provider> providersPage = providerRepository.searchProviders(null, null, null, Pageable.unpaged());
-//
-//        List<SearchResponse> ranked = providersPage.getContent().stream()
-//                .filter(p -> p.getLocation() != null)
-//                .map(provider -> {
-//
-//                    try {
-//                        double distance = locationService
-//                                .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
-//                                .getDistanceKm();
-//
-//                        if (distance > radius)
-//                            return null;
-//
-//                        SearchResponse res = providerMapper.toSearchResponse(provider);
-//
-//                        res.setDistance(distance);
-//                        res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
-//
-//                        double score = calculateScore(provider, distance);
-//                        res.setScore(score);
-//
-//                        return res;
-//
-//                    } catch (Exception e) {
-//                        throw new BadRequestException("Distance calculation failed");
-//                    }
-//                })
-//                .filter(Objects::nonNull)
-//                .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
-//                .toList();
-//
-//        return toPage(ranked, pageable);
-//    }
+    // @Override
+    // @Transactional(readOnly = true)
+    // public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius,
+    // Pageable pageable) {
+    //
+    // if (consumerId == null) {
+    // throw new BadRequestException("consumerId is required");
+    // }
+    // if (radius == null || radius <= 0) {
+    // throw new BadRequestException("radius must be greater than 0");
+    // }
+    //
+    // Page<Provider> providersPage = providerRepository.searchProviders(null, null,
+    // null, Pageable.unpaged());
+    //
+    // List<SearchResponse> ranked = providersPage.getContent().stream()
+    // .filter(p -> p.getLocation() != null)
+    // .map(provider -> {
+    //
+    // try {
+    // double distance = locationService
+    // .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
+    // .getDistanceKm();
+    //
+    // if (distance > radius)
+    // return null;
+    //
+    // SearchResponse res = providerMapper.toSearchResponse(provider);
+    //
+    // res.setDistance(distance);
+    // res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
+    //
+    // double score = calculateScore(provider, distance);
+    // res.setScore(score);
+    //
+    // return res;
+    //
+    // } catch (Exception e) {
+    // throw new BadRequestException("Distance calculation failed");
+    // }
+    // })
+    // .filter(Objects::nonNull)
+    // .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
+    // .toList();
+    //
+    // return toPage(ranked, pageable);
+    // }
     @Transactional(readOnly = true)
     public Page<SearchResponse> topRatedNearMe(Long consumerId,
-                                               Double radius,
-                                               Pageable pageable) {
+            Double radius,
+            Pageable pageable) {
 
-        List<SearchResponse> ranked =
-                searchCacheService.topRatedNearMe(consumerId, radius);
+        List<SearchResponse> ranked = searchCacheService.topRatedNearMe(consumerId, radius);
 
         int start = (int) pageable.getOffset();
         int end = Math.min(start + pageable.getPageSize(), ranked.size());
 
-        List<SearchResponse> pageContent =
-                start >= ranked.size()
-                        ? Collections.emptyList()
-                        : ranked.subList(start, end);
+        List<SearchResponse> pageContent = start >= ranked.size()
+                ? Collections.emptyList()
+                : ranked.subList(start, end);
 
         return new PageImpl<>(pageContent, pageable, ranked.size());
     }
-
 
     @Override
     @Transactional
@@ -848,7 +845,7 @@ public class ProviderServiceImpl implements ProviderService {
                 .orElseThrow(() -> new BadRequestException("Selected start time with duration is not available"));
 
         LocalTime blockedStart = maxTime(containingSlot.getStartTime(), bookingStart.minusMinutes(BUFFER_MINUTES));
-        LocalTime blockedEnd = minTime(containingSlot.getEndTime(), bookingEnd.plusMinutes(BUFFER_MINUTES));
+        LocalTime blockedEnd = bookingEnd;
 
         timeSlotRepository.delete(containingSlot);
 
@@ -882,16 +879,6 @@ public class ProviderServiceImpl implements ProviderService {
                 .schedule(containingSlot.getSchedule())
                 .build();
         slotsToSave.add(bookedSlot);
-
-        if (bookingEnd.isBefore(blockedEnd)) {
-            slotsToSave.add(TimeSlot.builder()
-                    .date(date)
-                    .startTime(bookingEnd)
-                    .endTime(blockedEnd)
-                    .status(TimeSlotStatus.UNAVAILABLE)
-                    .schedule(containingSlot.getSchedule())
-                    .build());
-        }
 
         if (blockedEnd.isBefore(containingSlot.getEndTime())) {
             slotsToSave.add(TimeSlot.builder()
