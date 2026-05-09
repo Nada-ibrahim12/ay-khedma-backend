@@ -30,6 +30,7 @@ public class ProviderResponse {
     @JoinColumn(name = "emergency_request_id", nullable = false)
     private EmergencyRequest emergencyRequest;
 
+    @Builder.Default
     @NotNull(message = "Response type is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

@@ -20,5 +20,6 @@ public class AcceptBookingRequest
     @Min(value = 30, message = "Estimated duration cannot be less than 30 minutes")
     private Long estimatedDuration; // In minutes
 
+    @Builder.Default
     private boolean overrideWorkingHours = false; // Set true when provider wants to accept after knowing it will end after the working hours
 }

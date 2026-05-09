@@ -39,6 +39,7 @@ public class ServiceType {
     @JoinColumn(name = "category_id", nullable = false)
     private ServiceCategory category;
 
+    @Builder.Default
     @NotNull(message = "Risk level is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)

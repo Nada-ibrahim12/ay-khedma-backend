@@ -30,6 +30,7 @@ public class ChatMessageResponse {
     private String content;
     private MessageType type;
 
+    @Builder.Default
     private List<String> mediaUrls = List.of();
     private LocalDateTime timestamp;
     private boolean isRead;

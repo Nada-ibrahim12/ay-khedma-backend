@@ -42,6 +42,7 @@ public class ChatMessage {
     @Column(length = 5000, nullable = true)
     private String content;
 
+    @Builder.Default
     @NotNull(message = "Message type is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -51,6 +52,7 @@ public class ChatMessage {
     @CreationTimestamp
     private LocalDateTime timestamp;
 
+    @Builder.Default
     @Size(max = 500, message = "Media URL cannot exceed 500 characters")
     @ElementCollection
     private List<String> mediaUrls = new ArrayList<>();
@@ -58,6 +60,7 @@ public class ChatMessage {
     @Size(max = 64, message = "Audio hash must be 64 characters or less")
     private String originalAudioHash;
 
+    @Builder.Default
     private Boolean isRead = false;
 //    @Enumerated(EnumType.STRING)
 //    private MessageStatus status;

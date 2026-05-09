@@ -49,6 +49,7 @@ public class ChatRoom {
     @Size(max = 100, message = "Room name cannot exceed 100 characters")
     private String roomName;
 
+    @Builder.Default
     @NotNull(message = "Active status is required")
     @Column(nullable = false)
     private Boolean isActive = true;

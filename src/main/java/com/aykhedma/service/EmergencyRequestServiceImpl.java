@@ -38,7 +38,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class EmergencyRequestServiceImpl implements EmergencyRequestService {
+public class EmergencyRequestServiceImpl implements EmergencyRequestService
+{
     private final EmergencyRequestRepository emergencyRequestRepository;
     private final ProviderResponseRepository providerResponseRepository;
     private final UserRepository userRepository;
@@ -55,7 +56,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
     private final NotificationFactory notificationFactory;
 
     @Override
-    public EmergencyRequestResponse getCurrentEmergencyRequest(Long consumerId) {
+    public EmergencyRequestResponse getCurrentEmergencyRequest(Long consumerId)
+    {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
 
@@ -66,12 +68,45 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
         if (currentEmergencyRequest == null)
             throw new ResourceNotFoundException("No currently ongoing emergency request found for this consumer");
 
+        JobKey jobKey = new JobKey("broadcast_" + currentEmergencyRequest.getId());
+        boolean jobExists;
+        try
+        {
+            jobExists = scheduler.checkExists(jobKey);
+        }
+        catch (SchedulerException e)
+        {
+            throw new RuntimeException(e);
+        }
+
+        if (!jobExists && currentEmergencyRequest.getStatus() == EmergencyRequestStatus.BROADCASTING)
+        {
+            JobDetail jobDetail = JobBuilder.newJob(BroadcastEmergencyRequestJob.class)
+                .withIdentity("broadcast_" + currentEmergencyRequest.getId())
+                .usingJobData("requestId", currentEmergencyRequest.getId())
+                .build();
+
+            Trigger trigger = TriggerBuilder.newTrigger().startNow()
+                    .withSchedule(SimpleScheduleBuilder.simpleSchedule()
+                            .withIntervalInMinutes(1).repeatForever())
+                    .build();
+            try
+            {
+                scheduler.scheduleJob(jobDetail, trigger);
+            }
+            catch (SchedulerException e)
+            {
+                throw new RuntimeException(e);
+            }
+        }
+
         return emergencyRequestMapper.toEmergencyRequestResponse(currentEmergencyRequest);
     }
 
     @Override
     @Transactional
-    public EmergencyRequestResponse requestEmergencyRequest(Long consumerId, EmergencyRequestRequest request) {
+    public EmergencyRequestResponse requestEmergencyRequest(Long consumerId, EmergencyRequestRequest request)
+    {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
 
@@ -116,9 +151,12 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
                 .withSchedule(SimpleScheduleBuilder.simpleSchedule()
                         .withIntervalInMinutes(1).repeatForever())
                 .build();
-        try {
+        try
+        {
             scheduler.scheduleJob(jobDetail, trigger);
-        } catch (SchedulerException e) {
+        }
+        catch (SchedulerException e)
+        {
             throw new RuntimeException(e);
         }
 
@@ -127,14 +165,19 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
 
     @Override
     @Transactional
-    public void broadcastEmergencyRequest(Long requestId) {
+    public void broadcastEmergencyRequest(Long requestId)
+    {
         EmergencyRequest emergencyRequest = emergencyRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Emergency request not found"));
 
-        if (emergencyRequest.getStatus() != EmergencyRequestStatus.BROADCASTING) {
-            try {
+        if (emergencyRequest.getStatus() != EmergencyRequestStatus.BROADCASTING)
+        {
+            try
+            {
                 scheduler.deleteJob(new JobKey("broadcast_" + requestId));
-            } catch (SchedulerException e) {
+            }
+            catch (SchedulerException e)
+            {
                 throw new RuntimeException(e);
             }
             return;
@@ -155,7 +198,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
         List<Provider> providers = providerRepository.findProvidersWithinRadius(serviceType.getId(),
                 location.getCoordinates(), searchRadius * 1000);
 
-        for (Provider provider : providers) {
+        for (Provider provider : providers)
+        {
             if (providerResponseRepository.existsByEmergencyRequestIdAndProviderId(requestId, provider.getId()))
                 continue;
 
@@ -180,8 +224,10 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
         }
 
         int newSearchRadius = searchRadius + 5;
-        if (newSearchRadius > 50) {
-            if (emergencyRequest.getProviderResponses().isEmpty()) {
+        if (newSearchRadius > 50)
+        {
+            if (emergencyRequest.getProviderResponses().isEmpty())
+            {
                 emergencyRequest.setStatus(EmergencyRequestStatus.NO_PROVIDERS);
                 emergencyRequestRepository.save(emergencyRequest);
 
@@ -189,25 +235,33 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
                         emergencyRequest.getConsumer().getId().toString(),
                         "/queue/emergency-requests/no-providers",
                         emergencyRequestMapper.toEmergencyRequestResponse(emergencyRequest));
-            } else {
+            }
+            else
+            {
                 emergencyRequest.setStatus(EmergencyRequestStatus.WAITING_ACCEPTANCE);
                 emergencyRequestRepository.save(emergencyRequest);
             }
 
-            try {
+            try
+            {
                 scheduler.deleteJob(new JobKey("broadcast_" + requestId));
-            } catch (SchedulerException e) {
+            }
+            catch (SchedulerException e)
+            {
                 throw new RuntimeException(e);
             }
-
-        } else {
+        }
+        else
+        {
             emergencyRequest.setSearchRadius(newSearchRadius);
+            emergencyRequestRepository.save(emergencyRequest);
         }
     }
 
     @Override
     @Transactional
-    public List<ProviderResponseResponse> getPendingEmergencyRequests(Long providerId) {
+    public List<ProviderResponseResponse> getPendingEmergencyRequests(Long providerId)
+    {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -222,7 +276,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
 
     @Override
     @Transactional
-    public ProviderResponseResponse acceptEmergencyRequest(Long providerId, ProviderResponseRequest request) {
+    public ProviderResponseResponse acceptEmergencyRequest(Long providerId, ProviderResponseRequest request)
+    {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -290,7 +345,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
 
     @Override
     @Transactional
-    public ProviderResponseResponse declineEmergencyRequest(Long providerId, Long providerResponseId) {
+    public ProviderResponseResponse declineEmergencyRequest(Long providerId, Long providerResponseId)
+    {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -321,7 +377,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
 
     @Override
     @Transactional
-    public ProviderResponseResponse acceptProviderResponse(Long consumerId, Long providerResponseId) {
+    public ProviderResponseResponse acceptProviderResponse(Long consumerId, Long providerResponseId)
+    {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
 
@@ -354,9 +411,12 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
         providerResponse.setSelected(true);
         providerResponseRepository.save(providerResponse);
 
-        try {
+        try
+        {
             scheduler.deleteJob(new JobKey("broadcast_" + emergencyRequest.getId()));
-        } catch (SchedulerException e) {
+        }
+        catch (SchedulerException e)
+        {
             throw new RuntimeException(e);
         }
 
@@ -374,7 +434,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
 
     @Override
     @Transactional
-    public ProviderResponseResponse declineProviderResponse(Long consumerId, Long providerResponseId) {
+    public ProviderResponseResponse declineProviderResponse(Long consumerId, Long providerResponseId)
+    {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
 
@@ -415,8 +476,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
 
     @Override
     @Transactional
-    public EmergencyRequestResponse updateEmergencyRequestPrice(Long consumerId,
-            UpdateEmergencyRequestPriceRequest request) {
+    public EmergencyRequestResponse updateEmergencyRequestPrice(Long consumerId, UpdateEmergencyRequestPriceRequest request)
+    {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
 
@@ -438,7 +499,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
                 .findByEmergencyRequestIdAndResponseType(emergencyRequest.getId(),
                         ProviderResponseType.DECLINED_REQUEST);
 
-        for (ProviderResponse providerResponse : declinedProviderResponses) {
+        for (ProviderResponse providerResponse : declinedProviderResponses)
+        {
             providerResponse.setResponseType(ProviderResponseType.NO_RESPONSE);
             providerResponseRepository.save(providerResponse);
 
@@ -457,7 +519,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
 
     @Override
     @Transactional
-    public EmergencyRequestResponse cancelEmergencyRequest(Long consumerId, Long emergencyRequestId) {
+    public EmergencyRequestResponse cancelEmergencyRequest(Long consumerId, Long emergencyRequestId)
+    {
         Consumer consumer = consumerRepository.findById(consumerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
 
@@ -475,10 +538,11 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
         emergencyRequest.setStatus(EmergencyRequestStatus.CANCELLED);
         emergencyRequestRepository.save(emergencyRequest);
 
-        // Notify all providers that the emergency request has been cancelled
+        // Notify all providers that the emergency request has been canceled
         List<ProviderResponse> allResponses = providerResponseRepository
                 .findByEmergencyRequestId(emergencyRequest.getId());
-        for (ProviderResponse response : allResponses) {
+        for (ProviderResponse response : allResponses)
+        {
             notificationFactory.send(response.getProvider().getId(),
                     NotificationType.EMERGENCY_ALERT,
                     Map.of(
@@ -487,9 +551,12 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
                             "emergencyRequestId", emergencyRequest.getId().toString()));
         }
 
-        try {
+        try
+        {
             scheduler.deleteJob(new JobKey("broadcast_" + emergencyRequest.getId()));
-        } catch (SchedulerException e) {
+        }
+        catch (SchedulerException e)
+        {
             throw new RuntimeException(e);
         }
 
@@ -497,18 +564,23 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService {
     }
 
     @Override
-    public List<EmergencyRequestResponse> getEmergencyRequestsHistory(Long userId) {
+    public List<EmergencyRequestResponse> getEmergencyRequestsHistory(Long userId)
+    {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         List<EmergencyRequest> emergencyRequests;
-        if (user.getRole() == UserType.CONSUMER) {
+        if (user.getRole() == UserType.CONSUMER)
+        {
             emergencyRequests = emergencyRequestRepository
                     .findByConsumerIdAndStatusOrderByCreatedAtDesc(userId, EmergencyRequestStatus.ACCEPTED);
-        } else if (user.getRole() == UserType.PROVIDER) {
+        }
+        else if (user.getRole() == UserType.PROVIDER)
+        {
             emergencyRequests = emergencyRequestRepository
                     .findBySelectedProviderIdAndStatusOrderByCreatedAtDesc(userId, EmergencyRequestStatus.ACCEPTED);
-        } else
+        }
+        else
             throw new ForbiddenException("User is not a provider or a consumer");
 
         return emergencyRequests.stream().map(emergencyRequestMapper::toEmergencyRequestResponse).toList();

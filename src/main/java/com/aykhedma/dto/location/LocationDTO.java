@@ -22,12 +22,15 @@ public class LocationDTO {
     @DecimalMax(value = "180.0", message = "Longitude must be between -180 and 180")
     private Double longitude;
 
+    @Builder.Default
     @Size(max = 255, message = "Address cannot exceed 255 characters")
-    private String address;
+    private String address = " ";
 
+    @Builder.Default
     @Size(max = 100, message = "Area cannot exceed 100 characters")
-    private String area;
+    private String area = " ";
 
+    @Builder.Default
     @Size(max = 100, message = "City cannot exceed 100 characters")
-    private String city;
+    private String city = " ";
 }

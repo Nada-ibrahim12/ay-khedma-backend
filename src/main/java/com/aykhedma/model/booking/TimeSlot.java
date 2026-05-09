@@ -23,6 +23,7 @@ public class TimeSlot {
 
     private LocalTime endTime;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     private TimeSlotStatus status = TimeSlotStatus.AVAILABLE;
 

@@ -46,30 +46,36 @@ public class Notification {
     @Builder.Default
     private Set<NotificationChannel> methods = new HashSet<>();
 
+    @Builder.Default
     @Column(name = "push_sent")
     private boolean pushSent = false;
 
     @Column(name = "push_sent_at")
     private LocalDateTime pushSentAt;
 
+    @Builder.Default
     @Column(name = "push_failed")
     private boolean pushFailed = false;
 
+    @Builder.Default
     @Column(name = "email_sent")
     private boolean emailSent = false;
 
     @Column(name = "email_sent_at")
     private LocalDateTime emailSentAt;
 
+    @Builder.Default
     @Column(name = "email_failed")
     private boolean emailFailed = false;
 
+    @Builder.Default
     @Column(name = "in_app_delivered")
     private boolean inAppDelivered = false;
 
     @Column(name = "in_app_delivered_at")
     private LocalDateTime inAppDeliveredAt;
 
+    @Builder.Default
     @Column(name = "in_app_failed")
     private boolean inAppFailed = false;
 
@@ -86,6 +92,8 @@ public class Notification {
 
     @PastOrPresent(message = "Read date cannot be in the future")
     private LocalDateTime readAt;
+
+    @Builder.Default
     @Column(name = "is_delivered")
     private boolean delivered = false;
 

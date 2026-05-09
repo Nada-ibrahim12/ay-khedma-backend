@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -24,4 +25,5 @@ public class EmergencyRequestResponse
     private EmergencyRequestStatus status;
     private ProviderSummaryResponse selectedProvider;
     private LocalDateTime createdAt;
+    private List<ProviderResponseResponse> providerResponses;
 }

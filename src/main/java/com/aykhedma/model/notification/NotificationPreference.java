@@ -22,12 +22,15 @@ public class NotificationPreference {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    @Builder.Default
     @Column(name = "in_app_enabled")
     private boolean inAppEnabled = true;
 
+    @Builder.Default
     @Column(name = "email_enabled")
     private boolean emailEnabled = true;
 
+    @Builder.Default
     @Column(name = "push_enabled")
     private boolean pushEnabled = true;
 

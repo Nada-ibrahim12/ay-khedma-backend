@@ -45,6 +45,7 @@ public class EmergencyRequest {
     @DecimalMax(value = "100000.0", message = "Price cannot exceed 100,000")
     private Double price;
 
+    @Builder.Default
     @NotNull(message = "Emergency status is required")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -66,6 +67,7 @@ public class EmergencyRequest {
     @Column(length = 1000)
     private String description;
 
+    @Builder.Default
     @Min(value = 5, message = "Search radius must be at least 5 km")
     @Max(value = 50, message = "Search radius cannot exceed 50 km")
     private Integer searchRadius = 5;

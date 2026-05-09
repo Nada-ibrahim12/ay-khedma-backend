@@ -44,6 +44,7 @@ public class ChatSession {
     @Size(max = 50, message = "Detected dialect cannot exceed 50 characters")
     private String detectedDialect;
 
+    @Builder.Default
     @NotNull(message = "Active status is required")
     @Column(nullable = false)
     private Boolean isActive = true;
