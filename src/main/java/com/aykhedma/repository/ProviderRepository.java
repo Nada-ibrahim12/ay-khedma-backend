@@ -1,5 +1,6 @@
 package com.aykhedma.repository;
 
+import com.aykhedma.dto.response.ProviderDistanceProjection;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.model.user.VerificationStatus;
@@ -131,56 +132,98 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
     List<Provider> findProvidersWithinRadius(@Param("serviceTypeId") Long serviceTypeId,
                                              @Param("requestCoordinates") Point requestCoordinates,
                                              @Param("radiusMeters") double radiusMeters);
-        
-    @Query(value = """
-            WITH consumer_location AS (
-                SELECT cl.coordinates AS consumer_coords
-                FROM consumers c
-                JOIN locations cl ON c.location_id = cl.id
-                WHERE c.id = :consumerId
-            ),
-            provider_distance AS (
-                SELECT
-                    p.*,
-                    u.*,
-                    ST_Distance(
-                        CAST(l.coordinates AS geography),
-                        CAST(cl.consumer_coords AS geography)
-                    ) AS distance_meters
-                FROM providers p
-                JOIN users u ON p.id = u.id
-                JOIN locations l ON p.location_id = l.id
-                CROSS JOIN consumer_location cl
-                WHERE p.verification_status = 'VERIFIED'
-            )
-            SELECT *
-            FROM provider_distance
-            WHERE distance_meters <= :radiusMeters
-            ORDER BY (
-                (COALESCE(average_rating, 0) * 10) +
-                (GREATEST(0, 100 - (distance_meters / 100)) * 0.3) +
-                (COALESCE(completed_jobs, 0) * 0.02)
-            ) DESC
-            """, countQuery = """
-            WITH consumer_location AS (
-                SELECT cl.coordinates AS consumer_coords
-                FROM consumers c
-                JOIN locations cl ON c.location_id = cl.id
-                WHERE c.id = :consumerId
-            )
-            SELECT COUNT(*)
-            FROM providers p
-            JOIN locations l ON p.location_id = l.id
-            CROSS JOIN consumer_location cl
-            WHERE p.verification_status = 'VERIFIED'
-            AND ST_DWithin(
-                CAST(l.coordinates AS geography),
-                CAST(cl.consumer_coords AS geography),
-                :radiusMeters
-            )
-            """, nativeQuery = true)
-    Page<Provider> findTopRatedNearConsumer(
-            @Param("consumerId") Long consumerId,
-            @Param("radiusMeters") double radiusMeters,
-            Pageable pageable);
+
+        @Query(value = """
+WITH consumer_location AS (
+    SELECT cl.coordinates AS consumer_coords
+    FROM consumers c
+    JOIN locations cl ON c.location_id = cl.id
+    WHERE c.id = :consumerId
+),
+provider_distance AS (
+    SELECT
+        p.id AS id,
+        u.name AS name,
+        u.profile_image AS profileImage,
+
+        st.name AS serviceType,
+        st.name_ar AS serviceTypeAr,
+        sc.name AS categoryName,
+
+        p.average_rating AS averageRating,
+        p.price AS price,
+        p.price_type AS priceType,
+        p.service_area_radius AS serviceAreaRadius,
+
+        p.average_punctuality_rating AS averagePunctualityRating,
+        p.average_commitment_rating AS averageCommitmentRating,
+        p.average_quality_of_work_rating AS averageQualityOfWorkRating,
+
+        l.area AS area,
+
+        ST_Distance(
+            CAST(l.coordinates AS geography),
+            CAST(cl.consumer_coords AS geography)
+        ) AS distanceMeters
+
+    FROM providers p
+    JOIN users u ON p.id = u.id
+    JOIN locations l ON p.location_id = l.id
+    JOIN service_types st ON p.service_type_id = st.id
+    JOIN service_categories sc ON st.category_id = sc.id
+    CROSS JOIN consumer_location cl
+    WHERE p.verification_status = 'VERIFIED'
+)
+
+SELECT
+    id,
+    name,
+    profileImage,
+
+    serviceType,
+    serviceTypeAr,
+    categoryName,
+
+    averageRating,
+    price,
+    priceType,
+    serviceAreaRadius,
+
+    averagePunctualityRating,
+    averageCommitmentRating,
+    averageQualityOfWorkRating,
+
+    area,
+
+    distanceMeters,
+    (distanceMeters / 1000.0) AS distanceKm,
+    CAST((distanceMeters / 1000.0 / 30.0) * 60 AS INTEGER) AS estimatedArrivalTime
+
+FROM provider_distance
+WHERE distanceMeters <= :radiusMeters
+ORDER BY distanceMeters ASC
+""",
+                countQuery = """
+SELECT COUNT(*)
+FROM providers p
+JOIN locations l ON p.location_id = l.id
+CROSS JOIN (
+    SELECT cl.coordinates AS consumer_coords
+    FROM consumers c
+    JOIN locations cl ON c.location_id = cl.id
+    WHERE c.id = :consumerId
+) cl
+WHERE p.verification_status = 'VERIFIED'
+AND ST_DWithin(
+    CAST(l.coordinates AS geography),
+    CAST(cl.consumer_coords AS geography),
+    :radiusMeters
+)
+""",
+                nativeQuery = true)
+        Page<ProviderDistanceProjection> findTopRatedNearConsumer(
+                @Param("consumerId") Long consumerId,
+                @Param("radiusMeters") double radiusMeters,
+                Pageable pageable
+        );
 }

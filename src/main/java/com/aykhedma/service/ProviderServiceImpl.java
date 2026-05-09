@@ -16,6 +16,7 @@ import com.aykhedma.model.booking.TimeSlotStatus;
 import com.aykhedma.model.booking.WorkingDay;
 import com.aykhedma.model.document.Document;
 import com.aykhedma.model.location.Location;
+import com.aykhedma.model.service.PriceType;
 import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Consumer;
@@ -42,6 +43,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static org.locationtech.jts.util.Memory.round;
 
 @Service
 @Slf4j
@@ -399,20 +402,55 @@ public class ProviderServiceImpl implements ProviderService {
     // return toPage(ranked, pageable);
     // }
     @Transactional(readOnly = true)
-    public Page<SearchResponse> topRatedNearMe(Long consumerId,
-                                               Double radius,
-                                               Pageable pageable) {
+    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
 
-        List<SearchResponse> ranked = searchCacheService.topRatedNearMe(consumerId, radius);
+        double radiusMeters = radius * 1000;
 
-        int start = (int) pageable.getOffset();
-        int end = Math.min(start + pageable.getPageSize(), ranked.size());
+        Page<ProviderDistanceProjection> result =
+                providerRepository.findTopRatedNearConsumer(
+                        consumerId,
+                        radiusMeters,
+                        pageable
+                );
 
-        List<SearchResponse> pageContent = start >= ranked.size()
-                ? Collections.emptyList()
-                : ranked.subList(start, end);
+        List<SearchResponse> mapped = result.getContent()
+                .stream()
+                .map(this::map)
+                .toList();
 
-        return new PageImpl<>(pageContent, pageable, ranked.size());
+        return new PageImpl<>(mapped, pageable, result.getTotalElements());
+    }
+    private SearchResponse map(ProviderDistanceProjection p) {
+
+        SearchResponse res = new SearchResponse();
+
+        res.setId(p.getId());
+        res.setName(p.getName());
+        res.setProfileImage(p.getProfileImage());
+
+        res.setServiceType(p.getServiceType());
+        res.setServiceTypeAr(p.getServiceTypeAr());
+        res.setCategoryName(p.getCategoryName());
+
+        res.setAverageRating(p.getAverageRating());
+
+        res.setPrice(p.getPrice());
+        res.setPriceType(
+                p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null
+        );
+
+        res.setServiceAreaRadius(p.getServiceAreaRadius());
+
+        res.setAveragePunctualityRating(p.getAveragePunctualityRating());
+        res.setAverageCommitmentRating(p.getAverageCommitmentRating());
+        res.setAverageQualityOfWorkRating(p.getAverageQualityOfWorkRating());
+
+        res.setArea(p.getArea());
+
+        res.setDistance(p.getDistanceKm());
+        res.setEstimatedArrivalTime(p.getEstimatedArrivalTime());
+
+        return res;
     }
 
     @Override
