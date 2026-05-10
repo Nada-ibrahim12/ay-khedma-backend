@@ -107,6 +107,10 @@ public class ProviderServiceImpl implements ProviderService {
             provider.setWorksAt(request.getWorksAt());
         }
 
+        if (request.getBookingBufferMinutes() != null) {
+            provider.setBookingBufferMinutes(request.getBookingBufferMinutes());
+        }
+
         if (request.getWorkLocation() != null) {
             provider.setWorkLocation(request.getWorkLocation());
         }
@@ -276,12 +280,12 @@ public class ProviderServiceImpl implements ProviderService {
 
     @Transactional(readOnly = true)
     public Page<SearchResponse> search(String keyword,
-                                       Long categoryId,
-                                       String categoryName,
-                                       Long consumerId,
-                                       Double radius,
-                                       String sortBy,
-                                       Pageable pageable) {
+            Long categoryId,
+            String categoryName,
+            Long consumerId,
+            Double radius,
+            String sortBy,
+            Pageable pageable) {
 
         List<SearchResponse> fullList = searchCacheService.searchList(
                 keyword,
@@ -406,12 +410,10 @@ public class ProviderServiceImpl implements ProviderService {
 
         double radiusMeters = radius * 1000;
 
-        Page<ProviderDistanceProjection> result =
-                providerRepository.findTopRatedNearConsumer(
-                        consumerId,
-                        radiusMeters,
-                        pageable
-                );
+        Page<ProviderDistanceProjection> result = providerRepository.findTopRatedNearConsumer(
+                consumerId,
+                radiusMeters,
+                pageable);
 
         List<SearchResponse> mapped = result.getContent()
                 .stream()
@@ -420,6 +422,7 @@ public class ProviderServiceImpl implements ProviderService {
 
         return new PageImpl<>(mapped, pageable, result.getTotalElements());
     }
+
     private SearchResponse map(ProviderDistanceProjection p) {
 
         SearchResponse res = new SearchResponse();
@@ -436,8 +439,7 @@ public class ProviderServiceImpl implements ProviderService {
 
         res.setPrice(p.getPrice());
         res.setPriceType(
-                p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null
-        );
+                p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null);
 
         res.setServiceAreaRadius(p.getServiceAreaRadius());
 
@@ -867,9 +869,11 @@ public class ProviderServiceImpl implements ProviderService {
 
     @Override
     public TimeSlot reserveTimeSlotWithBuffer(Long scheduleId,
-                                              LocalDate date,
-                                              LocalTime bookingStart,
-                                              LocalTime bookingEnd) {
+            LocalDate date,
+            LocalTime bookingStart,
+            LocalTime bookingEnd,
+            long bufferMinutes,
+            boolean applyPostBuffer) {
         List<TimeSlot> availableSlots = timeSlotRepository
                 .findByScheduleIdAndDateAndStatus(scheduleId, date, TimeSlotStatus.AVAILABLE)
                 .stream()
@@ -882,8 +886,8 @@ public class ProviderServiceImpl implements ProviderService {
                 .findFirst()
                 .orElseThrow(() -> new BadRequestException("Selected start time with duration is not available"));
 
-        LocalTime blockedStart = maxTime(containingSlot.getStartTime(), bookingStart.minusMinutes(BUFFER_MINUTES));
-        LocalTime blockedEnd = bookingEnd;
+        LocalTime blockedStart = maxTime(containingSlot.getStartTime(), bookingStart.minusMinutes(bufferMinutes));
+        LocalTime blockedEnd = applyPostBuffer ? bookingEnd.plusMinutes(bufferMinutes) : bookingEnd;
 
         timeSlotRepository.delete(containingSlot);
 
@@ -918,6 +922,16 @@ public class ProviderServiceImpl implements ProviderService {
                 .build();
         slotsToSave.add(bookedSlot);
 
+        if (bookingEnd.isBefore(blockedEnd)) {
+            slotsToSave.add(TimeSlot.builder()
+                    .date(date)
+                    .startTime(bookingEnd)
+                    .endTime(blockedEnd)
+                    .status(TimeSlotStatus.UNAVAILABLE)
+                    .schedule(containingSlot.getSchedule())
+                    .build());
+        }
+
         if (blockedEnd.isBefore(containingSlot.getEndTime())) {
             slotsToSave.add(TimeSlot.builder()
                     .date(date)
@@ -934,6 +948,14 @@ public class ProviderServiceImpl implements ProviderService {
                 .filter(slot -> slot.getStatus() == TimeSlotStatus.BOOKED)
                 .findFirst()
                 .orElseThrow(() -> new BadRequestException("Failed to reserve booked time slot"));
+    }
+
+    @Override
+    public TimeSlot reserveTimeSlotWithBuffer(Long scheduleId,
+            LocalDate date,
+            LocalTime bookingStart,
+            LocalTime bookingEnd) {
+        return reserveTimeSlotWithBuffer(scheduleId, date, bookingStart, bookingEnd, BUFFER_MINUTES, false);
     }
 
     @Override
@@ -1039,7 +1061,7 @@ public class ProviderServiceImpl implements ProviderService {
     @Override
     @Transactional(readOnly = true)
     public List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlotsForDateRange(Long providerId,
-                                                                                     LocalDate startDate, LocalDate endDate) {
+            LocalDate startDate, LocalDate endDate) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
 
@@ -1102,7 +1124,7 @@ public class ProviderServiceImpl implements ProviderService {
     // }
 
     private List<ScheduleResponse.TimeSlotResponse> toDiscreteStartTimeResponses(List<TimeSlot> availableSlots,
-                                                                                 LocalDate fallbackDate) {
+            LocalDate fallbackDate) {
         if (availableSlots == null || availableSlots.isEmpty()) {
             return List.of();
         }

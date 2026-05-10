@@ -59,4 +59,8 @@ public class ProviderProfileRequest {
     private Double serviceAreaRadius;
 
     private LocationDTO location;
+
+    @Min(value = 0, message = "Booking buffer cannot be negative")
+    @Max(value = 480, message = "Booking buffer cannot exceed 480 minutes")
+    private Integer bookingBufferMinutes;
 }

@@ -88,20 +88,17 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         bookingRepository.save(booking);
 
-        // Reserve the requested time slot (default 30 minutes) with buffer so the
-        // requested
-        // start time and the half-hour before it become unavailable to others.
-        // Use 30 minutes as the default requested slot length.
         try {
+            long buffer = (provider.getBookingBufferMinutes() != null) ? provider.getBookingBufferMinutes() : 30L;
             TimeSlot reservedForRequest = providerService.reserveTimeSlotWithBuffer(scheduleId,
                     requestedDate,
                     requestedTime,
-                    requestedTime.plusMinutes(30));
+                    requestedTime.plusMinutes(30),
+                    buffer,
+                    false);
             booking.setTimeSlot(reservedForRequest);
             bookingRepository.save(booking);
         } catch (Exception ignored) {
-            // If reserving fails, we keep the booking as PENDING without a reserved slot.
-            // This preserves existing behavior when a slot isn't available.
         }
 
         // Update provider stats in memory
@@ -213,9 +210,10 @@ public class BookingServiceImpl implements BookingService {
                     .build();
         }
 
+        long buffer = (provider.getBookingBufferMinutes() != null) ? provider.getBookingBufferMinutes() : 30L;
         TimeSlot reservedBookedSlot = canReuseExistingReservedSlot
                 ? existingReservedSlot
-                : providerService.reserveTimeSlotWithBuffer(scheduleId, date, startTime, endTime);
+                : providerService.reserveTimeSlotWithBuffer(scheduleId, date, startTime, endTime, buffer, true);
 
         booking.setEstimatedDuration(estimatedDuration);
         booking.setStatus(BookingStatus.ACCEPTED);

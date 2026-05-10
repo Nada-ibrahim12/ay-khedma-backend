@@ -70,6 +70,9 @@ public interface ProviderService {
         void validateHalfHourBoundary(LocalTime time);
 
         TimeSlot reserveTimeSlotWithBuffer(Long scheduleId, LocalDate date, LocalTime bookingStart,
+                        LocalTime bookingEnd, long bufferMinutes, boolean applyPostBuffer);
+
+        TimeSlot reserveTimeSlotWithBuffer(Long scheduleId, LocalDate date, LocalTime bookingStart,
                         LocalTime bookingEnd);
 
         void restoreAvailabilityForCancelledBooking(Booking booking);
