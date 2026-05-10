@@ -4,6 +4,7 @@ import com.aykhedma.dto.request.ChatMessageRequest;
 import com.aykhedma.dto.response.ChatMessageResponse;
 import com.aykhedma.dto.response.ChatRoomResponse;
 import com.aykhedma.exception.BadRequestException;
+import com.aykhedma.exception.UnauthorizedException;
 import com.aykhedma.model.chat.MessageType;
 import com.aykhedma.security.CustomUserDetails;
 import com.aykhedma.service.ChatService;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -80,6 +82,9 @@ public class ChatController {
     ) throws IOException {
         if (roomId == null || roomId.isBlank()) {
             throw new BadRequestException("roomId is required");
+        }
+        if (user == null || user.getUser() == null) {
+            throw new UnauthorizedException("User not authenticated or session expired");
         }
         if ((content == null || content.isBlank())
                 && (mediaFiles == null || mediaFiles.isEmpty())) {

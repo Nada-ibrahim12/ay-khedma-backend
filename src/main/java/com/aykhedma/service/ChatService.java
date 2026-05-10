@@ -101,10 +101,6 @@ public class ChatService {
                 });
 
         }
-        @CacheEvict(
-                value = "chatMessages",
-                key = "#room.id + '_' + sender.id + '_*'"
-        )
         @Transactional
         public ChatMessageResponse sendMessage(User sender, ChatMessageRequest request) throws IOException {
 
@@ -183,11 +179,6 @@ public class ChatService {
 
                 return response;
         }
-
-        @Cacheable(
-                value = "chatMessages",
-                key = "#roomId + '_' + #currentUser.id + '_' + #page + '_' + #size"
-        )
         @Transactional
         public List<ChatMessageResponse> getMessages(User currentUser, String roomId, int page, int size) {
 
