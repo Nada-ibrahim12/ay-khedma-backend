@@ -29,6 +29,8 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
 
         List<Provider> findByVerificationStatus(VerificationStatus status);
 
+        long countByVerificationStatus(VerificationStatus status);
+
         List<Provider> findByServiceType(ServiceType serviceType);
 
         @Query("SELECT p FROM Provider p WHERE p.serviceType = :serviceType AND p.verificationStatus = 'VERIFIED' AND p.emergencyEnabled = true")

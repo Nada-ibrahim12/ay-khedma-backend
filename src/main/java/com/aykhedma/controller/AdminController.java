@@ -4,6 +4,7 @@ import com.aykhedma.auth.AuthService;
 import com.aykhedma.dto.request.RegisterRequest;
 import com.aykhedma.dto.request.RejectProviderRequest;
 import com.aykhedma.dto.request.UpdateUserRequest;
+import com.aykhedma.dto.response.DashboardStatsResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
 import com.aykhedma.model.user.UserType;
@@ -37,6 +38,16 @@ public class AdminController {
 
     private final AdminService adminService;
     private final AuthService authService;
+
+    @GetMapping("/stats")
+    @Operation(summary = "Get dashboard statistics", description = "Retrieve total users, providers, pending providers, and services")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Statistics retrieved successfully", content = @Content(schema = @Schema(implementation = DashboardStatsResponse.class))),
+            @ApiResponse(responseCode = "403", description = "Unauthorized - admin access required")
+    })
+    public ResponseEntity<DashboardStatsResponse> getDashboardStats() {
+        return ResponseEntity.ok(adminService.getDashboardStats());
+    }
 
     @GetMapping("/providers/pending")
     @Operation(summary = "Get pending providers", description = "Retrieve list of providers awaiting verification")
@@ -138,8 +149,9 @@ public class AdminController {
             @RequestParam(value = "status", required = false) Boolean status,
             @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
+            @RequestParam(value = "keyword", required = false) String keyword,
             Pageable pageable) {
-        return ResponseEntity.ok(adminService.searchUsers(role, status, startDate, endDate, pageable));
+        return ResponseEntity.ok(adminService.searchUsers(role, status, startDate, endDate, keyword, pageable));
     }
 
     @PostMapping("/users")

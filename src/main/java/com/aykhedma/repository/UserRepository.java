@@ -34,11 +34,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "(:role IS NULL OR u.role = :role) AND " +
             "(:status IS NULL OR u.enabled = :status) AND " +
             "(CAST(:startDate AS timestamp) IS NULL OR u.createdAt >= :startDate) AND " +
-            "(CAST(:endDate AS timestamp) IS NULL OR u.createdAt <= :endDate)")
+            "(CAST(:endDate AS timestamp) IS NULL OR u.createdAt <= :endDate) AND " +
+            "(:keyword IS NULL OR :keyword = '' OR " +
+            "LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.phoneNumber) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     org.springframework.data.domain.Page<User> searchUsers(
             @Param("role") UserType role,
             @Param("status") Boolean status,
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate,
+            @Param("keyword") String keyword,
             org.springframework.data.domain.Pageable pageable);
 }

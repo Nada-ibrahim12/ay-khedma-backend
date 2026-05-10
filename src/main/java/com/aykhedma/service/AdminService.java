@@ -1,6 +1,7 @@
 package com.aykhedma.service;
 
 import com.aykhedma.dto.request.UpdateUserRequest;
+import com.aykhedma.dto.response.DashboardStatsResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
 import com.aykhedma.model.user.UserType;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AdminService {
+    DashboardStatsResponse getDashboardStats();
     List<ProviderResponse> getPendingProviders();
     ProviderResponse getProviderDetails(Long providerId);
     ProviderResponse approveProvider(Long providerId);
@@ -23,6 +25,7 @@ public interface AdminService {
             Boolean status,
             LocalDateTime startDate,
             LocalDateTime endDate,
+            String keyword,
             Pageable pageable);
 
     Page<ProviderResponse> searchProviders(

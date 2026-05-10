@@ -150,7 +150,6 @@ public class AuthService {
                     .phoneNumber(request.getPhoneNumber())
                     .password(encodedPassword)
                     .role(UserType.ADMIN)
-                    .department(request.getDepartment() != null ? request.getDepartment() : "General")
                     .enabled(true) // Admins enabled by default for testing, or set to false if OTP is required
                     .credentialsNonExpired(true)
                     .build();

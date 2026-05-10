@@ -1,6 +1,7 @@
 package com.aykhedma.service;
 
 import com.aykhedma.dto.request.UpdateUserRequest;
+import com.aykhedma.dto.response.DashboardStatsResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
 import com.aykhedma.exception.ResourceNotFoundException;
@@ -12,6 +13,7 @@ import com.aykhedma.model.user.User;
 import com.aykhedma.model.user.UserType;
 import com.aykhedma.model.user.VerificationStatus;
 import com.aykhedma.repository.ProviderRepository;
+import com.aykhedma.repository.ServiceTypeRepository;
 import com.aykhedma.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,8 +35,19 @@ public class AdminServiceImpl implements AdminService {
     private final ProviderService providerService;
     private final NotificationFactory notificationFactory;
     private final UserRepository userRepository;
+    private final ServiceTypeRepository serviceTypeRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+
+    @Override
+    public DashboardStatsResponse getDashboardStats() {
+        return DashboardStatsResponse.builder()
+                .totalUsers(userRepository.count())
+                .totalProviders(providerRepository.count())
+                .pendingProviders(providerRepository.countByVerificationStatus(VerificationStatus.PENDING))
+                .totalServices(serviceTypeRepository.countServices())
+                .build();
+    }
 
     @Override
     public List<ProviderResponse> getPendingProviders() {
@@ -107,9 +120,10 @@ public class AdminServiceImpl implements AdminService {
     public Page<UserResponse> searchUsers(
             UserType role, Boolean status,
             LocalDateTime startDate, LocalDateTime endDate,
+            String keyword,
             Pageable pageable) {
 
-        Page<User> users = userRepository.searchUsers(role, status, startDate, endDate, pageable);
+        Page<User> users = userRepository.searchUsers(role, status, startDate, endDate, keyword, pageable);
 
         return users.map(userMapper::toUserResponse);
     }
