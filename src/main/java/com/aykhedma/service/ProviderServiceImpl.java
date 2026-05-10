@@ -671,27 +671,24 @@ public class ProviderServiceImpl implements ProviderService {
 
         // Calculate week boundaries (Saturday to Friday)
         // DayOfWeek.SATURDAY = 6, DayOfWeek.FRIDAY = 5
-        int dayOfWeek = today.getDayOfWeek().getValue(); // 1 = Monday, 6 = Saturday, 7 = Sunday
-        LocalDate weekStart; // Saturday
+        int dayOfWeek = today.getDayOfWeek().getValue();
+        LocalDate weekStart; 
 
-        if (dayOfWeek == 6) { // Saturday
+        if (dayOfWeek == 6) {
             weekStart = today;
-        } else if (dayOfWeek == 7) { // Sunday
-            weekStart = today.plusDays(6); // Next Saturday
+        } else if (dayOfWeek == 7) { 
+            weekStart = today.plusDays(6);
         } else {
-            // Monday to Friday: go back to previous Saturday
             weekStart = today.minusDays(dayOfWeek + 1);
         }
 
-        LocalDate weekEnd = weekStart.plusDays(6); // Friday of the same week
+        LocalDate weekEnd = weekStart.plusDays(6);
 
-        // Get all working days in this week
         List<WorkingDay> workingDaysInWeek = provider.getSchedule().getWorkingDays().stream()
                 .filter(wd -> !wd.getDate().isBefore(weekStart) && !wd.getDate().isAfter(weekEnd))
                 .sorted(Comparator.comparing(WorkingDay::getDate))
                 .collect(Collectors.toList());
 
-        // Build working days with their time slots
         List<WeeklyScheduleResponse.WorkingDayWithSlots> workingDaysWithSlots = workingDaysInWeek.stream()
                 .map(wd -> {
                     List<TimeSlot> slotsForDay = provider.getSchedule().getTimeSlots().stream()
