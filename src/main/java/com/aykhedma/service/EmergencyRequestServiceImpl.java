@@ -231,9 +231,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
                 emergencyRequest.setStatus(EmergencyRequestStatus.NO_PROVIDERS);
                 emergencyRequestRepository.save(emergencyRequest);
 
-                simpMessagingTemplate.convertAndSendToUser(
-                        emergencyRequest.getConsumer().getId().toString(),
-                        "/queue/emergency-requests/no-providers",
+                simpMessagingTemplate.convertAndSend(
+                        "/topic/emergency-requests-no-providers-" + emergencyRequest.getConsumer().getId(),
                         emergencyRequestMapper.toEmergencyRequestResponse(emergencyRequest));
             }
             else
@@ -335,9 +334,8 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
                         "estimatedArrivalTime", String.valueOf(estimatedArrivalTime),
                         "proposedPrice", request.getProposedPrice().toString()));
 
-        simpMessagingTemplate.convertAndSendToUser(
-                emergencyRequest.getConsumer().getId().toString(),
-                "/queue/emergency-requests/accepted-provider-responses",
+        simpMessagingTemplate.convertAndSend(
+                "/topic/emergency-requests-accepted-" + emergencyRequest.getConsumer().getId(),
                 providerResponseMapper.toProviderResponseResponse(providerResponse));
 
         return providerResponseMapper.toProviderResponseResponse(providerResponse);
