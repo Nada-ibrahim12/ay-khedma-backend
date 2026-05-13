@@ -56,6 +56,27 @@ public class BookingController
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PreAuthorize("hasRole('CONSUMER')")
+    @PutMapping("/delete-booking/{bookingId}")
+    @Operation(summary = "Delete a previously requested booking")
+    @ApiResponses(value =
+            {
+                   @ApiResponse(responseCode = "200", description = "Booking deleted successfully",
+                           content = @Content(schema = @Schema(implementation = BookingResponse.class))),
+                   @ApiResponse(responseCode = "400", description = "Invalid booking to be deleted"),
+                   @ApiResponse(responseCode = "403", description = "Consumer does not own this booking"),
+                   @ApiResponse(responseCode = "404", description = "Consumer or booking not found")
+            })
+    public ResponseEntity<BookingResponse> deleteBooking(
+            @Parameter(description = "ID of the consumer", required = true)
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+            @Parameter(description = "ID of the booking", required = true)
+            @PathVariable Long bookingId)
+    {
+        BookingResponse response = bookingService.deleteBooking(consumerId, bookingId);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
     // =================================== Provider Side ===================================
 
     @PreAuthorize("hasRole('PROVIDER')")

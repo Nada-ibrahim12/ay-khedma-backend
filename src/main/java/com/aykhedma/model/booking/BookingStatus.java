@@ -7,5 +7,6 @@ public enum BookingStatus
     DECLINED,
     EXPIRED,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    DELETED
 }

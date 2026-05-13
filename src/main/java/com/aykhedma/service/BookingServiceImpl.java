@@ -131,6 +131,28 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    public BookingResponse deleteBooking (Long consumerId, Long bookingId)
+    {
+        Consumer consumer = consumerRepository.findById(consumerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!consumerId.equals(booking.getConsumer().getId()))
+            throw new ForbiddenException("Booking does not belong to this consumer");
+
+        if (booking.getStatus() != BookingStatus.PENDING)
+            throw new BadRequestException("Booking cannot be deleted, it has already been " + booking.getStatus());
+
+        booking.setStatus(BookingStatus.DELETED);
+        bookingRepository.save(booking);
+
+        return bookingMapper.toBookingResponse(booking);
+    }
+
+    @Override
+    @Transactional
     public AcceptBookingResponse acceptBooking(Long providerId, AcceptBookingRequest acceptBookingRequest) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));

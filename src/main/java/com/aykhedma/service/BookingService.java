@@ -1,12 +1,7 @@
 package com.aykhedma.service;
 
-import com.aykhedma.dto.request.AcceptBookingRequest;
-import com.aykhedma.dto.request.BookingRequest;
-import com.aykhedma.dto.request.CancelBookingRequest;
-import com.aykhedma.dto.response.AcceptBookingResponse;
-import com.aykhedma.dto.response.BookingResponse;
-import com.aykhedma.dto.response.MonthlyBookingStatsResponse;
-import com.aykhedma.dto.response.WeeklyBookingStatsResponse;
+import com.aykhedma.dto.request.*;
+import com.aykhedma.dto.response.*;
 import com.aykhedma.model.booking.BookingStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +11,8 @@ import java.util.List;
 public interface BookingService
 {
     BookingResponse requestBooking (Long consumerId, BookingRequest bookingRequest);
+
+    BookingResponse deleteBooking (Long consumerId, Long bookingId);
 
     AcceptBookingResponse acceptBooking (Long providerId, AcceptBookingRequest acceptBookingRequest);
 
@@ -31,9 +28,9 @@ public interface BookingService
 
     List<BookingResponse> getUpcomingBookings (Long userId);
 
-    BookingResponse submitRating(Long consumerId, com.aykhedma.dto.request.RatingRequest ratingRequest);
+    BookingResponse submitRating(Long consumerId, RatingRequest ratingRequest);
 
-    BookingResponse submitConsumerRating(Long providerId, com.aykhedma.dto.request.ProviderRatingRequest ratingRequest);
+    BookingResponse submitConsumerRating(Long providerId, ProviderRatingRequest ratingRequest);
 
-    List<com.aykhedma.dto.response.ConsumerReviewResponse> getConsumerReviews(Long consumerId);
+    List<ConsumerReviewResponse> getConsumerReviews(Long consumerId);
 }
