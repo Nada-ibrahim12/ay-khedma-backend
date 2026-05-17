@@ -131,7 +131,7 @@ class SearchCacheService {
                         .sorted(Comparator.comparing(SearchResponse::getPrice).reversed())
                         .collect(Collectors.toList());
 
-            case "experience":
+            case "completed_jobs":
                 return responses.stream()
                         .sorted(
                                 Comparator.comparing(
