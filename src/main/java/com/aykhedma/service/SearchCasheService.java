@@ -133,7 +133,12 @@ class SearchCacheService {
 
             case "experience":
                 return responses.stream()
-                        .sorted(Comparator.comparing(SearchResponse::getCompletedJobs).reversed())
+                        .sorted(
+                                Comparator.comparing(
+                                        SearchResponse::getCompletedJobs,
+                                        Comparator.nullsLast(Comparator.reverseOrder())
+                                )
+                        )
                         .collect(Collectors.toList());
 
             case "distance":

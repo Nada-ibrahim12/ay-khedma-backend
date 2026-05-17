@@ -81,6 +81,38 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
                         @Param("categoryId") Long categoryId,
                         @Param("categoryName") String categoryName,
                         Pageable pageable);
+//        @Query("SELECT p FROM Provider p " +
+//                "LEFT JOIN p.serviceType s " +
+//                "LEFT JOIN s.category c " +
+//                "LEFT JOIN p.location l " +
+//                "WHERE p.enabled = true " +
+//                "AND p.verificationStatus = 'VERIFIED' " +
+//                "AND ( " +
+//                "   :keyword IS NULL OR :keyword = '' OR " +
+//                "   (LENGTH(:keyword) = 1 AND ( " +
+//                "       LOWER(p.name) LIKE LOWER(CONCAT(:keyword, '%')) OR " +
+//                "       LOWER(COALESCE(p.bio, '')) LIKE LOWER(CONCAT(:keyword, '%')) OR " +
+//                "       LOWER(s.name) LIKE LOWER(CONCAT(:keyword, '%')) OR " +
+//                "       LOWER(COALESCE(s.nameAr, '')) LIKE LOWER(CONCAT(:keyword, '%')) OR " +
+//                "       LOWER(c.name) LIKE LOWER(CONCAT(:keyword, '%')) OR " +
+//                "       LOWER(COALESCE(l.area, '')) LIKE LOWER(CONCAT(:keyword, '%')) " +
+//                "   )) OR " +
+//                "   (LENGTH(:keyword) > 1 AND ( " +
+//                "       LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+//                "       LOWER(COALESCE(p.bio, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+//                "       LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+//                "       LOWER(COALESCE(s.nameAr, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+//                "       LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+//                "       LOWER(COALESCE(l.area, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+//                "   )) " +
+//                ") " +
+//                "AND (:categoryId IS NULL OR c.id = :categoryId) " +
+//                "AND (:categoryName IS NULL OR :categoryName = '' OR LOWER(c.name) = LOWER(:categoryName))")
+//        Page<Provider> searchProviders(
+//                @Param("keyword") String keyword,
+//                @Param("categoryId") Long categoryId,
+//                @Param("categoryName") String categoryName,
+//                Pageable pageable);
 
         @Modifying
         @Query("UPDATE Provider p SET p.totalBookings = p.totalBookings + 1 WHERE p.id = :providerId")
