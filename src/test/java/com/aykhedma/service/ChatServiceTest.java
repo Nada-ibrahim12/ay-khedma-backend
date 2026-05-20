@@ -20,6 +20,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +35,7 @@ class ChatServiceTest {
     @Mock UserRepository userRepository;
     @Mock SimpMessagingTemplate messagingTemplate;
     @Mock MediaStorageService mediaStorageService;
+    @Mock NotificationFactory notificationFactory;
 
     @InjectMocks ChatService chatService;
     @MockBean
@@ -55,7 +57,6 @@ class ChatServiceTest {
         return new CustomUserDetails(user);
     }
 
-    // ===================== helpers =====================
 
     private User user(Long id) {
         User u = new User() {};
@@ -85,13 +86,21 @@ class ChatServiceTest {
         req.setType(MessageType.TEXT);
 
         when(chatRoomRepository.findById("room1")).thenReturn(Optional.of(r));
-        when(chatMessageRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        when(chatMessageRepository.save(any())).thenAnswer(invocation -> {
+            ChatMessage m = invocation.getArgument(0);
+            m.setId("msg1");
+            m.setTimestamp(LocalDateTime.now());
+            return m;
+        });
 
         ChatMessageResponse res = chatService.sendMessage(sender, req);
-
         assertNotNull(res);
         verify(chatMessageRepository).save(any(ChatMessage.class));
-        verify(messagingTemplate).convertAndSend(eq("/topic/chat/room1"), any(ChatMessageResponse.class));
+        verify(messagingTemplate).convertAndSend(
+                eq("/topic/chat/room1"),
+                any(ChatMessageResponse.class)
+        );
     }
 
     @Test

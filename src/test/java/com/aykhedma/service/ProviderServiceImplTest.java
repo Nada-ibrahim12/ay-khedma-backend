@@ -3,8 +3,10 @@ package com.aykhedma.service;
 import com.aykhedma.dto.location.LocationDTO;
 import com.aykhedma.dto.request.ProviderProfileRequest;
 import com.aykhedma.dto.request.WorkingDayRequest;
+import com.aykhedma.dto.response.ProviderDistanceProjection;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.ScheduleResponse;
+import com.aykhedma.dto.response.SearchResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
@@ -30,6 +32,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.IOException;
@@ -43,9 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Provider Service Unit Tests")
@@ -80,6 +84,9 @@ class ProviderServiceImplTest {
 
         @InjectMocks
         private ProviderServiceImpl providerService;
+
+        @Mock
+        private SearchCacheService searchCacheService;
 
         private Provider provider;
         private ProviderResponse providerResponse;
@@ -405,4 +412,58 @@ class ProviderServiceImplTest {
         // .hasMessageContaining("Selected start time with duration is not available");
         // }
         // }
+
+        @Test
+        void search_shouldReturnPaginatedResults() {
+
+                List<SearchResponse> fullList = List.of(
+                        new SearchResponse(),
+                        new SearchResponse(),
+                        new SearchResponse()
+                );
+
+                Pageable pageable = PageRequest.of(0, 2);
+
+                when(searchCacheService.searchList(
+                        any(), any(), any(), any(), any(), any()
+                )).thenReturn(fullList);
+
+                Page<SearchResponse> result = providerService.search(
+                        "test",
+                        1L,
+                        "cat",
+                        1L,
+                        10.0,
+                        "rating",
+                        pageable
+                );
+
+                assertThat(result.getContent()).hasSize(2);
+                assertThat(result.getTotalElements()).isEqualTo(3);
+        }
+        @Test
+        void topRatedNearMe_shouldReturnMappedResults() {
+
+                Pageable pageable = PageRequest.of(0, 10);
+
+                ProviderDistanceProjection projection = mock(ProviderDistanceProjection.class);
+
+                Page<ProviderDistanceProjection> repoResult =
+                        new PageImpl<>(List.of(projection), pageable, 1);
+
+                when(providerRepository.findTopRatedNearConsumer(
+                        anyLong(),
+                        anyDouble(),
+                        eq(pageable)
+                )).thenReturn(repoResult);
+
+                Page<SearchResponse> result = providerService.topRatedNearMe(
+                        1L,
+                        10.0,
+                        pageable
+                );
+
+                assertThat(result.getContent()).hasSize(1);
+                assertThat(result.getTotalElements()).isEqualTo(1);
+        }
 }
