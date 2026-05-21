@@ -9,10 +9,8 @@ import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
-    uses = {ProviderMapper.class})
-public interface ProviderResponseMapper
-{
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE, uses = { ProviderMapper.class })
+public interface ProviderResponseMapper {
     @Mapping(source = "id", target = "id")
     @Mapping(source = "provider", target = "provider", qualifiedByName = "providerSummary")
     @Mapping(source = "emergencyRequest", target = "emergencyRequest", qualifiedByName = "noProviderResponsesEmergencyRequest")
@@ -27,6 +25,7 @@ public interface ProviderResponseMapper
     @Mapping(source = "id", target = "id")
     @Mapping(source = "consumer", target = "consumer")
     @Mapping(source = "serviceType.name", target = "serviceType")
+    @Mapping(source = "serviceType.nameAr", target = "serviceTypeAr")
     @Mapping(source = "location", target = "location")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "description", target = "description")

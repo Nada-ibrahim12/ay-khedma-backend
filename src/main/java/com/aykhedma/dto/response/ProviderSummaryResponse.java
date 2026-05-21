@@ -16,6 +16,7 @@ public class ProviderSummaryResponse {
     private String name;
     private String profileImage;
     private String serviceType;
+    private String serviceTypeAr;
     private Double averageRating;
     private Double price;
     private PriceType priceType;

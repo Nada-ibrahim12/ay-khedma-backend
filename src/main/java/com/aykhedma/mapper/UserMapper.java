@@ -24,6 +24,11 @@ public interface UserMapper {
         return serviceType != null ? serviceType.getName() : null;
     }
 
+    @Named("mapServiceTypeToArabicString")
+    default String mapServiceTypeToArabicString(ServiceType serviceType) {
+        return serviceType != null ? serviceType.getNameAr() : null;
+    }
+
     // Consumer mappings
     @Mapping(target = "profileImage", ignore = true)
     @Mapping(target = "credentialsNonExpired", ignore = true)
@@ -60,6 +65,7 @@ public interface UserMapper {
     @Mapping(source = "verificationStatus", target = "verificationStatus")
     @Mapping(source = "completedJobs", target = "completedJobs")
     @Mapping(source = "serviceType", target = "serviceType", qualifiedByName = "mapServiceTypeToString") // FIXED
+    @Mapping(source = "serviceType", target = "serviceTypeAr", qualifiedByName = "mapServiceTypeToArabicString")
     @Mapping(source = "serviceType.id", target = "serviceTypeId")
     @Mapping(source = "location", target = "location")
     @Mapping(source = "emergencyEnabled", target = "emergencyEnabled")
@@ -76,6 +82,7 @@ public interface UserMapper {
     @Mapping(source = "name", target = "name")
     @Mapping(source = "profileImage", target = "profileImage")
     @Mapping(source = "serviceType", target = "serviceType", qualifiedByName = "mapServiceTypeToString")
+    @Mapping(source = "serviceType", target = "serviceTypeAr", qualifiedByName = "mapServiceTypeToArabicString")
     @Mapping(source = "averageRating", target = "averageRating")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "priceType", target = "priceType")

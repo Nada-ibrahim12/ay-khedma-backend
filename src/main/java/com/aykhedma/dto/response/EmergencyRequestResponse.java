@@ -14,11 +14,11 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EmergencyRequestResponse
-{
+public class EmergencyRequestResponse {
     private Long id;
     private ConsumerSummaryResponse consumer;
     private String serviceType;
+    private String serviceTypeAr;
     private LocationDTO location;
     private Double price;
     private String description;

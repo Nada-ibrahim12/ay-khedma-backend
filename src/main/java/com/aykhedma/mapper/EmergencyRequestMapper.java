@@ -12,13 +12,13 @@ import org.mapstruct.ReportingPolicy;
 
 import java.util.List;
 
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
-    uses = {ConsumerMapper.class, LocationMapper.class, ProviderMapper.class})
-public interface EmergencyRequestMapper
-{
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE, uses = { ConsumerMapper.class,
+        LocationMapper.class, ProviderMapper.class })
+public interface EmergencyRequestMapper {
     @Mapping(source = "id", target = "id")
     @Mapping(source = "consumer", target = "consumer")
     @Mapping(source = "serviceType.name", target = "serviceType")
+    @Mapping(source = "serviceType.nameAr", target = "serviceTypeAr")
     @Mapping(source = "location", target = "location")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "description", target = "description")
@@ -39,8 +39,7 @@ public interface EmergencyRequestMapper
     ProviderResponseResponse toProviderResponseResponse(ProviderResponse providerResponse);
 
     @Named("noEmergencyRequestAcceptedProviderResponses")
-    default List<ProviderResponseResponse> mapProviderResponses (List<ProviderResponse> providerResponses)
-    {
+    default List<ProviderResponseResponse> mapProviderResponses(List<ProviderResponse> providerResponses) {
         if (providerResponses == null)
             return null;
 

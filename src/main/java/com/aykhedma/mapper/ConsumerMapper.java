@@ -85,6 +85,7 @@ public interface ConsumerMapper {
     @Mapping(source = "name", target = "name")
     @Mapping(source = "profileImage", target = "profileImage")
     @Mapping(source = "serviceType.name", target = "serviceType")
+    @Mapping(source = "serviceType.nameAr", target = "serviceTypeAr")
     @Mapping(source = "averageRating", target = "averageRating")
     @Mapping(source = "price", target = "price")
     @Mapping(source = "priceType", target = "priceType")

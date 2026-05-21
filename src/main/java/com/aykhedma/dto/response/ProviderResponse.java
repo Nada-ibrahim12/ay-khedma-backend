@@ -31,6 +31,7 @@ public class ProviderResponse {
     private Integer totalBookings;
     private Integer cancelledBookings;
     private String serviceType;
+    private String serviceTypeAr;
     private String serviceCategory;
     private Long serviceTypeId;
     private String worksAt;
