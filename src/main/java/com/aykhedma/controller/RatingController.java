@@ -23,12 +23,31 @@ public class RatingController {
     private final BookingService bookingService;
     
     @GetMapping("/questions")
-    public ResponseEntity<List<EvaluationQuestionResponse>> getEvaluationQuestions() {
-        List<EvaluationQuestionResponse> questions = Arrays.asList(
-            new EvaluationQuestionResponse("Punctuality", "How punctual was the provider in arriving the scheduled time?", 1, 5),
-            new EvaluationQuestionResponse("Commitment", "Did the provider demonstrate dedication and commitment to the requested task?", 1, 5),
-            new EvaluationQuestionResponse("Quality of Work", "How would you rate the overall quality of the service provided?", 1, 5)
-        );
+    public ResponseEntity<List<EvaluationQuestionResponse>> getEvaluationQuestions(
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @RequestParam(value = "lang", required = false) String lang) {
+        
+        boolean isArabic = false;
+        if (lang != null && lang.trim().equalsIgnoreCase("ar")) {
+            isArabic = true;
+        } else if (acceptLanguage != null && acceptLanguage.toLowerCase().startsWith("ar")) {
+            isArabic = true;
+        }
+
+        List<EvaluationQuestionResponse> questions;
+        if (isArabic) {
+            questions = Arrays.asList(
+                new EvaluationQuestionResponse("الالتزام بالوقت", "ما مدى التزام مزود الخدمة بالوصول في الوقت المحدد؟", 1, 5),
+                new EvaluationQuestionResponse("الالتزام والجدية", "هل أظهر مزود الخدمة تفانياً والتزاماً بالمهمة المطلوبة؟", 1, 5),
+                new EvaluationQuestionResponse("جودة العمل", "كيف تقيم الجودة العامة للخدمة المقدمة؟", 1, 5)
+            );
+        } else {
+            questions = Arrays.asList(
+                new EvaluationQuestionResponse("Punctuality", "How punctual was the provider in arriving the scheduled time?", 1, 5),
+                new EvaluationQuestionResponse("Commitment", "Did the provider demonstrate dedication and commitment to the requested task?", 1, 5),
+                new EvaluationQuestionResponse("Quality of Work", "How would you rate the overall quality of the service provided?", 1, 5)
+            );
+        }
         return ResponseEntity.ok(questions);
     }
 
