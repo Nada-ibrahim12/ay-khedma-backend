@@ -42,7 +42,6 @@ public class Booking
     private ServiceType serviceType;
 
     @NotNull(message = "Requested date is required")
-    @FutureOrPresent(message = "Requested date must be today or in the future")
     @Column(nullable = false)
     private LocalDate requestedDate;
 
