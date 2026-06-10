@@ -17,7 +17,6 @@ import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -80,43 +79,45 @@ public class FirebaseService {
                     .setBody(body)
                     .build();
 
-            // Create messages for all devices
-            List<Message> messages = deviceTokens.stream()
-                    .map(token -> {
-                        Message.Builder builder = Message.builder()
-                                .setToken(token.getFcmToken())
-                                .setNotification(notification)
-                                .setAndroidConfig(getAndroidConfig())
-                                .setApnsConfig(getIosConfig());
+            // Send individually
+            int successCount = 0;
+            int failureCount = 0;
 
-                        // Convert data values to strings
-                        if (data != null) {
-                            data.forEach((key, value) -> builder.putData(key, String.valueOf(value)));
-                        }
+            for (int i = 0; i < deviceTokens.size(); i++) {
+                DeviceToken deviceToken = deviceTokens.get(i);
+                Message.Builder builder = Message.builder()
+                        .setToken(deviceToken.getFcmToken())
+                        .setNotification(notification)
+                        .setAndroidConfig(getAndroidConfig())
+                        .setApnsConfig(getIosConfig());
 
-                        return builder.build();
-                    })
-                    .collect(Collectors.toList());
+                if (data != null) {
+                    data.forEach((key, value) -> builder.putData(key, String.valueOf(value)));
+                }
 
-            // Send in batch
-            BatchResponse response = firebaseMessaging.sendAll(messages);
-
-            log.info("Push notifications sent: {} success, {} failures",
-                    response.getSuccessCount(), response.getFailureCount());
-
-            // Handle failed tokens
-            if (response.getFailureCount() > 0) {
-                handleFailedTokens(deviceTokens, response.getResponses());
+                try {
+                    firebaseMessaging.send(builder.build());
+                    successCount++;
+                } catch (FirebaseMessagingException ex) {
+                    failureCount++;
+                    log.warn("Failed to send to device {}: {}", deviceToken.getDeviceId(), ex.getMessage());
+                    if (ex.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
+                        deviceToken.setActive(false);
+                        deviceTokenRepository.save(deviceToken);
+                        log.info("Deactivated invalid token for device: {}", deviceToken.getDeviceId());
+                    }
+                }
             }
 
-            // Return DELIVERED if at least one message was successful
-            if (response.getSuccessCount() > 0) {
+            log.info("Push notifications sent: {} success, {} failures", successCount, failureCount);
+
+            if (successCount > 0) {
                 return NotificationStatus.DELIVERED;
             } else {
                 return NotificationStatus.FAILED;
             }
 
-        } catch (FirebaseMessagingException e) {
+        } catch (Exception e) {
             log.error("Failed to send push notification: {}", e.getMessage());
             return NotificationStatus.FAILED;
         }
@@ -127,7 +128,6 @@ public class FirebaseService {
                 .setPriority(AndroidConfig.Priority.HIGH)
                 .setNotification(AndroidNotification.builder()
                         .setChannelId("high_importance_channel")
-                        .setClickAction("OPEN_ACTIVITY")
                         .setPriority(AndroidNotification.Priority.HIGH)
                         .build())
                 .build();
@@ -142,23 +142,6 @@ public class FirebaseService {
                 .build();
     }
 
-    private void handleFailedTokens(List<DeviceToken> tokens, List<SendResponse> responses) {
-        for (int i = 0; i < responses.size(); i++) {
-            if (!responses.get(i).isSuccessful()) {
-                SendResponse response = responses.get(i);
-                if (response.getException() instanceof FirebaseMessagingException) {
-                    FirebaseMessagingException ex = (FirebaseMessagingException) response.getException();
-                    // Check if token is invalid/unregistered
-                    if (ex.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
-                        DeviceToken token = tokens.get(i);
-                        token.setActive(false);
-                        deviceTokenRepository.save(token);
-                        log.info("Deactivated invalid token for device: {}", token.getDeviceId());
-                    }
-                }
-            }
-        }
-    }
 
     public boolean isFirebaseEnabled() {
         return firebaseMessaging != null;

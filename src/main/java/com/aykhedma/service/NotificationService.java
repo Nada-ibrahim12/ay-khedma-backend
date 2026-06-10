@@ -112,11 +112,22 @@ public class NotificationService {
 
         if (requestedMethods.contains(NotificationChannel.PUSH)) {
             try {
+                Map<String, Object> pushData = new HashMap<>();
+                if (request.getData() != null) {
+                    pushData.putAll(request.getData());
+                }
+                if (request.getDeepLink() != null) {
+                    pushData.put("deepLink", request.getDeepLink());
+                }
+                if (request.getType() != null) {
+                    pushData.put("type", request.getType().name());
+                }
+
                 NotificationStatus pushStatus = firebaseService.sendPushNotification(
                         request.getUserId(),
                         request.getTitle(),
                         request.getContent(),
-                        request.getData());
+                        pushData);
 
                 if (pushStatus == NotificationStatus.DELIVERED) {
                     notification.setPushSent(true);

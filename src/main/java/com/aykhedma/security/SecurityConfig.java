@@ -35,6 +35,7 @@ public class SecurityConfig {
 
                 http
                                 .csrf(csrf -> csrf.disable())
+                                .cors(org.springframework.security.config.Customizer.withDefaults())
 
                                 // We use JWT → no session
                                 .sessionManagement(session -> session
