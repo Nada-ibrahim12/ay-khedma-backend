@@ -320,6 +320,8 @@ public class BookingServiceImpl implements BookingService {
         if (bookingStartTime.isBefore(LocalDateTime.now()))
             throw new BadRequestException("Booking cannot be declined, its starting time has already passed");
 
+        providerService.restoreAvailabilityForCancelledBooking(booking);
+
         booking.setStatus(BookingStatus.DECLINED);
         booking.setDeclinedAt(LocalDateTime.now());
         bookingRepository.save(booking);
