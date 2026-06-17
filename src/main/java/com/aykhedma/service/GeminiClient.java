@@ -26,8 +26,8 @@ public class GeminiClient {
 
     private volatile ChatClient chatClient;
 
-    @Value("${ai.gemini.api-key:}")
-    private String apiKey;
+    @Value("#{'${ai.gemini.api-keys:}'.split(',')}")
+    private List<String> apiKeys;
 
     @Value("${ai.gemini.base-url:https://generativelanguage.googleapis.com/v1beta}")
     private String baseUrl;
@@ -38,8 +38,21 @@ public class GeminiClient {
     @Value("${ai.gemini.use-spring-ai:false}")
     private boolean useSpringAi;
 
+    private List<String> getApiKeys() {
+        List<String> keys = new ArrayList<>();
+        if (apiKeys == null) {
+            return keys;
+        }
+        for (String apiKey : apiKeys) {
+            if (StringUtils.hasText(apiKey)) {
+                keys.add(apiKey.trim());
+            }
+        }
+        return keys;
+    }
+
     public boolean isEnabled() {
-        return useSpringAi || StringUtils.hasText(apiKey);
+        return useSpringAi || !getApiKeys().isEmpty();
     }
 
     /**
@@ -72,62 +85,88 @@ public class GeminiClient {
     }
 
     private String generateWithWebClient(List<ConversationTurn> history, String systemPrompt) {
-        try {
-            WebClient client = webClientBuilder.baseUrl(baseUrl).build();
-
-            List<GeminiContent> contents = new ArrayList<>();
-
-            // Add system instruction if provided
-            if (StringUtils.hasText(systemPrompt)) {
-                contents.add(new GeminiContent("user", List.of(new GeminiPart(systemPrompt))));
-                contents.add(new GeminiContent("model",
-                        List.of(new GeminiPart("Understood. I will follow these instructions."))));
-            }
-
-            // Add conversation history with correct roles
-            for (ConversationTurn turn : history) {
-                String geminiRole = "user".equals(turn.role()) ? "user" : "model";
-                contents.add(new GeminiContent(geminiRole, List.of(new GeminiPart(turn.text()))));
-            }
-
-            GeminiRequest request = new GeminiRequest(
-                    contents,
-                    new GeminiGenerationConfig(0.2, "application/json"));
-
-            String response = client.post()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/models/{model}:generateContent")
-                            .build(model))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("X-goog-api-key", apiKey)
-                    .bodyValue(request)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            if (!StringUtils.hasText(response)) {
-                log.debug("Empty response from Gemini");
-                return null;
-            }
-
-            JsonNode root = objectMapper.readTree(response);
-            JsonNode textNode = root.path("candidates")
-                    .path(0)
-                    .path("content")
-                    .path("parts")
-                    .path(0)
-                    .path("text");
-
-            if (textNode.isMissingNode() || textNode.isNull()) {
-                log.debug("No text in Gemini response");
-                return null;
-            }
-
-            return textNode.asText();
-        } catch (Exception ex) {
-            log.warn("Gemini WebClient request failed: {}", ex.getMessage());
+        List<String> apiKeys = getApiKeys();
+        if (apiKeys.isEmpty()) {
+            log.debug("No API keys configured");
             return null;
         }
+
+        // Build the request once
+        List<GeminiContent> contents = new ArrayList<>();
+
+        // Add system instruction if provided
+        if (StringUtils.hasText(systemPrompt)) {
+            contents.add(new GeminiContent("user", List.of(new GeminiPart(systemPrompt))));
+            contents.add(new GeminiContent("model",
+                    List.of(new GeminiPart("Understood. I will follow these instructions."))));
+        }
+
+        // Add conversation history with correct roles
+        for (ConversationTurn turn : history) {
+            String geminiRole = "user".equals(turn.role()) ? "user" : "model";
+            contents.add(new GeminiContent(geminiRole, List.of(new GeminiPart(turn.text()))));
+        }
+
+        GeminiRequest request = new GeminiRequest(
+                contents,
+                new GeminiGenerationConfig(0.2, "application/json"));
+
+        for (int keyIndex = 0; keyIndex < apiKeys.size(); keyIndex++) {
+            String currentKey = apiKeys.get(keyIndex);
+
+            try {
+                WebClient client = webClientBuilder.baseUrl(baseUrl).build();
+
+                String response = client.post()
+                        .uri(uriBuilder -> uriBuilder
+                                .path("/models/{model}:generateContent")
+                                .build(model))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-goog-api-key", currentKey)
+                        .bodyValue(request)
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
+
+                if (!StringUtils.hasText(response)) {
+                    log.debug("Empty response from Gemini with key {}", keyIndex + 1);
+                    continue;
+                }
+
+                JsonNode root = objectMapper.readTree(response);
+
+                JsonNode error = root.path("error");
+                if (!error.isMissingNode()) {
+                    String errorMessage = error.path("message").asText("");
+                    log.warn("Gemini API error with key {}: {}", keyIndex + 1, errorMessage);
+                    // try next key
+                    continue;
+                }
+
+                JsonNode textNode = root.path("candidates")
+                        .path(0)
+                        .path("content")
+                        .path("parts")
+                        .path(0)
+                        .path("text");
+
+                if (textNode.isMissingNode() || textNode.isNull()) {
+                    log.debug("No text in Gemini response with key {}", keyIndex + 1);
+                    continue;
+                }
+
+                log.debug("Successfully used API key {}", keyIndex + 1);
+                return textNode.asText();
+
+            } catch (Exception ex) {
+                log.warn("Gemini WebClient request failed with key {}: {}", keyIndex + 1, ex.getMessage());
+                // try next key
+                continue;
+            }
+        }
+
+        log.warn("All {} API keys failed", apiKeys.size());
+        return null;
     }
 
     private String generateWithSpringAi(List<ConversationTurn> history, String systemPrompt) {
