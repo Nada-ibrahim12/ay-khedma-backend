@@ -42,6 +42,16 @@ public class ChatMessage {
     @Column(length = 5000, nullable = true)
     private String content;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private ChatResponseType responseType;
+
+    @Column(columnDefinition = "TEXT")
+    private String providersPayload;
+
+    @Column(columnDefinition = "TEXT")
+    private String availableSlotsPayload;
+
     @Builder.Default
     @NotNull(message = "Message type is required")
     @Enumerated(EnumType.STRING)
@@ -62,8 +72,8 @@ public class ChatMessage {
 
     @Builder.Default
     private Boolean isRead = false;
-//    @Enumerated(EnumType.STRING)
-//    private MessageStatus status;
+    // @Enumerated(EnumType.STRING)
+    // private MessageStatus status;
 
     @PastOrPresent(message = "Read timestamp cannot be in the future")
     private LocalDateTime readAt;

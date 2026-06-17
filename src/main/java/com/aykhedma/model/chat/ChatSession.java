@@ -44,6 +44,11 @@ public class ChatSession {
     @Size(max = 50, message = "Detected dialect cannot exceed 50 characters")
     private String detectedDialect;
 
+    private Long lastSuggestedProviderId;
+
+    @Size(max = 255, message = "Last suggested provider name cannot exceed 255 characters")
+    private String lastSuggestedProviderName;
+
     @Builder.Default
     @NotNull(message = "Active status is required")
     @Column(nullable = false)

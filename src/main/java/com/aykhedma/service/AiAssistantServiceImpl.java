@@ -71,8 +71,10 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new BadRequestException("Chat session not found"));
 
-        List<ChatMessageResponse> messages = chatMessageRepository
-                .findByChatSessionSessionIdOrderByTimestampAsc(sessionId)
+        List<ChatMessage> messageEntities = chatMessageRepository
+            .findByChatSessionSessionIdOrderByTimestampAsc(sessionId);
+
+        List<ChatMessageResponse> messages = messageEntities
                 .stream()
                 .map(message -> ChatMessageResponse.builder()
                         .id(message.getId())
@@ -88,13 +90,36 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                         .build())
                 .collect(Collectors.toList());
 
+                ChatMessage lastAssistantMessage = messageEntities.stream()
+                    .filter(ChatMessage::isAssistantMessage)
+                    .reduce((first, second) -> second)
+                    .orElse(null);
+
+                ChatResponseType lastResponseType = lastAssistantMessage != null && lastAssistantMessage.getResponseType() != null
+                    ? lastAssistantMessage.getResponseType()
+                    : ChatResponseType.TEXT;
+
+                List<ProviderSummaryResponse> providers = lastAssistantMessage != null
+                    ? parseProvidersPayload(lastAssistantMessage.getProvidersPayload())
+                    : List.of();
+
+                List<ScheduleResponse.TimeSlotResponse> availableSlots = lastAssistantMessage != null
+                    ? parseAvailableSlotsPayload(lastAssistantMessage.getAvailableSlotsPayload())
+                    : List.of();
+
+                String lastMessage = lastAssistantMessage != null && StringUtils.hasText(lastAssistantMessage.getContent())
+                    ? lastAssistantMessage.getContent()
+                    : (session.getLastMessage() != null ? session.getLastMessage().getContent() : "");
+
         return ChatResponse.builder()
                 .sessionId(session.getSessionId())
                 .messages(messages)
                 .timestamp(LocalDateTime.now())
-                .message(session.getLastMessage() != null ? session.getLastMessage().getContent() : "")
-                .detectedLanguage(session.getDetectedLanguage())
-                .responseType(ChatResponseType.TEXT)
+                    .message(lastMessage)
+                    .detectedLanguage(StringUtils.hasText(session.getDetectedLanguage()) ? session.getDetectedLanguage() : "en")
+                    .responseType(lastResponseType)
+                    .providers(providers)
+                    .availableTimeSlots(availableSlots)
                 .build();
     }
 
@@ -117,8 +142,13 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                     Long userId = currentUser != null ? currentUser.getId() : null;
                     ChatSession session = resolveSession(request, userId);
                     saveUserMessage(session, userId != null ? userId : 0L, "[Voice note - transcription failed]");
-                    saveAssistantMessage(session,
-                            "عذراً، لم أتمكن من تحويل الرسالة الصوتية. ممكن تعيد تسجيلها أو تكتبها نصياً؟");
+                        saveAssistantMessage(session, ChatResponse.builder()
+                            .sessionId(session.getSessionId())
+                            .timestamp(LocalDateTime.now())
+                            .message("عذراً، لم أتمكن من تحويل الرسالة الصوتية. ممكن تعيد تسجيلها أو تكتبها نصياً؟")
+                            .responseType(ChatResponseType.CLARIFICATION)
+                            .detectedLanguage("ar")
+                            .build());
                     return ChatResponse.builder()
                             .sessionId(session.getSessionId())
                             .timestamp(LocalDateTime.now())
@@ -140,6 +170,12 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         Long userId = currentUser != null ? currentUser.getId() : null;
         ChatSession session = resolveSession(request, userId);
 
+        String detectedLanguage = detectLanguage(userMessage);
+        if (!detectedLanguage.equals(session.getDetectedLanguage())) {
+            session.setDetectedLanguage(detectedLanguage);
+            chatSessionRepository.save(session);
+        }
+
         // Load only recent history
         List<ChatMessage> fullHistory = chatMessageRepository
                 .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId());
@@ -159,10 +195,11 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .build();
 
         UnifiedAssistantResponse unifiedResponse = getUnifiedResponse(effectiveRequest, currentUser, recentHistory);
+        applySessionProviderContext(unifiedResponse, session);
 
-        ChatResponse chatResponse = executeAction(effectiveRequest, currentUser, unifiedResponse);
+        ChatResponse chatResponse = executeAction(effectiveRequest, currentUser, unifiedResponse, session);
 
-        saveAssistantMessage(session, chatResponse.getMessage());
+        saveAssistantMessage(session, chatResponse);
 
         return chatResponse;
     }
@@ -181,7 +218,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         ChatSession session = ChatSession.builder()
                 .userId(userId)
                 .isActive(true)
-                .detectedLanguage("en")
+                .detectedLanguage("ar")
                 .build();
 
         ChatSession savedSession = chatSessionRepository.save(session);
@@ -191,7 +228,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .timestamp(LocalDateTime.now())
                 .message("New chat started. How can I help you today?")
                 .responseType(ChatResponseType.TEXT)
-                .detectedLanguage("en")
+                .detectedLanguage("ar")
                 .build();
     }
 
@@ -211,7 +248,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         ChatSession session = ChatSession.builder()
                 .userId(userId)
                 .isActive(true)
-                .detectedLanguage("en")
+            .detectedLanguage("ar")
                 .build();
         return chatSessionRepository.save(session);
     }
@@ -325,6 +362,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
                 ## OUTPUT FORMAT:
                 Return ONLY valid JSON. No extra text, no explanation, no markdown.
+                                The reply field must be the final user-facing answer, not a raw intent label.
 
                 {
                   "action": "SEARCH_PROVIDERS | SUGGEST_SOLUTIONS | CHECK_AVAILABILITY | CREATE_BOOKING | ASK_CLARIFICATION | GENERAL",
@@ -560,7 +598,8 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         return response;
     }
 
-    private ChatResponse executeAction(AiChatRequest request, User currentUser, UnifiedAssistantResponse unified) {
+        private ChatResponse executeAction(AiChatRequest request, User currentUser,
+            UnifiedAssistantResponse unified, ChatSession session) {
         ChatResponse.ChatResponseBuilder responseBuilder = ChatResponse.builder()
                 .sessionId(request.getSessionId())
                 .timestamp(LocalDateTime.now())
@@ -574,7 +613,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         return switch (unified.action) {
             case SEARCH_PROVIDERS -> handleProviderSearchAction(request, currentUser, unified, responseBuilder);
             case SUGGEST_SOLUTIONS -> handleSuggestionAction(request, unified, responseBuilder);
-            case CHECK_AVAILABILITY -> handleAvailabilityAction(unified, responseBuilder);
+            case CHECK_AVAILABILITY -> handleAvailabilityAction(unified, session, responseBuilder);
             case CREATE_BOOKING -> handleBookingAction(request, currentUser, unified, responseBuilder);
             default -> responseBuilder.responseType(ChatResponseType.TEXT).build();
         };
@@ -604,7 +643,9 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
         log.info("Found {} providers for service: {}", providers.size(), selectedService.getName());
 
-        String replyMessage = buildSmartReply(providers, selectedService, userMessage);
+        String replyMessage = StringUtils.hasText(unified.reply)
+            ? unified.reply
+            : buildSmartReply(providers, selectedService, userMessage);
 
         return responseBuilder
                 .responseType(ChatResponseType.PROVIDER_LIST)
@@ -992,7 +1033,9 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             return responseBuilder
                     .responseType(ChatResponseType.BOOKING_CREATED)
                     .booking(bookingResponse)
-                    .message("تم إنشاء طلب الحجز بنجاح رقم #" + bookingResponse.getId())
+                    .message(StringUtils.hasText(unified.reply)
+                        ? unified.reply
+                        : "تم إنشاء طلب الحجز بنجاح رقم #" + bookingResponse.getId())
                     .build();
         } catch (BadRequestException ex) {
             log.warn("Booking validation failed: {}", ex.getMessage());
@@ -1028,13 +1071,22 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         }
     }
 
-    private ChatResponse handleAvailabilityAction(UnifiedAssistantResponse unified,
+    private ChatResponse handleAvailabilityAction(UnifiedAssistantResponse unified, ChatSession session,
             ChatResponse.ChatResponseBuilder responseBuilder) {
 
         Long providerId = unified.providerId;
 
         if (providerId == null && StringUtils.hasText(unified.providerName)) {
             providerId = resolveProviderIdByName(unified.providerName);
+        }
+
+        if (providerId == null && session != null && session.getLastSuggestedProviderId() != null) {
+            providerId = session.getLastSuggestedProviderId();
+            if (!StringUtils.hasText(unified.providerName)) {
+                unified.providerName = session.getLastSuggestedProviderName();
+            }
+            log.debug("Using last suggested provider context for availability check: {}",
+                    session.getLastSuggestedProviderName());
         }
 
         if (providerId == null) {
@@ -1064,7 +1116,9 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             return responseBuilder
                     .responseType(ChatResponseType.AVAILABLE_SLOTS)
                     .availableTimeSlots(slots)
-                    .message(formatUpcomingAvailabilityMessage(unified.providerName, slots))
+                    .message(StringUtils.hasText(unified.reply)
+                        ? unified.reply
+                        : formatUpcomingAvailabilityMessage(unified.providerName, slots))
                     .build();
         } else {
             slots = providerService.getAvailableTimeSlots(providerId, targetDate);
@@ -1072,7 +1126,9 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             return responseBuilder
                     .responseType(ChatResponseType.AVAILABLE_SLOTS)
                     .availableTimeSlots(slots)
-                    .message(formatAvailabilityMessage(providerId, targetDate, slots))
+                    .message(StringUtils.hasText(unified.reply)
+                        ? unified.reply
+                        : formatAvailabilityMessage(providerId, targetDate, slots))
                     .build();
         }
     }
@@ -1222,16 +1278,92 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         chatMessageRepository.save(userMessage);
     }
 
-    private void saveAssistantMessage(ChatSession session, String content) {
+    private void saveAssistantMessage(ChatSession session, ChatResponse response) {
+        String content = response != null ? response.getMessage() : null;
+
         ChatMessage assistantMessage = ChatMessage.builder()
                 .chatSession(session)
                 .senderId(0L)
                 .senderRole(MessageRole.ASSISTANT)
                 .content(content)
                 .type(MessageType.TEXT)
+                .responseType(response != null ? response.getResponseType() : ChatResponseType.TEXT)
+                .providersPayload(serializeProviders(response != null ? response.getProviders() : null))
+                .availableSlotsPayload(serializeAvailableSlots(response != null ? response.getAvailableTimeSlots() : null))
                 .isRead(true)
                 .build();
         chatMessageRepository.save(assistantMessage);
+
+        if (response != null && response.getResponseType() == ChatResponseType.PROVIDER_LIST
+                && response.getProviders() != null && !response.getProviders().isEmpty()) {
+            ProviderSummaryResponse primary = response.getProviders().get(0);
+            session.setLastSuggestedProviderId(primary.getId());
+            session.setLastSuggestedProviderName(primary.getName());
+            chatSessionRepository.save(session);
+        }
+    }
+
+    private void applySessionProviderContext(UnifiedAssistantResponse unified, ChatSession session) {
+        if (unified == null || session == null || unified.action != Action.CHECK_AVAILABILITY) {
+            return;
+        }
+
+        if (unified.providerId == null && !StringUtils.hasText(unified.providerName)
+                && session.getLastSuggestedProviderId() != null) {
+            unified.providerId = session.getLastSuggestedProviderId();
+            unified.providerName = session.getLastSuggestedProviderName();
+        }
+    }
+
+    private String serializeProviders(List<ProviderSummaryResponse> providers) {
+        if (providers == null) {
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(providers);
+        } catch (Exception ex) {
+            log.debug("Failed to serialize providers payload: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private String serializeAvailableSlots(List<ScheduleResponse.TimeSlotResponse> slots) {
+        if (slots == null) {
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(slots);
+        } catch (Exception ex) {
+            log.debug("Failed to serialize available slots payload: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private List<ProviderSummaryResponse> parseProvidersPayload(String payload) {
+        if (!StringUtils.hasText(payload)) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(payload,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, ProviderSummaryResponse.class));
+        } catch (Exception ex) {
+            log.debug("Failed to parse providers payload: {}", ex.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<ScheduleResponse.TimeSlotResponse> parseAvailableSlotsPayload(String payload) {
+        if (!StringUtils.hasText(payload)) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(payload,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class,
+                            ScheduleResponse.TimeSlotResponse.class));
+        } catch (Exception ex) {
+            log.debug("Failed to parse available slots payload: {}", ex.getMessage());
+            return List.of();
+        }
     }
 
     private String extractJson(String text) {
