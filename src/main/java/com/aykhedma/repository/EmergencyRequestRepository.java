@@ -38,6 +38,14 @@ public interface EmergencyRequestRepository extends JpaRepository<EmergencyReque
 
     long countByConsumerIdAndProviderRatingIsNotNull(Long consumerId);
 
+    @Modifying
+    @Query("DELETE FROM EmergencyRequest er WHERE er.consumer.id = :consumerId")
+    void deleteByConsumerId(@Param("consumerId") Long consumerId);
+
+    @Modifying
+    @Query("DELETE FROM EmergencyRequest er WHERE er.selectedProvider.id = :providerId")
+    void deleteBySelectedProviderId(@Param("providerId") Long providerId);
+
     @Modifying(clearAutomatically = true)
     @Query("UPDATE EmergencyRequest er " +
             "SET er.status = 'EXPIRED' " +

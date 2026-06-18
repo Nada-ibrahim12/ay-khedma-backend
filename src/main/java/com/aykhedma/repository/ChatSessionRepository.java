@@ -20,4 +20,8 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, String
     Optional<ChatSession> findActiveSessionByUser(@Param("userId") Long userId);
 
     List<ChatSession> findByUserIdOrderByStartTimeDesc(Long userId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM ChatSession cs WHERE cs.userId = :userId")
+    void deleteByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }

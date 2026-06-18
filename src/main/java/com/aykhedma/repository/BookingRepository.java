@@ -48,6 +48,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
 
     List<Booking> findByConsumerIdAndProviderRatingIsNotNull(Long consumerId);
 
+        @Modifying
+        @Query("DELETE FROM Booking b WHERE b.consumer.id = :consumerId")
+        void deleteByConsumerId(@Param("consumerId") Long consumerId);
+
+        @Modifying
+        @Query("DELETE FROM Booking b WHERE b.provider.id = :providerId")
+        void deleteByProviderId(@Param("providerId") Long providerId);
+
     @Query("SELECT b FROM Booking b WHERE b.provider.id = :providerId AND b.status = 'COMPLETED' ORDER BY b.completedAt DESC")
     List<Booking> findRecentCompletedBookings(@Param("providerId") Long providerId, Pageable pageable);
 

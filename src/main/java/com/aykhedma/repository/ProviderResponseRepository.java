@@ -3,6 +3,7 @@ package com.aykhedma.repository;
 import com.aykhedma.model.emergency.EmergencyRequestStatus;
 import com.aykhedma.model.emergency.ProviderResponse;
 import com.aykhedma.model.emergency.ProviderResponseType;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +17,10 @@ public interface ProviderResponseRepository extends JpaRepository<ProviderRespon
     List<ProviderResponse> findByEmergencyRequestId(Long emergencyRequestId);
 
     List<ProviderResponse> findByProviderId(Long providerId);
+
+    @Modifying
+    @Query("DELETE FROM ProviderResponse pr WHERE pr.provider.id = :providerId")
+    void deleteByProviderId(@Param("providerId") Long providerId);
 
     @Query("SELECT pr FROM ProviderResponse pr WHERE pr.emergencyRequest.id = :requestId AND pr.responseType = 'ACCEPTED_OFFER'")
     List<ProviderResponse> findAcceptedResponsesForRequest(@Param("requestId") Long requestId);

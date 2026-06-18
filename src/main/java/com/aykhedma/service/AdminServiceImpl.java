@@ -8,10 +8,23 @@ import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
 import com.aykhedma.mapper.UserMapper;
 import com.aykhedma.model.notification.NotificationType;
+import com.aykhedma.model.chat.ChatRoom;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.model.user.User;
 import com.aykhedma.model.user.UserType;
 import com.aykhedma.model.user.VerificationStatus;
+import com.aykhedma.repository.BookingRepository;
+import com.aykhedma.repository.ChatRoomRepository;
+import com.aykhedma.repository.ChatSessionRepository;
+import com.aykhedma.repository.ConsumerRepository;
+import com.aykhedma.repository.DeviceTokenRepository;
+import com.aykhedma.repository.DocumentRepository;
+import com.aykhedma.repository.EmergencyRequestRepository;
+import com.aykhedma.repository.InteractionRatingRepository;
+import com.aykhedma.repository.NotificationPreferenceRepository;
+import com.aykhedma.repository.NotificationRepository;
+import com.aykhedma.repository.ProviderResponseRepository;
+import com.aykhedma.repository.RefreshTokenRepository;
 import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
 import com.aykhedma.repository.UserRepository;
@@ -34,6 +47,18 @@ public class AdminServiceImpl implements AdminService {
     private final ProviderMapper providerMapper;
     private final ProviderService providerService;
     private final NotificationFactory notificationFactory;
+    private final ConsumerRepository consumerRepository;
+    private final BookingRepository bookingRepository;
+    private final EmergencyRequestRepository emergencyRequestRepository;
+    private final InteractionRatingRepository interactionRatingRepository;
+    private final ProviderResponseRepository providerResponseRepository;
+    private final DocumentRepository documentRepository;
+    private final NotificationRepository notificationRepository;
+    private final NotificationPreferenceRepository notificationPreferenceRepository;
+    private final DeviceTokenRepository deviceTokenRepository;
+    private final ChatSessionRepository chatSessionRepository;
+    private final ChatRoomRepository chatRoomRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
     private final ServiceTypeRepository serviceTypeRepository;
     private final UserMapper userMapper;
@@ -123,7 +148,14 @@ public class AdminServiceImpl implements AdminService {
             String keyword,
             Pageable pageable) {
 
-        Page<User> users = userRepository.searchUsers(role, status, startDate, endDate, keyword, pageable);
+        // Cap page size to prevent expensive unbounded requests from admin UI
+        int maxPageSize = 100;
+        Pageable cappedPageable = Pageable.ofSize(Math.min(pageable.getPageSize(), maxPageSize));
+        // preserve page number and sort
+        cappedPageable = org.springframework.data.domain.PageRequest.of(
+            pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
+
+        Page<User> users = userRepository.searchUsers(role, status, startDate, endDate, keyword, cappedPageable);
 
         return users.map(userMapper::toUserResponse);
     }
@@ -133,7 +165,12 @@ public class AdminServiceImpl implements AdminService {
             String keyword, VerificationStatus status,
             Boolean enabled, Pageable pageable) {
 
-        Page<Provider> providers = providerRepository.findAllProvidersForAdmin(keyword, status, enabled, pageable);
+        // Cap page size to prevent very large admin queries
+        int maxPageSize = 100;
+        Pageable cappedPageable = org.springframework.data.domain.PageRequest.of(
+            pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
+
+        Page<Provider> providers = providerRepository.findAllProvidersForAdmin(keyword, status, enabled, cappedPageable);
 
         return providers.map(providerMapper::toProviderResponse);
     }
@@ -202,6 +239,32 @@ public class AdminServiceImpl implements AdminService {
     public void deleteUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        notificationPreferenceRepository.deleteByUserId(userId);
+        notificationRepository.deleteByUserId(userId);
+        deviceTokenRepository.deleteByUserId(userId);
+        refreshTokenRepository.deleteByUser(user);
+        chatSessionRepository.deleteByUserId(userId);
+
+        List<ChatRoom> chatRooms = chatRoomRepository.findAllByParticipant(user);
+        if (!chatRooms.isEmpty()) {
+            chatRoomRepository.deleteAll(chatRooms);
+        }
+
+        userRepository.deleteSavedProviderLinks(userId);
+
+        if (user instanceof Provider) {
+            bookingRepository.deleteByProviderId(userId);
+            emergencyRequestRepository.deleteBySelectedProviderId(userId);
+            interactionRatingRepository.deleteByProviderId(userId);
+            providerResponseRepository.deleteByProviderId(userId);
+            documentRepository.deleteByProviderId(userId);
+        } else if (user instanceof com.aykhedma.model.user.Consumer) {
+            bookingRepository.deleteByConsumerId(userId);
+            emergencyRequestRepository.deleteByConsumerId(userId);
+            interactionRatingRepository.deleteByConsumerId(userId);
+        }
+
         userRepository.delete(user);
     }
 }

@@ -1,10 +1,10 @@
 package com.aykhedma.repository;
 
 import com.aykhedma.model.notification.DeviceToken;
-import io.lettuce.core.dynamic.annotation.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +14,11 @@ public interface DeviceTokenRepository extends JpaRepository<DeviceToken, Long> 
     List<DeviceToken> findByUserIdAndActiveTrue(Long userId);
 
     Optional<DeviceToken> findByUserIdAndDeviceId(Long userId, String deviceId);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM DeviceToken d WHERE d.userId = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 
     @Modifying
     @Transactional

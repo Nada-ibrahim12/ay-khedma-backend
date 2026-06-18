@@ -13,4 +13,8 @@ import java.util.List;
 @Repository
 public interface NotificationPreferenceRepository extends JpaRepository<NotificationPreference, Long> {
     java.util.Optional<NotificationPreference> findByUserId(Long userId);
+
+    @Modifying
+    @Query("DELETE FROM NotificationPreference np WHERE np.userId = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }
