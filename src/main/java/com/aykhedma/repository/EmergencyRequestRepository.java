@@ -30,6 +30,14 @@ public interface EmergencyRequestRepository extends JpaRepository<EmergencyReque
 
     List<EmergencyRequest> findBySelectedProviderIdAndStatusOrderByCreatedAtDesc(Long providerId, EmergencyRequestStatus status);
 
+    List<EmergencyRequest> findByConsumerIdAndStatusInOrderByCreatedAtDesc(Long consumerId, List<EmergencyRequestStatus> statuses);
+
+    List<EmergencyRequest> findBySelectedProviderIdAndStatusInOrderByCreatedAtDesc(Long providerId, List<EmergencyRequestStatus> statuses);
+
+    long countBySelectedProviderIdAndConsumerRatingIsNotNull(Long providerId);
+
+    long countByConsumerIdAndProviderRatingIsNotNull(Long consumerId);
+
     @Modifying(clearAutomatically = true)
     @Query("UPDATE EmergencyRequest er " +
             "SET er.status = 'EXPIRED' " +

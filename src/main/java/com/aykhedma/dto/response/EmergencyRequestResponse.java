@@ -26,4 +26,13 @@ public class EmergencyRequestResponse {
     private ProviderSummaryResponse selectedProvider;
     private LocalDateTime createdAt;
     private List<ProviderResponseResponse> providerResponses;
+
+    private Double consumerRating;
+    private String consumerReview;
+    private Double punctualityRating;
+    private Double commitmentRating;
+    private Double qualityOfWorkRating;
+    private Double providerRating;
+    private String providerReview;
+    private LocalDateTime completedAt;
 }

@@ -1,5 +1,7 @@
 package com.aykhedma.service;
 
+import com.aykhedma.dto.request.EmergencyRatingRequest;
+import com.aykhedma.dto.request.ProviderEmergencyRatingRequest;
 import com.aykhedma.dto.location.LocationDTO;
 import com.aykhedma.dto.request.EmergencyRequestRequest;
 import com.aykhedma.dto.request.ProviderResponseRequest;
@@ -54,6 +56,7 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
     private final RestTemplate restTemplate;
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final NotificationFactory notificationFactory;
+    private final BookingRepository bookingRepository;
 
     @Override
     public EmergencyRequestResponse getCurrentEmergencyRequest(Long consumerId)
@@ -571,16 +574,173 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
         if (user.getRole() == UserType.CONSUMER)
         {
             emergencyRequests = emergencyRequestRepository
-                    .findByConsumerIdAndStatusOrderByCreatedAtDesc(userId, EmergencyRequestStatus.ACCEPTED);
+                    .findByConsumerIdAndStatusInOrderByCreatedAtDesc(userId, List.of(EmergencyRequestStatus.ACCEPTED, EmergencyRequestStatus.COMPLETED));
         }
         else if (user.getRole() == UserType.PROVIDER)
         {
             emergencyRequests = emergencyRequestRepository
-                    .findBySelectedProviderIdAndStatusOrderByCreatedAtDesc(userId, EmergencyRequestStatus.ACCEPTED);
+                    .findBySelectedProviderIdAndStatusInOrderByCreatedAtDesc(userId, List.of(EmergencyRequestStatus.ACCEPTED, EmergencyRequestStatus.COMPLETED));
         }
         else
             throw new ForbiddenException("User is not a provider or a consumer");
 
         return emergencyRequests.stream().map(emergencyRequestMapper::toEmergencyRequestResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public EmergencyRequestResponse submitEmergencyRequestRating(Long consumerId, EmergencyRatingRequest ratingRequest) {
+        EmergencyRequest emergencyRequest = emergencyRequestRepository.findById(ratingRequest.getEmergencyRequestId())
+                .orElseThrow(() -> new ResourceNotFoundException("Emergency request not found"));
+
+        if (!consumerId.equals(emergencyRequest.getConsumer().getId()))
+            throw new ForbiddenException("Emergency request does not belong to this consumer");
+
+        if (emergencyRequest.getStatus() == EmergencyRequestStatus.CANCELLED)
+            throw new BadRequestException("Cancelled emergency requests cannot be rated");
+
+        if (emergencyRequest.getStatus() != EmergencyRequestStatus.ACCEPTED && emergencyRequest.getStatus() != EmergencyRequestStatus.COMPLETED)
+            throw new BadRequestException("Only accepted or completed emergency requests can be rated");
+
+        if (emergencyRequest.getConsumerRating() != null)
+            throw new BadRequestException("You have already rated this emergency request");
+
+        emergencyRequest.setPunctualityRating(ratingRequest.getPunctualityRating().doubleValue());
+        emergencyRequest.setCommitmentRating(ratingRequest.getCommitmentRating().doubleValue());
+        emergencyRequest.setQualityOfWorkRating(ratingRequest.getQualityOfWorkRating().doubleValue());
+
+        Double overallRating = (emergencyRequest.getPunctualityRating() + emergencyRequest.getCommitmentRating()
+                + emergencyRequest.getQualityOfWorkRating()) / 3.0;
+        overallRating = Math.round(overallRating * 10.0) / 10.0;
+        emergencyRequest.setConsumerRating(overallRating);
+        emergencyRequest.setConsumerReview(ratingRequest.getReview());
+
+        // Mark as completed if both parties have rated
+        if (emergencyRequest.getProviderRating() != null) {
+            emergencyRequest.setStatus(EmergencyRequestStatus.COMPLETED);
+            emergencyRequest.setCompletedAt(LocalDateTime.now());
+            Provider provider = emergencyRequest.getSelectedProvider();
+            if (provider != null) {
+                provider.setCompletedJobs((provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0) + 1);
+            }
+        }
+
+        emergencyRequestRepository.save(emergencyRequest);
+
+        // Update provider averages
+        Provider provider = emergencyRequest.getSelectedProvider();
+        if (provider != null) {
+            long ratedBookingsCount = bookingRepository.countByProviderIdAndConsumerRatingIsNotNull(provider.getId());
+            long ratedEmergencyRequestsCount = emergencyRequestRepository.countBySelectedProviderIdAndConsumerRatingIsNotNull(provider.getId());
+            long totalRatedCount = ratedBookingsCount + ratedEmergencyRequestsCount;
+
+            if (totalRatedCount <= 1 || provider.getAverageRating() == null || provider.getAverageRating() == 0.0) {
+                provider.setAveragePunctualityRating(emergencyRequest.getPunctualityRating());
+                provider.setAverageCommitmentRating(emergencyRequest.getCommitmentRating());
+                provider.setAverageQualityOfWorkRating(emergencyRequest.getQualityOfWorkRating());
+                provider.setAverageRating(overallRating);
+            } else {
+                long oldCount = totalRatedCount - 1;
+                if (oldCount < 1) oldCount = 1;
+
+                double oldPunctuality = provider.getAveragePunctualityRating() != null ? provider.getAveragePunctualityRating() : 0.0;
+                double oldCommitment = provider.getAverageCommitmentRating() != null ? provider.getAverageCommitmentRating() : 0.0;
+                double oldQuality = provider.getAverageQualityOfWorkRating() != null ? provider.getAverageQualityOfWorkRating() : 0.0;
+                double oldOverall = provider.getAverageRating() != null ? provider.getAverageRating() : 0.0;
+
+                provider.setAveragePunctualityRating(((oldPunctuality * oldCount) + emergencyRequest.getPunctualityRating()) / totalRatedCount);
+                provider.setAverageCommitmentRating(((oldCommitment * oldCount) + emergencyRequest.getCommitmentRating()) / totalRatedCount);
+                provider.setAverageQualityOfWorkRating(((oldQuality * oldCount) + emergencyRequest.getQualityOfWorkRating()) / totalRatedCount);
+                provider.setAverageRating(((oldOverall * oldCount) + overallRating) / totalRatedCount);
+            }
+            updateProviderRates(provider);
+            providerRepository.save(provider);
+        }
+
+        return emergencyRequestMapper.toEmergencyRequestResponse(emergencyRequest);
+    }
+
+    @Override
+    @Transactional
+    public EmergencyRequestResponse submitConsumerEmergencyRequestRating(Long providerId, ProviderEmergencyRatingRequest ratingRequest) {
+        EmergencyRequest emergencyRequest = emergencyRequestRepository.findById(ratingRequest.getEmergencyRequestId())
+                .orElseThrow(() -> new ResourceNotFoundException("Emergency request not found"));
+
+        if (emergencyRequest.getSelectedProvider() == null || !providerId.equals(emergencyRequest.getSelectedProvider().getId()))
+            throw new ForbiddenException("Emergency request does not belong to this provider");
+
+        if (emergencyRequest.getStatus() == EmergencyRequestStatus.CANCELLED)
+            throw new BadRequestException("Cancelled emergency requests cannot be rated");
+
+        if (emergencyRequest.getStatus() != EmergencyRequestStatus.ACCEPTED && emergencyRequest.getStatus() != EmergencyRequestStatus.COMPLETED)
+            throw new BadRequestException("Only accepted or completed emergency requests can be rated");
+
+        if (emergencyRequest.getProviderRating() != null)
+            throw new BadRequestException("You have already rated this emergency request");
+
+        emergencyRequest.setProviderRating(ratingRequest.getRating().doubleValue());
+        emergencyRequest.setProviderReview(ratingRequest.getReview());
+
+        // Mark as completed if both parties have rated
+        if (emergencyRequest.getConsumerRating() != null) {
+            emergencyRequest.setStatus(EmergencyRequestStatus.COMPLETED);
+            emergencyRequest.setCompletedAt(LocalDateTime.now());
+            Provider provider = emergencyRequest.getSelectedProvider();
+            if (provider != null) {
+                provider.setCompletedJobs((provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0) + 1);
+            }
+        }
+
+        emergencyRequestRepository.save(emergencyRequest);
+
+        Provider provider = emergencyRequest.getSelectedProvider();
+        if (provider != null) {
+            updateProviderRates(provider);
+            providerRepository.save(provider);
+        }
+
+        // Update consumer average
+        Consumer consumer = emergencyRequest.getConsumer();
+        if (consumer != null) {
+            long ratedBookingsCount = bookingRepository.countByConsumerIdAndProviderRatingIsNotNull(consumer.getId());
+            long ratedEmergencyRequestsCount = emergencyRequestRepository.countByConsumerIdAndProviderRatingIsNotNull(consumer.getId());
+            long totalRatedCount = ratedBookingsCount + ratedEmergencyRequestsCount;
+
+            if (totalRatedCount <= 1 || consumer.getAverageRating() == null || consumer.getAverageRating() == 0.0) {
+                consumer.setAverageRating(emergencyRequest.getProviderRating());
+            } else {
+                long oldCount = totalRatedCount - 1;
+                if (oldCount < 1) oldCount = 1;
+                double oldOverall = consumer.getAverageRating() != null ? consumer.getAverageRating() : 0.0;
+                consumer.setAverageRating(((oldOverall * oldCount) + emergencyRequest.getProviderRating()) / totalRatedCount);
+            }
+            consumerRepository.save(consumer);
+        }
+
+        return emergencyRequestMapper.toEmergencyRequestResponse(emergencyRequest);
+    }
+
+    private void updateProviderRates(Provider provider) {
+        int acceptanceRate;
+        int bookingRate;
+
+        Integer totalRequests = provider.getTotalRequests();
+        if (totalRequests != null && totalRequests > 0) {
+            Integer accepted = provider.getTotalBookings() != null ? provider.getTotalBookings() : 0;
+            acceptanceRate = clampRate((accepted * 100) / totalRequests);
+
+            Integer completed = provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0;
+            bookingRate = clampRate((completed * 100) / totalRequests);
+        } else {
+            acceptanceRate = 100;
+            bookingRate = 0;
+        }
+
+        provider.setAcceptanceRate(acceptanceRate);
+        provider.setBookingRate(bookingRate);
+    }
+
+    private int clampRate(int value) {
+        return Math.max(0, Math.min(100, value));
     }
 }

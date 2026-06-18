@@ -59,6 +59,36 @@ public class EmergencyRequest {
     @JoinColumn(name = "selected_provider_id")
     private Provider selectedProvider;
 
+    @Min(value = 1, message = "Rating must be at least 1")
+    @Max(value = 5, message = "Rating cannot exceed 5")
+    private Double consumerRating;
+
+    @Size(max = 500, message = "Consumer review cannot exceed 500 characters")
+    @Column(length = 500)
+    private String consumerReview;
+
+    @Min(value = 1, message = "Punctuality rating must be at least 1")
+    @Max(value = 5, message = "Punctuality rating cannot exceed 5")
+    private Double punctualityRating;
+
+    @Min(value = 1, message = "Commitment rating must be at least 1")
+    @Max(value = 5, message = "Commitment rating cannot exceed 5")
+    private Double commitmentRating;
+
+    @Min(value = 1, message = "Quality of work rating must be at least 1")
+    @Max(value = 5, message = "Quality of work rating cannot exceed 5")
+    private Double qualityOfWorkRating;
+
+    @Min(value = 1, message = "Provider rating must be at least 1")
+    @Max(value = 5, message = "Provider rating cannot exceed 5")
+    private Double providerRating;
+
+    @Size(max = 500, message = "Provider review cannot exceed 500 characters")
+    @Column(length = 500)
+    private String providerReview;
+
+    private LocalDateTime completedAt;
+
     @PastOrPresent(message = "Created date cannot be in the future")
     @CreationTimestamp
     private LocalDateTime createdAt;

@@ -81,6 +81,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole())
                 .verified(user.isEnabled())
+                .preferredLanguage(user.getPreferredLanguage())
                 .build();
     }
 
@@ -130,6 +131,7 @@ public class AuthService {
                     .credentialsNonExpired(true)
                     .location(location)
                     .totalBookings(0)
+                    .preferredLanguage(request.getPreferredLanguage())
                     .build();
 
             Consumer savedConsumer = (Consumer) userRepository.save(consumer);
@@ -152,6 +154,7 @@ public class AuthService {
                     .role(UserType.ADMIN)
                     .enabled(true) // Admins enabled by default for testing, or set to false if OTP is required
                     .credentialsNonExpired(true)
+                    .preferredLanguage(request.getPreferredLanguage())
                     .build();
 
             userRepository.save(admin);
@@ -208,6 +211,7 @@ public class AuthService {
                         .price(request.getPrice())
                         .priceType(priceType)
                         .schedule(schedule)
+                        .preferredLanguage(request.getPreferredLanguage())
                         .build();
 
                 Provider savedProvider = (Provider) userRepository.save(provider);

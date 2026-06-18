@@ -1,5 +1,7 @@
 package com.aykhedma.service;
 
+import com.aykhedma.dto.request.EmergencyRatingRequest;
+import com.aykhedma.dto.request.ProviderEmergencyRatingRequest;
 import com.aykhedma.dto.request.EmergencyRequestRequest;
 import com.aykhedma.dto.request.ProviderResponseRequest;
 import com.aykhedma.dto.request.UpdateEmergencyRequestPriceRequest;
@@ -31,4 +33,8 @@ public interface EmergencyRequestService
     EmergencyRequestResponse cancelEmergencyRequest (Long consumerId, Long emergencyRequestId);
 
     List<EmergencyRequestResponse> getEmergencyRequestsHistory (Long userId);
+
+    EmergencyRequestResponse submitEmergencyRequestRating(Long consumerId, EmergencyRatingRequest ratingRequest);
+
+    EmergencyRequestResponse submitConsumerEmergencyRequestRating(Long providerId, ProviderEmergencyRatingRequest ratingRequest);
 }

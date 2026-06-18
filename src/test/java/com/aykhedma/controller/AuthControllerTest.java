@@ -38,6 +38,7 @@ class AuthControllerTest extends BaseIntegrationTest {
                                 .password("Password123")
                                 .phoneNumber("010" + String.format("%08d", (int) (Math.random() * 100_000_000)))
                                 .userType(UserType.CONSUMER)
+                                .preferredLanguage("en")
                                 .build();
         }
 
@@ -169,7 +170,8 @@ class AuthControllerTest extends BaseIntegrationTest {
                                         .andExpect(jsonPath("$.token").isNotEmpty())
                                         .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                                         .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                                        .andExpect(jsonPath("$.email").value(regReq.getEmail()));
+                                        .andExpect(jsonPath("$.email").value(regReq.getEmail()))
+                                        .andExpect(jsonPath("$.preferredLanguage").value("en"));
                 }
 
                 @Test

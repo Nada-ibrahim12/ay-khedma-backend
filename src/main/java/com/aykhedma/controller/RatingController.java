@@ -1,9 +1,13 @@
 package com.aykhedma.controller;
 
 import com.aykhedma.dto.request.RatingRequest;
+import com.aykhedma.dto.request.EmergencyRatingRequest;
+import com.aykhedma.dto.request.ProviderEmergencyRatingRequest;
 import com.aykhedma.dto.response.BookingResponse;
+import com.aykhedma.dto.response.EmergencyRequestResponse;
 import com.aykhedma.dto.response.EvaluationQuestionResponse;
 import com.aykhedma.service.BookingService;
+import com.aykhedma.service.EmergencyRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +25,7 @@ import java.util.List;
 public class RatingController {
 
     private final BookingService bookingService;
+    private final EmergencyRequestService emergencyRequestService;
     
     @GetMapping("/questions")
     public ResponseEntity<List<EvaluationQuestionResponse>> getEvaluationQuestions(
@@ -76,5 +81,25 @@ public class RatingController {
     public ResponseEntity<List<com.aykhedma.dto.response.ConsumerReviewResponse>> getConsumerReviews(
             @PathVariable Long consumerId) {
         return ResponseEntity.ok(bookingService.getConsumerReviews(consumerId));
+    }
+
+    @PostMapping("/emergency")
+    @PreAuthorize("hasRole('CONSUMER')")
+    public ResponseEntity<EmergencyRequestResponse> submitEmergencyRating(
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+            @Valid @RequestBody EmergencyRatingRequest ratingRequest) {
+        
+        EmergencyRequestResponse response = emergencyRequestService.submitEmergencyRequestRating(consumerId, ratingRequest);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/emergency/consumer")
+    @PreAuthorize("hasRole('PROVIDER')")
+    public ResponseEntity<EmergencyRequestResponse> submitConsumerEmergencyRating(
+            @AuthenticationPrincipal(expression = "user.id") Long providerId,
+            @Valid @RequestBody ProviderEmergencyRatingRequest ratingRequest) {
+        
+        EmergencyRequestResponse response = emergencyRequestService.submitConsumerEmergencyRequestRating(providerId, ratingRequest);
+        return ResponseEntity.ok(response);
     }
 }

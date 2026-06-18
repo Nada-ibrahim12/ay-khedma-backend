@@ -22,5 +22,6 @@ public class AuthResponse {
     private String email;
     private UserType role;
     private boolean verified;
+    private String preferredLanguage;
     private String message;
 }
