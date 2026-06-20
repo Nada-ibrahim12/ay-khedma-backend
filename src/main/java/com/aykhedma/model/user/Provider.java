@@ -193,12 +193,12 @@ public class Provider extends User {
     private String rejectionReason;
 
     @Builder.Default
-    @Column(columnDefinition = "boolean default false")
-    private boolean isNidVerified = false;
+    @Column(name = "is_nid_verified", columnDefinition = "boolean default false")
+    private Boolean nidVerified = false;
 
     @Builder.Default
-    @Column(columnDefinition = "boolean default false")
-    private boolean isFaceMatched = false;
+    @Column(name = "is_face_matched", columnDefinition = "boolean default false")
+    private Boolean faceMatched = false;
 
     private Double faceMatchConfidence;
 
