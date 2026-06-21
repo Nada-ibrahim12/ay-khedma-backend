@@ -10,5 +10,5 @@ public interface AiAssistantService {
 
     ChatResponse startNewChat(User currentUser);
 
-    ChatResponse getChat(String sessionId);
+    ChatResponse getChat(String sessionId, User currentUser);
 }

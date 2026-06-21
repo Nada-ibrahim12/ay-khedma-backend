@@ -5,6 +5,7 @@ import com.aykhedma.dto.request.AiChatRequest;
 import com.aykhedma.dto.request.BookingRequest;
 import com.aykhedma.dto.response.*;
 import com.aykhedma.exception.BadRequestException;
+import com.aykhedma.exception.ForbiddenException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.model.chat.*;
 import com.aykhedma.model.location.Location;
@@ -67,12 +68,16 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private final SpeechToTextService speechToTextService;
 
     @Override
-    public ChatResponse getChat(String sessionId) {
+    public ChatResponse getChat(String sessionId, User currentUser) {
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new BadRequestException("Chat session not found"));
 
+        if (!Objects.equals(session.getUserId(), currentUser != null ? currentUser.getId() : null)) {
+            throw new ForbiddenException("You are not allowed to access this chat session");
+        }
+
         List<ChatMessage> messageEntities = chatMessageRepository
-            .findByChatSessionSessionIdOrderByTimestampAsc(sessionId);
+                .findByChatSessionSessionIdOrderByTimestampAsc(sessionId);
 
         List<ChatMessageResponse> messages = messageEntities
                 .stream()
@@ -90,36 +95,38 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                         .build())
                 .collect(Collectors.toList());
 
-                ChatMessage lastAssistantMessage = messageEntities.stream()
-                    .filter(ChatMessage::isAssistantMessage)
-                    .reduce((first, second) -> second)
-                    .orElse(null);
+        ChatMessage lastAssistantMessage = messageEntities.stream()
+                .filter(ChatMessage::isAssistantMessage)
+                .reduce((first, second) -> second)
+                .orElse(null);
 
-                ChatResponseType lastResponseType = lastAssistantMessage != null && lastAssistantMessage.getResponseType() != null
-                    ? lastAssistantMessage.getResponseType()
-                    : ChatResponseType.TEXT;
+        ChatResponseType lastResponseType = lastAssistantMessage != null
+                && lastAssistantMessage.getResponseType() != null
+                        ? lastAssistantMessage.getResponseType()
+                        : ChatResponseType.TEXT;
 
-                List<ProviderSummaryResponse> providers = lastAssistantMessage != null
-                    ? parseProvidersPayload(lastAssistantMessage.getProvidersPayload())
-                    : List.of();
+        List<ProviderSummaryResponse> providers = lastAssistantMessage != null
+                ? parseProvidersPayload(lastAssistantMessage.getProvidersPayload())
+                : List.of();
 
-                List<ScheduleResponse.TimeSlotResponse> availableSlots = lastAssistantMessage != null
-                    ? parseAvailableSlotsPayload(lastAssistantMessage.getAvailableSlotsPayload())
-                    : List.of();
+        List<ScheduleResponse.TimeSlotResponse> availableSlots = lastAssistantMessage != null
+                ? parseAvailableSlotsPayload(lastAssistantMessage.getAvailableSlotsPayload())
+                : List.of();
 
-                String lastMessage = lastAssistantMessage != null && StringUtils.hasText(lastAssistantMessage.getContent())
-                    ? lastAssistantMessage.getContent()
-                    : (session.getLastMessage() != null ? session.getLastMessage().getContent() : "");
+        String lastMessage = lastAssistantMessage != null && StringUtils.hasText(lastAssistantMessage.getContent())
+                ? lastAssistantMessage.getContent()
+                : (session.getLastMessage() != null ? session.getLastMessage().getContent() : "");
 
         return ChatResponse.builder()
                 .sessionId(session.getSessionId())
                 .messages(messages)
                 .timestamp(LocalDateTime.now())
-                    .message(lastMessage)
-                    .detectedLanguage(StringUtils.hasText(session.getDetectedLanguage()) ? session.getDetectedLanguage() : "en")
-                    .responseType(lastResponseType)
-                    .providers(providers)
-                    .availableTimeSlots(availableSlots)
+                .message(lastMessage)
+                .detectedLanguage(
+                        StringUtils.hasText(session.getDetectedLanguage()) ? session.getDetectedLanguage() : "en")
+                .responseType(lastResponseType)
+                .providers(providers)
+                .availableTimeSlots(availableSlots)
                 .build();
     }
 
@@ -142,7 +149,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                     Long userId = currentUser != null ? currentUser.getId() : null;
                     ChatSession session = resolveSession(request, userId);
                     saveUserMessage(session, userId != null ? userId : 0L, "[Voice note - transcription failed]");
-                        saveAssistantMessage(session, ChatResponse.builder()
+                    saveAssistantMessage(session, ChatResponse.builder()
                             .sessionId(session.getSessionId())
                             .timestamp(LocalDateTime.now())
                             .message("عذراً، لم أتمكن من تحويل الرسالة الصوتية. ممكن تعيد تسجيلها أو تكتبها نصياً؟")
@@ -234,8 +241,14 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
     private ChatSession resolveSession(AiChatRequest request, Long userId) {
         if (StringUtils.hasText(request.getSessionId())) {
-            return chatSessionRepository.findBySessionIdAndIsActiveTrue(request.getSessionId())
+            ChatSession session = chatSessionRepository.findBySessionIdAndIsActiveTrue(request.getSessionId())
                     .orElseThrow(() -> new BadRequestException("Invalid or expired session ID"));
+
+            if (!Objects.equals(session.getUserId(), userId)) {
+                throw new ForbiddenException("You are not allowed to access this chat session");
+            }
+
+            return session;
         }
 
         if (userId != null) {
@@ -248,7 +261,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         ChatSession session = ChatSession.builder()
                 .userId(userId)
                 .isActive(true)
-            .detectedLanguage("ar")
+                .detectedLanguage("ar")
                 .build();
         return chatSessionRepository.save(session);
     }
@@ -598,7 +611,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         return response;
     }
 
-        private ChatResponse executeAction(AiChatRequest request, User currentUser,
+    private ChatResponse executeAction(AiChatRequest request, User currentUser,
             UnifiedAssistantResponse unified, ChatSession session) {
         ChatResponse.ChatResponseBuilder responseBuilder = ChatResponse.builder()
                 .sessionId(request.getSessionId())
@@ -643,9 +656,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
         log.info("Found {} providers for service: {}", providers.size(), selectedService.getName());
 
-        String replyMessage = StringUtils.hasText(unified.reply)
-            ? unified.reply
-            : buildSmartReply(providers, selectedService, userMessage);
+        String replyMessage = buildSmartReply(providers, selectedService, userMessage);
 
         return responseBuilder
                 .responseType(ChatResponseType.PROVIDER_LIST)
@@ -810,6 +821,12 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             double score2 = calculateScore(p2);
             return Double.compare(score2, score1);
         });
+
+        if (radiusKm != null && radiusKm > 0) {
+            responses = responses.stream()
+                    .filter(provider -> provider.getDistance() == null || provider.getDistance() <= radiusKm)
+                    .collect(Collectors.toList());
+        }
 
         return responses;
     }
@@ -1033,9 +1050,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             return responseBuilder
                     .responseType(ChatResponseType.BOOKING_CREATED)
                     .booking(bookingResponse)
-                    .message(StringUtils.hasText(unified.reply)
-                        ? unified.reply
-                        : "تم إنشاء طلب الحجز بنجاح رقم #" + bookingResponse.getId())
+                    .message("تم إنشاء طلب الحجز بنجاح رقم #" + bookingResponse.getId())
                     .build();
         } catch (BadRequestException ex) {
             log.warn("Booking validation failed: {}", ex.getMessage());
@@ -1116,9 +1131,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             return responseBuilder
                     .responseType(ChatResponseType.AVAILABLE_SLOTS)
                     .availableTimeSlots(slots)
-                    .message(StringUtils.hasText(unified.reply)
-                        ? unified.reply
-                        : formatUpcomingAvailabilityMessage(unified.providerName, slots))
+                    .message(formatUpcomingAvailabilityMessage(unified.providerName, slots))
                     .build();
         } else {
             slots = providerService.getAvailableTimeSlots(providerId, targetDate);
@@ -1126,9 +1139,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             return responseBuilder
                     .responseType(ChatResponseType.AVAILABLE_SLOTS)
                     .availableTimeSlots(slots)
-                    .message(StringUtils.hasText(unified.reply)
-                        ? unified.reply
-                        : formatAvailabilityMessage(providerId, targetDate, slots))
+                    .message(formatAvailabilityMessage(providerId, targetDate, slots))
                     .build();
         }
     }
@@ -1289,7 +1300,8 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .type(MessageType.TEXT)
                 .responseType(response != null ? response.getResponseType() : ChatResponseType.TEXT)
                 .providersPayload(serializeProviders(response != null ? response.getProviders() : null))
-                .availableSlotsPayload(serializeAvailableSlots(response != null ? response.getAvailableTimeSlots() : null))
+                .availableSlotsPayload(
+                        serializeAvailableSlots(response != null ? response.getAvailableTimeSlots() : null))
                 .isRead(true)
                 .build();
         chatMessageRepository.save(assistantMessage);
