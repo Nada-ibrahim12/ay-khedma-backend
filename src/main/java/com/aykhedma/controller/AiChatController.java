@@ -46,8 +46,8 @@ public class AiChatController {
             @RequestPart(value = "location", required = false) LocationDTO location,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
-        log.info("Chat request - sessionId: {}, message: {}, voiceNote: {}",
-                sessionId, message, voiceNote != null ? "present (" + voiceNote.getSize() + " bytes)" : "null");
+        log.info("Chat request - sessionId: {}, voiceNote: {}",
+                sessionId, voiceNote != null ? "present (" + voiceNote.getSize() + " bytes)" : "null");
 
         AiChatRequest request = AiChatRequest.builder()
                 .sessionId(sessionId)
@@ -82,7 +82,11 @@ public class AiChatController {
     }
 
     @GetMapping("/chat/{sessionId}")
-    public ResponseEntity<ChatResponse> getChat(@PathVariable String sessionId) {
-        return ResponseEntity.ok(aiAssistantService.getChat(sessionId));
+    public ResponseEntity<ChatResponse> getChat(
+            @PathVariable String sessionId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        User currentUser = userDetails != null ? userDetails.getUser() : null;
+        return ResponseEntity.ok(aiAssistantService.getChat(sessionId, currentUser));
     }
 }
