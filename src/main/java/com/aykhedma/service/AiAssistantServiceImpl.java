@@ -68,6 +68,32 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private final SpeechToTextService speechToTextService;
 
     @Override
+    public List<ChatResponse> getUserChats(User currentUser) {
+        if (currentUser == null) {
+            throw new ForbiddenException("User must be authenticated to view chat history");
+        }
+
+        List<ChatSession> sessions = chatSessionRepository.findByUserIdOrderByStartTimeDesc(currentUser.getId());
+
+        return sessions.stream()
+                .map(session -> {
+                    List<ChatMessage> messages = chatMessageRepository
+                            .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId());
+
+                    String lastMessageContent = messages.isEmpty() ? "" : messages.get(messages.size() - 1).getContent();
+                    LocalDateTime lastMessageTime = messages.isEmpty() ? session.getStartTime() : messages.get(messages.size() - 1).getTimestamp();
+
+                    return ChatResponse.builder()
+                            .sessionId(session.getSessionId())
+                            .timestamp(lastMessageTime)
+                            .message(lastMessageContent)
+                            .detectedLanguage(session.getDetectedLanguage())
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public ChatResponse getChat(String sessionId, User currentUser) {
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new BadRequestException("Chat session not found"));

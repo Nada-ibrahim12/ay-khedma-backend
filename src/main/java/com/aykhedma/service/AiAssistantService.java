@@ -3,6 +3,7 @@ package com.aykhedma.service;
 import com.aykhedma.dto.request.AiChatRequest;
 import com.aykhedma.dto.response.ChatResponse;
 import com.aykhedma.model.user.User;
+import java.util.List;
 
 public interface AiAssistantService {
 
@@ -11,4 +12,6 @@ public interface AiAssistantService {
     ChatResponse startNewChat(User currentUser);
 
     ChatResponse getChat(String sessionId, User currentUser);
+
+    List<ChatResponse> getUserChats(User currentUser);
 }
