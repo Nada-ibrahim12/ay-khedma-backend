@@ -15,13 +15,13 @@ def face_match(img1, img2):
         result = DeepFace.verify(
             img1_path=img1,
             img2_path=img2,
-            model_name="Facenet512",
-            enforce_detection=False,  
-            detector_backend="opencv"
+            model_name="ArcFace",
+            detector_backend="retinaface",
+            enforce_detection=False
         )
 
         distance = float(result["distance"])
-        threshold = 0.3  # Increased from default ~0.3 to be more lenient
+        threshold = float(result["threshold"])
         is_matched = distance < threshold
 
         return {
