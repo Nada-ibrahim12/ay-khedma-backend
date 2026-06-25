@@ -1232,7 +1232,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 if (availableSlots.isEmpty()) {
                     slotMessage = "للأسف، لا توجد مواعيد متاحة في هذا التاريخ. الرجاء اختيار تاريخ آخر.";
                 } else {
-                    slotMessage = "المكان المطلوب غير متاح. اختر من المواعيد المتاحة التالية:";
+                    slotMessage = "الموعد المطلوب غير متاح. اختر من المواعيد المتاحة التالية:";
                 }
 
                 return responseBuilder
@@ -1266,7 +1266,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 if (availableSlots.isEmpty()) {
                     slotMessage = "للأسف، لا توجد مواعيد متاحة في هذا التاريخ. الرجاء اختيار تاريخ آخر.";
                 } else {
-                    slotMessage = "المكان المطلوب غير متاح. اختر من المواعيد المتاحة التالية:";
+                    slotMessage = "الموعد المطلوب غير متاح. اختر من المواعيد المتاحة التالية:";
                 }
 
                 return responseBuilder
