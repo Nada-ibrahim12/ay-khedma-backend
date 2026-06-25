@@ -33,6 +33,7 @@ public class ProviderResponse {
     private String serviceType;
     private String serviceTypeAr;
     private String serviceCategory;
+    private String serviceCategoryAr;
     private Long serviceTypeId;
     private String worksAt;
     private String workLocation;

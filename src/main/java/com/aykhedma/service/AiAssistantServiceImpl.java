@@ -29,11 +29,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -47,6 +50,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private static final int MAX_SERVICE_CANDIDATES_FOR_AI = 8;
     private static final int DEFAULT_SEARCH_RADIUS_KM = 10;
     private static final int DEFAULT_PROVIDER_LIMIT = 5;
+    private static final int MAX_SERVICES_FOR_INLINE_CATALOG = 80;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^\\p{IsAlphabetic}\\p{IsDigit}]+");
@@ -66,6 +70,18 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private final ChatMessageRepository chatMessageRepository;
     private final ServiceCategoryRepository categoryRepository;
     private final SpeechToTextService speechToTextService;
+    private final TimeSlotRepository timeSlotRepository;
+
+    // ---- Lightweight in-memory caches to cut down on DB hits and repeated
+    // ---- Gemini calls for identical/near-identical lookups. These are simple
+    // ---- TTL caches; swap for Caffeine/Redis if you need multi-instance sharing.
+    private static final Duration CATALOG_CACHE_TTL = Duration.ofMinutes(5);
+    private static final Duration AI_LOOKUP_CACHE_TTL = Duration.ofMinutes(10);
+
+    private volatile CachedValue<List<ServiceType>> serviceTypesCache;
+    private volatile CachedValue<List<ServiceCategory>> categoriesCache;
+    private volatile CachedValue<String> serviceCatalogJsonCache;
+    private final Map<String, CachedValue<Long>> serviceTypeByMeaningCache = new ConcurrentHashMap<>();
 
     @Override
     public List<ChatResponse> getUserChats(User currentUser) {
@@ -80,8 +96,10 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                     List<ChatMessage> messages = chatMessageRepository
                             .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId());
 
-                    String lastMessageContent = messages.isEmpty() ? "" : messages.get(messages.size() - 1).getContent();
-                    LocalDateTime lastMessageTime = messages.isEmpty() ? session.getStartTime() : messages.get(messages.size() - 1).getTimestamp();
+                    String lastMessageContent = messages.isEmpty() ? ""
+                            : messages.get(messages.size() - 1).getContent();
+                    LocalDateTime lastMessageTime = messages.isEmpty() ? session.getStartTime()
+                            : messages.get(messages.size() - 1).getTimestamp();
 
                     return ChatResponse.builder()
                             .sessionId(session.getSessionId())
@@ -155,8 +173,6 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .availableTimeSlots(availableSlots)
                 .build();
     }
-
-    private final TimeSlotRepository timeSlotRepository;
 
     public ChatResponse chat(AiChatRequest request, User currentUser) {
 
@@ -316,14 +332,23 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             return smartFallback(request.getMessage(), history);
         }
 
-        String systemPrompt = buildUnifiedSystemPrompt(currentUser);
+        String serviceCatalogJson = getServiceCatalogJsonOrNull();
+        String conversationContext = buildConversationContext(history);
+
+        String systemPrompt = buildUnifiedSystemPrompt(currentUser, serviceCatalogJson);
+
+        String userMessage = conversationContext + "\n\nUser: " + request.getMessage();
+
         List<GeminiClient.ConversationTurn> turns = toConversationTurns(history);
         turns.add(new GeminiClient.ConversationTurn("user", request.getMessage()));
 
         String modelResponse = geminiClient.generateJson(turns, systemPrompt);
-
         UnifiedAssistantResponse parsed = parseUnifiedResponse(modelResponse);
+
         if (parsed != null && parsed.isValid()) {
+            if (parsed.serviceTypeId != null) {
+                log.info("Gemini resolved serviceTypeId: {}", parsed.serviceTypeId);
+            }
             return parsed;
         }
 
@@ -331,10 +356,19 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         return smartFallback(request.getMessage(), history);
     }
 
-    private String buildUnifiedSystemPrompt(User currentUser) {
+    private String buildUnifiedSystemPrompt(User currentUser, String serviceCatalogJson) {
         String userRole = (currentUser != null && currentUser.getRole() != null)
                 ? currentUser.getRole().name()
                 : "anonymous";
+
+        String lastProviderContext = "";
+        String catalogSection = StringUtils.hasText(serviceCatalogJson)
+                ? "\n## AVAILABLE SERVICE TYPES (choose serviceTypeId from this list by MEANING, not exact word match):\n"
+                        + serviceCatalogJson
+                        + "\n- If the user's request matches one of these by meaning, set \"serviceTypeId\" to its id.\n"
+                        + "- If unsure or no good match, set \"serviceTypeId\": null - it will be resolved separately.\n"
+                : "\n## NOTE: Service catalog is too large to include here. Always set \"serviceTypeId\": null; "
+                        + "it will be resolved in a follow-up step using \"serviceTypeName\".\n";
 
         return """
                 You are Ay Khedma AI Assistant - a comprehensive service marketplace connecting consumers with ALL types of service providers across any profession or industry.
@@ -387,6 +421,9 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                   * If user does NOT provide a date: we will show upcoming availability (next 7 days)
                   * NEVER set needsClarification=true just because requestedDate is missing
                   * NEVER add requestedDate to missingFields
+                  * When user says "معاه", "هو", or any pronoun referring to a provider, USE THE PROVIDER FROM CONTEXT
+                  * Do NOT ask for clarification about provider when it's implied
+                  * Always maintain conversation context
 
                 ## CRITICAL RULES FOR CREATE_BOOKING:
                 - Use CREATE_BOOKING when user wants to MAKE a booking or appointment
@@ -394,112 +431,127 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 - REQUIRED: providerName/providerId, requestedDate, requestedTime, problemDescription
                 - If missing ANY of these, set needsClarification=true and list missingFields
                 - For unauthenticated users, set action=ASK_CLARIFICATION with message to login
+                -If the user says "معاه", "هو", "same provider", "هذا" without naming:
+                → Keep providerId and providerName from the previous turn
+                → Do NOT set needsClarification for provider
 
                 ## CRITICAL RULES FOR SEARCH_PROVIDERS:
                 - Use SEARCH_PROVIDERS when user wants to FIND providers
                 - For urgent needs, set problemDescription="emergency" and searchRadiusKm=5
+                - Always set "serviceTypeName" to your best guess of the service category in Arabic or English
+                - Additionally set "serviceTypeId" using the catalog below when you can confidently match one
 
-                ## OUTPUT FORMAT:
-                Return ONLY valid JSON. No extra text, no explanation, no markdown.
-                                The reply field must be the final user-facing answer, not a raw intent label.
+                ## CRITICAL: PROVIDER CONTEXT IN CONVERSATION
+                - The conversation history is provided before the current user message
+                - ALWAYS check the last assistant message for provider names and IDs
+                - If the last assistant message mentioned a provider, use that as context
+                - The providerId in the previous turn should be preserved
+                """
+                + catalogSection
+                + """
 
-                {
-                  "action": "SEARCH_PROVIDERS | SUGGEST_SOLUTIONS | CHECK_AVAILABILITY | CREATE_BOOKING | ASK_CLARIFICATION | GENERAL",
-                  "intent": "SEARCH_PROVIDERS | SUGGEST_SOLUTIONS | GET_AVAILABILITY | CREATE_BOOKING | CLARIFICATION | GENERAL",
-                  "reply": "natural language response to user (Arabic if user message is Arabic, otherwise English)",
-                  "providerId": number or null,
-                  "providerName": string or null,
-                  "serviceTypeName": string or null,
-                  "requestedDate": "yyyy-MM-dd" or null,
-                  "requestedTime": "HH:mm" or null,
-                  "problemDescription": string or null,
-                  "searchRadiusKm": number or null,
-                  "needsClarification": boolean,
-                  "missingFields": ["field1", "field2"] or null
-                }
+                        ## OUTPUT FORMAT:
+                        Return ONLY valid JSON. No extra text, no explanation, no markdown.
+                                        The reply field must be the final user-facing answer, not a raw intent label.
 
-                ## EXAMPLES:
+                        {
+                          "action": "SEARCH_PROVIDERS | SUGGEST_SOLUTIONS | CHECK_AVAILABILITY | CREATE_BOOKING | ASK_CLARIFICATION | GENERAL",
+                          "intent": "SEARCH_PROVIDERS | SUGGEST_SOLUTIONS | GET_AVAILABILITY | CREATE_BOOKING | CLARIFICATION | GENERAL",
+                          "reply": "natural language response to user (Arabic if user message is Arabic, otherwise English)",
+                          "providerId": number or null,
+                          "providerName": string or null,
+                          "serviceTypeName": string or null,
+                          "serviceTypeId": number or null,
+                          "requestedDate": "yyyy-MM-dd" or null,
+                          "requestedTime": "HH:mm" or null,
+                          "problemDescription": string or null,
+                          "searchRadiusKm": number or null,
+                          "needsClarification": boolean,
+                          "missingFields": ["field1", "field2"] or null
+                        }
 
-                ## EXAMPLES FOR SUGGEST_SOLUTIONS:
+                        ## EXAMPLES:
 
-                ### Example: Electrical Issue
-                User: "اللمبة مش شغالة"
-                → {"action":"SUGGEST_SOLUTIONS","intent":"SUGGEST_SOLUTIONS","reply":"جرب: 1) غير اللمبة، 2) تأكد من الفيشة، 3) راجع القاطع. لو لسة مش شغالة، أقدر أدورلك على كهربائي.","needsClarification":false}
+                        ## EXAMPLES FOR SUGGEST_SOLUTIONS:
 
-                ### Example: Plumbing Issue
-                User: "الحنفية بتقطر"
-                → {"action":"SUGGEST_SOLUTIONS","intent":"SUGGEST_SOLUTIONS","reply":"جرب شد الصامولة أو غير الجلدة. لو القطر مستمر، أقدر أدورلك على سباك.","needsClarification":false}
+                        ### Example: Electrical Issue
+                        User: "اللمبة مش شغالة"
+                        → {"action":"SUGGEST_SOLUTIONS","intent":"SUGGEST_SOLUTIONS","reply":"جرب: 1) غير اللمبة، 2) تأكد من الفيشة، 3) راجع القاطع. لو لسة مش شغالة، أقدر أدورلك على كهربائي.","needsClarification":false}
 
-                ### Example: When user directly asks for provider
-                User: "جيبلي سباك"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، بدورلك على سباكين في منطقتك...","serviceTypeName":"سباك"}
+                        ### Example: Plumbing Issue
+                        User: "الحنفية بتقطر"
+                        → {"action":"SUGGEST_SOLUTIONS","intent":"SUGGEST_SOLUTIONS","reply":"جرب شد الصامولة أو غير الجلدة. لو القطر مستمر، أقدر أدورلك على سباك.","needsClarification":false}
 
-                ### Example: Complex issue that needs professional
-                User: "الدولاب كله متكسر"
-                → {"action":"SUGGEST_SOLUTIONS","intent":"SUGGEST_SOLUTIONS","reply":"دي مشكلة أكبر من إصلاح بسيط. الأفضل تستعين بنجار محترف. عايز أدورلك على نجارين في منطقتك؟"}
+                        ### Example: When user directly asks for provider
+                        User: "جيبلي سباك"
+                        → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، بدورلك على سباكين في منطقتك...","serviceTypeName":"سباك","serviceTypeId":12}
 
-                ### Example 1: CHECK_AVAILABILITY (with date provided)
-                User: "وريني المواعيد عند طارق أحمد يوم الأحد"
-                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"تمام، ببحثلك عن المواعيد المتاحة عند طارق أحمد يوم الأحد","providerName":"طارق أحمد","requestedDate":"2026-05-07","needsClarification":false}
+                        ### Example: Complex issue that needs professional
+                        User: "الدولاب كله متكسر"
+                        → {"action":"SUGGEST_SOLUTIONS","intent":"SUGGEST_SOLUTIONS","reply":"دي مشكلة أكبر من إصلاح بسيط. الأفضل تستعين بنجار محترف. عايز أدورلك على نجارين في منطقتك؟"}
 
-                ### Example 2: CHECK_AVAILABILITY (without date - just show upcoming)
-                User: "وريني المواعيد المتاحة عند طارق أحمد"
-                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"تمام، ببحثلك عن أقرب المواعيد المتاحة عند طارق أحمد","providerName":"طارق أحمد","requestedDate":null,"needsClarification":false}
+                        ### Example 1: CHECK_AVAILABILITY (with date provided)
+                        User: "وريني المواعيد عند طارق أحمد يوم الأحد"
+                        → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"تمام، ببحثلك عن المواعيد المتاحة عند طارق أحمد يوم الأحد","providerName":"طارق أحمد","requestedDate":"2026-05-07","needsClarification":false}
 
-                ### Example 3: CHECK_AVAILABILITY (Arabic slang)
-                User: "شوفيلي جدول دكتور محمد"
-                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"ببحثلك عن جدول مواعيد دكتور محمد للأيام القادمة","providerName":"دكتور محمد","requestedDate":null,"needsClarification":false}
+                        ### Example 2: CHECK_AVAILABILITY (without date - just show upcoming)
+                        User: "وريني المواعيد المتاحة عند طارق أحمد"
+                        → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"تمام، ببحثلك عن أقرب المواعيد المتاحة عند طارق أحمد","providerName":"طارق أحمد","requestedDate":null,"needsClarification":false}
 
-                ### Example 4: CHECK_AVAILABILITY (plural)
-                User: "عند دكتور أسماء مواعيد امتى"
-                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"ببحثلك عن المواعيد المتاحة عند دكتورة أسماء","providerName":"دكتور أسماء","requestedDate":null,"needsClarification":false}
+                        ### Example 3: CHECK_AVAILABILITY (Arabic slang)
+                        User: "شوفيلي جدول دكتور محمد"
+                        → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"ببحثلك عن جدول مواعيد دكتور محمد للأيام القادمة","providerName":"دكتور محمد","requestedDate":null,"needsClarification":false}
 
-                ### Example 5: CHECK_AVAILABILITY (with provider ID)
-                User: "وريني المواعيد عند provider 123"
-                → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"ببحثلك عن المواعيد المتاحة للمزود رقم 123","providerId":123,"requestedDate":null,"needsClarification":false}
+                        ### Example 4: CHECK_AVAILABILITY (plural)
+                        User: "عند دكتور أسماء مواعيد امتى"
+                        → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"ببحثلك عن المواعيد المتاحة عند دكتورة أسماء","providerName":"دكتور أسماء","requestedDate":null,"needsClarification":false}
 
-                ### Example 6: CREATE_BOOKING (all info provided)
-                User: "عايز احجز مع دكتور محمد يوم الأحد الساعة 4، عندي صداع"
-                → {"action":"CREATE_BOOKING","intent":"CREATE_BOOKING","reply":"تمام، هحجزلك مع دكتور محمد يوم الأحد الساعة 4 لعلاج الصداع","providerName":"دكتور محمد","requestedDate":"2026-05-07","requestedTime":"16:00","problemDescription":"صداع"}
+                        ### Example 5: CHECK_AVAILABILITY (with provider ID)
+                        User: "وريني المواعيد عند provider 123"
+                        → {"action":"CHECK_AVAILABILITY","intent":"GET_AVAILABILITY","reply":"ببحثلك عن المواعيد المتاحة للمزود رقم 123","providerId":123,"requestedDate":null,"needsClarification":false}
 
-                ### Example 7: CREATE_BOOKING (missing info - needs clarification)
-                User: "عايز احجز مع دكتور محمد"
-                → {"action":"CREATE_BOOKING","intent":"CREATE_BOOKING","reply":"تمام، هحجزلك مع دكتور محمد. محتاج منك التاريخ والوقت ووصف المشكلة","providerName":"دكتور محمد","needsClarification":true,"missingFields":["requestedDate","requestedTime","problemDescription"]}
+                        ### Example 6: CREATE_BOOKING (all info provided)
+                        User: "عايز احجز مع دكتور محمد يوم الأحد الساعة 4، عندي صداع"
+                        → {"action":"CREATE_BOOKING","intent":"CREATE_BOOKING","reply":"تمام، هحجزلك مع دكتور محمد يوم الأحد الساعة 4 لعلاج الصداع","providerName":"دكتور محمد","requestedDate":"2026-05-07","requestedTime":"16:00","problemDescription":"صداع"}
 
-                ### Example 8: SEARCH_PROVIDERS (medical)
-                User: "أنا تعبان وعندي صداع"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"ممكن توصفلي الأعراض بالتفصيل عشان أقترح دكتور مناسب؟","serviceTypeName":"طبيب","needsClarification":true,"missingFields":["symptoms"]}
+                        ### Example 7: CREATE_BOOKING (missing info - needs clarification)
+                        User: "عايز احجز مع دكتور محمد"
+                        → {"action":"CREATE_BOOKING","intent":"CREATE_BOOKING","reply":"تمام، هحجزلك مع دكتور محمد. محتاج منك التاريخ والوقت ووصف المشكلة","providerName":"دكتور محمد","needsClarification":true,"missingFields":["requestedDate","requestedTime","problemDescription"]}
 
-                ### Example 9: SEARCH_PROVIDERS (home service)
-                User: "الحوض عندي مسرب"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، سأبحث لك عن سباكين متاحين في منطقتك.","serviceTypeName":"سباك","searchRadiusKm":10}
+                        ### Example 8: SEARCH_PROVIDERS (medical)
+                        User: "أنا تعبان وعندي صداع"
+                        → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"ممكن توصفلي الأعراض بالتفصيل عشان أقترح دكتور مناسب؟","serviceTypeName":"طبيب","needsClarification":true,"missingFields":["symptoms"]}
 
-                ### Example 10: SEARCH_PROVIDERS (engineering)
-                User: "عايز مهندس معماري يصمم فيلا"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، بدورلك على مهندسين معماريين متخصصين في تصميم الفلل. ممكن تقولي في أي منطقة؟","serviceTypeName":"مهندس معماري","searchRadiusKm":10}
+                        ### Example 9: SEARCH_PROVIDERS (home service)
+                        User: "الحوض عندي مسرب"
+                        → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، سأبحث لك عن سباكين متاحين في منطقتك.","serviceTypeName":"سباك","searchRadiusKm":10}
 
-                ### Example 11: SEARCH_PROVIDERS (legal)
-                User: "عايز محامي للقضية بتاعتي"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"فهمت، محتاج محامي. ممكن توصف نوع القضية عشان ألاقي لك المتخصص المناسب؟","serviceTypeName":"محامي","needsClarification":true,"missingFields":["caseType"]}
+                        ### Example 10: SEARCH_PROVIDERS (engineering)
+                        User: "عايز مهندس معماري يصمم فيلا"
+                        → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، بدورلك على مهندسين معماريين متخصصين في تصميم الفلل. ممكن تقولي في أي منطقة؟","serviceTypeName":"مهندس معماري","searchRadiusKm":10}
 
-                ### Example 12: SEARCH_PROVIDERS (tech)
-                User: "عايز مبرمج يعمل لي تطبيق"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، هدورلك على مبرمجين متخصصين في تطوير التطبيقات. نوع التطبيق إيه؟","serviceTypeName":"مبرمج","needsClarification":true,"missingFields":["appType"]}
+                        ### Example 11: SEARCH_PROVIDERS (legal)
+                        User: "عايز محامي للقضية بتاعتي"
+                        → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"فهمت، محتاج محامي. ممكن توصف نوع القضية عشان ألاقي لك المتخصص المناسب؟","serviceTypeName":"محامي","needsClarification":true,"missingFields":["caseType"]}
 
-                ### Example 13: SEARCH_PROVIDERS (urgent/emergency)
-                User: "طوارئ كهربائي البيت وقعت الكهرباء"
-                → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"فهمت، حالة طارئة. هدورلك على كهربائي قريب منك جداً.","serviceTypeName":"كهربائي","problemDescription":"emergency","searchRadiusKm":5}
+                        ### Example 12: SEARCH_PROVIDERS (tech)
+                        User: "عايز مبرمج يعمل لي تطبيق"
+                        → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"تمام، هدورلك على مبرمجين متخصصين في تطوير التطبيقات. نوع التطبيق إيه؟","serviceTypeName":"مبرمج","needsClarification":true,"missingFields":["appType"]}
 
-                ### Example 14: GENERAL (greeting)
-                User: "السلام عليكم"
-                → {"action":"GENERAL","intent":"GENERAL","reply":"وعليكم السلام ورحمة الله وبركاته! كيف أقدر أساعدك اليوم؟ ممكن تطلب أي خدمة - دكتور، مهندس، محامي، سباك، كهربائي، أو تحجز مع أي مزود."}
+                        ### Example 13: SEARCH_PROVIDERS (urgent/emergency)
+                        User: "طوارئ كهربائي البيت وقعت الكهرباء"
+                        → {"action":"SEARCH_PROVIDERS","intent":"SEARCH_PROVIDERS","reply":"فهمت، حالة طارئة. هدورلك على كهربائي قريب منك جداً.","serviceTypeName":"كهربائي","problemDescription":"emergency","searchRadiusKm":5}
 
-                ### Example 15: GENERAL (question about app)
-                User: "إيه الخدمات اللي عندكم؟"
-                → {"action":"GENERAL","intent":"GENERAL","reply":"أي خدمة - أي حرفة - أي مهنة. عندنا أطباء، مهندسين، محامين، سباكين، كهربائيين، مبرمجين، معلمين، ومئات المهن التانية. ممكن تطلب أي خدمة واحنا ندورلك على أفضل مقدمي الخدمة في منطقتك."}
+                        ### Example 14: GENERAL (greeting)
+                        User: "السلام عليكم"
+                        → {"action":"GENERAL","intent":"GENERAL","reply":"وعليكم السلام ورحمة الله وبركاته! كيف أقدر أساعدك اليوم؟ ممكن تطلب أي خدمة - دكتور، مهندس، محامي، سباك، كهربائي، أو تحجز مع أي مزود."}
 
-                ## DATE HANDLING:
-                Today's date is: """
+                        ### Example 15: GENERAL (question about app)
+                        User: "إيه الخدمات اللي عندكم؟"
+                        → {"action":"GENERAL","intent":"GENERAL","reply":"أي خدمة - أي حرفة - أي مهنة. عندنا أطباء، مهندسين، محامين، سباكين، كهربائيين، مبرمجين، معلمين، ومئات المهن التانية. ممكن تطلب أي خدمة واحنا ندورلك على أفضل مقدمي الخدمة في منطقتك."}
+
+                        ## DATE HANDLING:
+                        Today's date is: """
                 + LocalDate.now() + """
                         - "بكرا" / "tomorrow" → """ + LocalDate.now().plusDays(1)
                 + """
@@ -531,6 +583,24 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                         - Always use double quotes for JSON properties
                         - Keep replies concise, friendly, and helpful in Arabic or English matching the user's language
                         """;
+    }
+
+    private String buildConversationContext(List<ChatMessage> history) {
+        if (history == null || history.isEmpty()) {
+            return "No previous conversation.";
+        }
+
+        StringBuilder context = new StringBuilder();
+        context.append("## PREVIOUS CONVERSATION CONTEXT:\n");
+
+        int start = Math.max(0, history.size() - 5);
+        for (int i = start; i < history.size(); i++) {
+            ChatMessage msg = history.get(i);
+            String role = msg.getSenderRole() == MessageRole.USER ? "User" : "Assistant";
+            context.append(role).append(": ").append(msg.getContent()).append("\n");
+        }
+
+        return context.toString();
     }
 
     private UnifiedAssistantResponse parseUnifiedResponse(String modelResponse) {
@@ -569,6 +639,9 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                     : null;
             response.providerName = node.path("providerName").asText(null);
             response.serviceTypeName = node.path("serviceTypeName").asText(null);
+            response.serviceTypeId = node.hasNonNull("serviceTypeId") && node.path("serviceTypeId").canConvertToLong()
+                    ? node.path("serviceTypeId").asLong()
+                    : null;
             response.requestedDate = parseDateSafe(node.path("requestedDate").asText(null));
             response.requestedTime = parseTimeSafe(node.path("requestedTime").asText(null));
             response.problemDescription = node.path("problemDescription").asText(null);
@@ -663,7 +736,24 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
         String userMessage = request.getMessage();
 
-        ServiceType selectedService = resolveServiceTypeByMeaning(userMessage);
+
+        ServiceType selectedService = null;
+        if (unified.serviceTypeId != null) {
+            selectedService = getCachedServiceTypes().stream()
+                    .filter(st -> st.getId().equals(unified.serviceTypeId))
+                    .findFirst()
+                    .orElse(null);
+            log.info("Using serviceTypeId from Gemini: {} -> {}", unified.serviceTypeId,
+                    selectedService != null ? selectedService.getName() : "not found");        
+        }
+
+        if (selectedService == null && StringUtils.hasText(unified.serviceTypeName)) {
+            selectedService = resolveServiceTypeByName(unified.serviceTypeName);
+        }
+
+        if (selectedService == null) {
+            selectedService = resolveServiceTypeByMeaning(userMessage);
+        }
 
         if (selectedService == null) {
             return responseBuilder
@@ -691,6 +781,18 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .build();
     }
 
+    private ServiceType resolveServiceTypeByName(String name) {
+        if (!StringUtils.hasText(name))
+            return null;
+        return getCachedServiceTypes().stream()
+                .filter(st -> name.equalsIgnoreCase(st.getName()) ||
+                        name.equalsIgnoreCase(st.getNameAr()) ||
+                        st.getName().toLowerCase().contains(name.toLowerCase()) ||
+                        st.getNameAr().toLowerCase().contains(name.toLowerCase()))
+                .findFirst()
+                .orElse(null);
+    }
+
     private ChatResponse handleSuggestionAction(AiChatRequest request,
             UnifiedAssistantResponse unified, ChatResponse.ChatResponseBuilder responseBuilder) {
 
@@ -708,18 +810,36 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
     private ServiceType resolveServiceTypeByMeaning(String userMessage) {
 
-        List<ServiceType> allServices = serviceTypeRepository.findAll();
+        List<ServiceType> allServices = getCachedServiceTypes();
 
         if (allServices.isEmpty()) {
             log.warn("No service types in database");
             return null;
         }
 
-        if (allServices.size() <= 50 && geminiClient.isEnabled()) {
-            return resolveServiceTypeWithAiByMeaning(userMessage, allServices);
-        } else {
-            return resolveServiceTypeWithCategoriesThenAi(userMessage);
+        String cacheKey = normalize(userMessage);
+        CachedValue<Long> cached = StringUtils.hasText(cacheKey) ? serviceTypeByMeaningCache.get(cacheKey) : null;
+        if (cached != null && !cached.isExpired()) {
+            Long cachedId = cached.value;
+            if (cachedId == null) {
+                return null;
+            }
+            return allServices.stream().filter(st -> st.getId().equals(cachedId)).findFirst().orElse(null);
         }
+
+        ServiceType resolved;
+        if (allServices.size() <= 50 && geminiClient.isEnabled()) {
+            resolved = resolveServiceTypeWithAiByMeaning(userMessage, allServices);
+        } else {
+            resolved = resolveServiceTypeWithCategoriesThenAi(userMessage);
+        }
+
+        if (StringUtils.hasText(cacheKey)) {
+            serviceTypeByMeaningCache.put(cacheKey,
+                    new CachedValue<>(resolved != null ? resolved.getId() : null, AI_LOOKUP_CACHE_TTL));
+        }
+
+        return resolved;
     }
 
     private ServiceType resolveServiceTypeWithAiByMeaning(String userMessage, List<ServiceType> allServices) {
@@ -768,7 +888,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
     private ServiceType resolveServiceTypeWithCategoriesThenAi(String userMessage) {
 
-        List<ServiceCategory> allCategories = categoryRepository.findAll();
+        List<ServiceCategory> allCategories = getCachedCategories();
         ServiceCategory detectedCategory = detectCategoryWithAi(userMessage, allCategories);
 
         if (detectedCategory == null) {
@@ -825,6 +945,49 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         }
 
         return null;
+    }
+
+    // ---- Catalog caching helpers ----
+
+    private List<ServiceType> getCachedServiceTypes() {
+        CachedValue<List<ServiceType>> cached = serviceTypesCache;
+        if (cached != null && !cached.isExpired()) {
+            return cached.value;
+        }
+        List<ServiceType> fresh = serviceTypeRepository.findAll();
+        serviceTypesCache = new CachedValue<>(fresh, CATALOG_CACHE_TTL);
+        return fresh;
+    }
+
+    private List<ServiceCategory> getCachedCategories() {
+        CachedValue<List<ServiceCategory>> cached = categoriesCache;
+        if (cached != null && !cached.isExpired()) {
+            return cached.value;
+        }
+        List<ServiceCategory> fresh = categoryRepository.findAll();
+        categoriesCache = new CachedValue<>(fresh, CATALOG_CACHE_TTL);
+        return fresh;
+    }
+
+    private String getServiceCatalogJsonOrNull() {
+        CachedValue<String> cached = serviceCatalogJsonCache;
+        if (cached != null && !cached.isExpired()) {
+            return cached.value;
+        }
+
+        List<ServiceType> allServices = getCachedServiceTypes();
+        String json;
+        if (allServices.isEmpty() || allServices.size() > MAX_SERVICES_FOR_INLINE_CATALOG) {
+            json = null;
+        } else {
+            json = "[" + allServices.stream()
+                    .map(st -> String.format("{\"id\":%d,\"name\":\"%s\",\"nameAr\":\"%s\"}",
+                            st.getId(), escapeJson(st.getName()), escapeJson(st.getNameAr())))
+                    .collect(Collectors.joining(",")) + "]";
+        }
+
+        serviceCatalogJsonCache = new CachedValue<>(json, CATALOG_CACHE_TTL);
+        return json;
     }
 
     private List<ProviderSummaryResponse> findAndSortProviders(Long serviceTypeId,
@@ -959,8 +1122,6 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
         log.info("Searching for providers - serviceType: {}, queryText: {}, locationDTO: {}",
                 serviceType != null ? serviceType.getName() : "null", queryText, locationDTO);
-        log.info("Searching for providers - serviceType: {}, queryText: {}, locationDTO: {}",
-                serviceType != null ? serviceType.getName() : "null", queryText, locationDTO);
 
         List<Provider> providers;
 
@@ -1008,16 +1169,32 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         }
 
         Long providerId = unified.providerId;
-        if (providerId == null && StringUtils.hasText(unified.providerName)) {
-            providerId = resolveProviderIdByName(unified.providerName);
+        String providerName = unified.providerName;
+
+        if (providerId == null) {
+            ChatSession session = chatSessionRepository.findById(request.getSessionId()).orElse(null);
+            if (session != null && session.getLastSuggestedProviderId() != null) {
+                providerId = session.getLastSuggestedProviderId();
+                providerName = session.getLastSuggestedProviderName();
+                log.info("Using provider from session: {} (ID: {})", providerName, providerId);
+            }
         }
 
-        if (providerId == null || unified.requestedDate == null ||
-                unified.requestedTime == null || !StringUtils.hasText(unified.problemDescription)) {
+        if (providerId == null && StringUtils.hasText(unified.providerName)) {
+            providerId = resolveProviderIdByName(unified.providerName);
+            log.info("Resolved provider by name from unified: {} -> ID {}", providerName, providerId);
+        }
+
+        if (providerId == null) {
+            return responseBuilder
+                    .responseType(ChatResponseType.CLARIFICATION)
+                    .message("ممكن توضح أي مزود تقصد؟ / Could you specify which provider you mean?")
+                    .build();
+        }
+
+        if (unified.requestedDate == null || unified.requestedTime == null || !StringUtils.hasText(unified.problemDescription)) {
 
             List<String> missing = new ArrayList<>();
-            if (providerId == null)
-                missing.add("provider");
             if (unified.requestedDate == null)
                 missing.add("date");
             if (unified.requestedTime == null)
@@ -1342,14 +1519,19 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     private void applySessionProviderContext(UnifiedAssistantResponse unified, ChatSession session) {
-        if (unified == null || session == null || unified.action != Action.CHECK_AVAILABILITY) {
+        if (unified == null || session == null) {
             return;
         }
 
-        if (unified.providerId == null && !StringUtils.hasText(unified.providerName)
+        if ((unified.action == Action.CHECK_AVAILABILITY || unified.action == Action.CREATE_BOOKING)
+                && unified.providerId == null
+                && !StringUtils.hasText(unified.providerName)
                 && session.getLastSuggestedProviderId() != null) {
+
             unified.providerId = session.getLastSuggestedProviderId();
             unified.providerName = session.getLastSuggestedProviderName();
+            log.info("Applied session provider context for {}: {} (ID: {})",
+                    unified.action, unified.providerName, unified.providerId);
         }
     }
 
@@ -1486,6 +1668,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         private Long providerId;
         private String providerName;
         private String serviceTypeName;
+        private Long serviceTypeId;
         private LocalDate requestedDate;
         private LocalTime requestedTime;
         private String problemDescription;
@@ -1504,5 +1687,19 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
     private enum Action {
         GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, CHECK_AVAILABILITY, CREATE_BOOKING, ASK_CLARIFICATION
+    }
+
+    private static class CachedValue<T> {
+        final T value;
+        final Instant expiresAt;
+
+        CachedValue(T value, Duration ttl) {
+            this.value = value;
+            this.expiresAt = Instant.now().plus(ttl);
+        }
+
+        boolean isExpired() {
+            return Instant.now().isAfter(expiresAt);
+        }
     }
 }

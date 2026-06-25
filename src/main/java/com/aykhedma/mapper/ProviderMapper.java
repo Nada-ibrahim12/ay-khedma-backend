@@ -30,6 +30,7 @@ public interface ProviderMapper {
     @Mapping(source = "cancelledBookings", target = "cancelledBookings")
     @Mapping(source = "serviceType.name", target = "serviceType")
     @Mapping(source = "serviceType.nameAr", target = "serviceTypeAr")
+    @Mapping(source = "serviceType.category.nameAr", target = "serviceCategoryAr")
     @Mapping(source = "serviceType.category.name", target = "serviceCategory")
     @Mapping(source = "serviceType.id", target = "serviceTypeId")
     @Mapping(source = "worksAt", target = "worksAt")
