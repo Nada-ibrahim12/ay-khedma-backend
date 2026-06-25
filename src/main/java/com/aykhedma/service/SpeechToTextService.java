@@ -56,7 +56,7 @@ public class SpeechToTextService {
         for (String apiKey : apiKeys) {
             if (StringUtils.hasText(apiKey)) {
                 String trimmed = apiKey.trim();
-                if (trimmed.startsWith("AIzaSy") && trimmed.length() > 35) {
+                if (trimmed.length() > 35) {
                     keys.add(trimmed);
                 } else {
                     log.warn("Skipping invalid API key format for transcription: {}",

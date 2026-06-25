@@ -68,7 +68,7 @@ public class GeminiClient {
             if (StringUtils.hasText(apiKey)) {
                 String trimmed = apiKey.trim();
                 // Only include valid Gemini keys
-                if (trimmed.startsWith("AIzaSy") && trimmed.length() > 35) {
+                if (trimmed.length() > 35) {
                     keys.add(trimmed);
                 } else {
                     log.warn("Skipping invalid API key format: {}",
