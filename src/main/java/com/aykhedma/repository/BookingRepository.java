@@ -94,6 +94,19 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
                                @Param("currentDate") LocalDate currentDate,
                                @Param("currentTime") LocalTime currentTime);
 
+    @Modifying(clearAutomatically = true)
+    @Query(value = "UPDATE Booking b " +
+            "SET b.status = 'EXPIRED', b.expiredAt = :currentTimestamp " +
+            "WHERE b.status = 'ACCEPTED' " +
+            "AND " +
+            "(" +
+                "b.requestedDate < :currentDate " +
+                "OR (b.requestedDate = :currentDate AND b.requestedStartTime < :currentTime)" +
+            ")")
+    void expireAcceptedBookings(@Param("currentTimestamp") LocalDateTime currentTimestamp,
+                               @Param("currentDate") LocalDate currentDate,
+                               @Param("currentTime") LocalTime currentTime);
+
     @Query(value = "SELECT " +
             "SUM(CASE WHEN status IN ('COMPLETED', 'ACCEPTED') THEN 1 ELSE 0 END) AS completed_and_accepted, " +
             "SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled " +

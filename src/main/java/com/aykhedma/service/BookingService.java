@@ -14,6 +14,8 @@ public interface BookingService
 
     BookingResponse deleteBooking (Long consumerId, Long bookingId);
 
+    BookingResponse completeBooking (Long consumerId, Long bookingId);
+
     AcceptBookingResponse acceptBooking (Long providerId, AcceptBookingRequest acceptBookingRequest);
 
     BookingResponse declineBooking (Long providerId, Long bookingId);

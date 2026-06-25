@@ -145,8 +145,43 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getStatus() != BookingStatus.PENDING)
             throw new BadRequestException("Booking cannot be deleted, it has already been " + booking.getStatus());
 
+        providerService.restoreAvailabilityForCancelledBooking(booking);
+
         booking.setStatus(BookingStatus.DELETED);
         bookingRepository.save(booking);
+
+        booking.getProvider().setTotalRequests
+                ((booking.getProvider().getTotalRequests() != null ? booking.getProvider().getTotalRequests() : 1) - 1);
+        updateProviderRates(booking.getProvider());
+        providerRepository.save(booking.getProvider());
+
+        return bookingMapper.toBookingResponse(booking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse completeBooking (Long consumerId, Long bookingId)
+    {
+        Consumer consumer = consumerRepository.findById(consumerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+
+        if (!consumerId.equals(booking.getConsumer().getId()))
+            throw new ForbiddenException("Booking does not belong to this consumer");
+
+        if (booking.getStatus() != BookingStatus.ACCEPTED)
+            throw new BadRequestException("Booking cannot be completed, it has already been " + booking.getStatus());
+
+        booking.setStatus(BookingStatus.COMPLETED);
+        booking.setCompletedAt(LocalDateTime.now());
+        bookingRepository.save(booking);
+
+        booking.getProvider().setCompletedJobs
+                ((booking.getProvider().getCompletedJobs() != null ? booking.getProvider().getCompletedJobs() : 0) + 1);
+        updateProviderRates(booking.getProvider());
+        providerRepository.save(booking.getProvider());
 
         return bookingMapper.toBookingResponse(booking);
     }
@@ -174,6 +209,7 @@ public class BookingServiceImpl implements BookingService {
         LocalDate date = booking.getRequestedDate();
         LocalTime startTime = booking.getRequestedStartTime();
         Long estimatedDuration = acceptBookingRequest.getEstimatedDuration();
+        Integer bookingBuffer = provider.getBookingBufferMinutes();
         LocalTime endTime = booking.getRequestedStartTime().plusMinutes(estimatedDuration);
 
         TimeSlot existingReservedSlot = null;
@@ -202,10 +238,10 @@ public class BookingServiceImpl implements BookingService {
         else
             scheduleId = schedule.getId();
 
-        if (!acceptBookingRequest.isOverrideWorkingHours()) {
-            WorkingDay workingDay = workingDayRepository.findByScheduleIdAndDate(scheduleId, date)
+        WorkingDay workingDay = workingDayRepository.findByScheduleIdAndDate(scheduleId, date)
                     .orElseThrow(() -> new ResourceNotFoundException("Working day by the booking date is not found"));
 
+        if (!acceptBookingRequest.isOverrideWorkingHours()) {
             if (endTime.isAfter(workingDay.getEndTime())) {
                 return AcceptBookingResponse.builder()
                         .status("WARNING")
@@ -213,16 +249,13 @@ public class BookingServiceImpl implements BookingService {
                         .build();
             }
         } else {
-            WorkingDay workingDay = workingDayRepository.findByScheduleIdAndDate(scheduleId, date)
-                    .orElseThrow(() -> new ResourceNotFoundException("Working day by the booking date is not found"));
-
             if (endTime.isAfter(workingDay.getEndTime())) {
                 extendWorkingDayAndAvailability(scheduleId, date, startTime, workingDay, endTime);
             }
         }
 
         List<Booking> conflictingBookings = bookingRepository.findConflictingBookings(providerId, bookingId, date,
-                startTime, endTime);
+                startTime, endTime.plusMinutes(bookingBuffer));
         if (!conflictingBookings.isEmpty()) {
             return AcceptBookingResponse.builder()
                     .status("CONFLICT")

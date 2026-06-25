@@ -77,6 +77,27 @@ public class BookingController
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
+    @PreAuthorize("hasRole('CONSUMER')")
+    @PutMapping("/complete-booking/{bookingId}")
+    @Operation(summary = "Complete a previously accepted booking")
+    @ApiResponses(value =
+            {
+                   @ApiResponse(responseCode = "200", description = "Booking completed successfully",
+                           content = @Content(schema = @Schema(implementation = BookingResponse.class))),
+                   @ApiResponse(responseCode = "400", description = "Invalid booking to be completed"),
+                   @ApiResponse(responseCode = "403", description = "Consumer does not own this booking"),
+                   @ApiResponse(responseCode = "404", description = "Consumer or booking not found")
+            })
+    public ResponseEntity<BookingResponse> completeBooking(
+            @Parameter(description = "ID of the consumer", required = true)
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+            @Parameter(description = "ID of the booking", required = true)
+            @PathVariable Long bookingId)
+    {
+        BookingResponse response = bookingService.completeBooking(consumerId, bookingId);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
     // =================================== Provider Side ===================================
 
     @PreAuthorize("hasRole('PROVIDER')")

@@ -18,8 +18,9 @@ public class BookingExpiryScheduler
 
     @Scheduled(fixedRate = 60000)
     @Transactional
-    public void expirePendingBookings ()
+    public void expireBookings ()
     {
         bookingRepository.expirePendingBookings(LocalDateTime.now(), LocalDate.now(), LocalTime.now());
+        bookingRepository.expireAcceptedBookings(LocalDateTime.now(), LocalDate.now().minusDays(1), LocalTime.now());
     }
 }
