@@ -187,4 +187,4 @@ async def face_match_endpoint(
     img1 = read_image(id_bytes)
     img2 = read_image(selfie_bytes)
 
-    return face_match(img1, img2)
+    return face_match(img1, img2, object_model=object_model)
