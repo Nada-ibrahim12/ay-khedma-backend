@@ -76,6 +76,10 @@ public class SecurityConfig {
                                                                 RegexRequestMatcher.regexMatcher(HttpMethod.GET,
                                                                                 "^/api/services/types/[0-9]+$"))
                                                 .permitAll()
+                                                .requestMatchers("/mcp/**").permitAll()
+                                                .requestMatchers("/mcp/health").permitAll()
+                                                .requestMatchers("/mcp/tools").permitAll()
+                                                .requestMatchers("/mcp").permitAll()
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                                 .requestMatchers("/provider/**").hasRole("PROVIDER")
                                                 .requestMatchers("/consumer/**").hasRole("CONSUMER")

@@ -7,6 +7,7 @@ import com.aykhedma.dto.response.*;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ForbiddenException;
 import com.aykhedma.exception.ResourceNotFoundException;
+import com.aykhedma.model.booking.BookingStatus;
 import com.aykhedma.model.chat.*;
 import com.aykhedma.model.location.Location;
 import com.aykhedma.model.service.ServiceCategory;
@@ -18,12 +19,14 @@ import com.aykhedma.model.user.UserType;
 import com.aykhedma.model.user.VerificationStatus;
 import com.aykhedma.mapper.LocationMapper;
 import com.aykhedma.mapper.ProviderMapper;
+import com.aykhedma.mcp.server.McpServer;
 import com.aykhedma.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -71,6 +74,15 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private final ServiceCategoryRepository categoryRepository;
     private final SpeechToTextService speechToTextService;
     private final TimeSlotRepository timeSlotRepository;
+
+    // MCP Configuration
+    @Value("${mcp.use-mcp:false}")
+    private boolean useMcp;
+
+    @Value("${mcp.enabled:true}")
+    private boolean mcpEnabled;
+
+    private final Optional<McpServer> mcpServer;
 
     // ---- Lightweight in-memory caches to cut down on DB hits and repeated
     // ---- Gemini calls for identical/near-identical lookups. These are simple
@@ -175,7 +187,720 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     public ChatResponse chat(AiChatRequest request, User currentUser) {
+        // If MCP is enabled and we have the server, use MCP
+        if (mcpEnabled && useMcp && mcpServer.isPresent()) {
+            log.info("Using MCP implementation for chat");
+            return chatWithMcp(request, currentUser);
+        }
 
+        log.info("Using existing implementation for chat");
+        return chatWithExisting(request, currentUser);
+    }
+
+    /**
+     * MCP-based chat implementation with all tools
+     */
+    private ChatResponse chatWithMcp(AiChatRequest request, User currentUser) {
+        log.info("Processing chat with MCP - message: {}", request.getMessage());
+
+        try {
+            // Get the intent using Gemini
+            List<ChatMessage> recentHistory = getRecentHistory(
+                    chatMessageRepository.findByChatSessionSessionIdOrderByTimestampAsc(request.getSessionId()),
+                    MAX_HISTORY_TURNS);
+
+            UnifiedAssistantResponse unifiedResponse = getUnifiedResponse(request, currentUser, recentHistory);
+
+            if (unifiedResponse == null) {
+                return chatWithExisting(request, currentUser);
+            }
+
+            log.info("MCP Action: {}, Intent: {}", unifiedResponse.action, unifiedResponse.intent);
+
+            return switch (unifiedResponse.action) {
+                case SEARCH_PROVIDERS -> handleSearchProvidersWithMcp(request, currentUser, unifiedResponse);
+                case CHECK_AVAILABILITY -> handleCheckAvailabilityWithMcp(request, currentUser, unifiedResponse);
+                case CREATE_BOOKING -> handleCreateBookingWithMcp(request, currentUser, unifiedResponse);
+                case GET_PROVIDER_DETAILS -> handleGetProviderDetailsWithMcp(request, currentUser, unifiedResponse);
+                case SUGGEST_SOLUTIONS -> handleSuggestionAction(request, unifiedResponse,
+                        ChatResponse.builder().sessionId(request.getSessionId()).timestamp(LocalDateTime.now()));
+                default -> chatWithExisting(request, currentUser);
+            };
+
+        } catch (Exception e) {
+            log.error("MCP chat failed: {}", e.getMessage(), e);
+            return chatWithExisting(request, currentUser);
+        }
+    }
+
+    private ChatResponse handleSearchProvidersWithMcp(AiChatRequest request, User currentUser,
+            UnifiedAssistantResponse unifiedResponse) {
+
+        log.info("Using MCP for SEARCH_PROVIDERS");
+        log.info("Unified response: serviceTypeId={}, serviceTypeName={}",
+                unifiedResponse.serviceTypeId, unifiedResponse.serviceTypeName);
+
+        String serviceTypeName = null;
+        Long serviceTypeId = null;
+
+        // Get service type from DB using ID
+        if (unifiedResponse.serviceTypeId != null) {
+            ServiceType st = getCachedServiceTypes().stream()
+                    .filter(s -> s.getId().equals(unifiedResponse.serviceTypeId))
+                    .findFirst()
+                    .orElse(null);
+            if (st != null) {
+                serviceTypeName = StringUtils.hasText(st.getNameAr()) ? st.getNameAr() : st.getName();
+                serviceTypeId = st.getId();
+                log.info("Using serviceType from DB: {} (ID: {})", serviceTypeName, st.getId());
+            }
+        }
+
+        // Fallback to unified serviceTypeName
+        if (serviceTypeName == null && StringUtils.hasText(unifiedResponse.serviceTypeName)) {
+            serviceTypeName = unifiedResponse.serviceTypeName;
+            log.info("Using serviceTypeName from unified response: {}", serviceTypeName);
+        }
+
+        // Last resort: use user message
+        if (serviceTypeName == null) {
+            serviceTypeName = request.getMessage();
+            log.info("Using user message as service type: {}", serviceTypeName);
+        }
+
+        // Get location
+        LocationDTO location = resolveSearchLocation(currentUser, request);
+        double lat = location != null && location.getLatitude() != null ? location.getLatitude() : 30.0444;
+        double lng = location != null && location.getLongitude() != null ? location.getLongitude() : 31.2357;
+
+        // Prepare MCP request for search_providers
+        Map<String, Object> mcpRequest = buildMcpRequest("search_providers", Map.of(
+                "serviceType", serviceTypeName,
+                "latitude", lat,
+                "longitude", lng,
+                "radiusKm", unifiedResponse.searchRadiusKm != null ? unifiedResponse.searchRadiusKm : 10,
+                "isEmergency", false));
+
+        log.info("MCP Request: {}", mcpRequest);
+
+        Map<String, Object> mcpResponse = mcpServer.get().handleRequest(mcpRequest);
+        log.info("MCP Response: {}", mcpResponse);
+
+        List<ProviderSummaryResponse> providers = parseMcpResponse(mcpResponse);
+
+        String replyMessage;
+        if (providers.isEmpty()) {
+            replyMessage = "عذراً، لم أجد أي مقدمي خدمة متاحين في منطقتك حالياً. جرب توسيع نطاق البحث أو حاول مرة أخرى لاحقاً.";
+        } else {
+            final Long finalServiceTypeId = serviceTypeId;
+            final String finalServiceTypeName = serviceTypeName;
+
+            ServiceType serviceType = getCachedServiceTypes().stream()
+                    .filter(st -> {
+                        if (finalServiceTypeId != null) {
+                            return st.getId().equals(finalServiceTypeId);
+                        }
+                        return st.getName().equalsIgnoreCase(finalServiceTypeName) ||
+                                st.getNameAr().equalsIgnoreCase(finalServiceTypeName);
+                    })
+                    .findFirst()
+                    .orElse(null);
+            replyMessage = buildSmartReply(providers, serviceType, request.getMessage());
+        }
+
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message(replyMessage)
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.PROVIDER_LIST)
+                .providers(providers)
+                .build();
+    }
+
+    private ChatResponse handleCheckAvailabilityWithMcp(AiChatRequest request, User currentUser,
+            UnifiedAssistantResponse unifiedResponse) {
+
+        log.info("Using MCP for CHECK_AVAILABILITY");
+
+        Long providerId = unifiedResponse.providerId;
+        String providerName = unifiedResponse.providerName;
+
+        // Try to get provider from session if not provided
+        if (providerId == null && !StringUtils.hasText(providerName)) {
+            ChatSession session = chatSessionRepository.findById(request.getSessionId()).orElse(null);
+            if (session != null && session.getLastSuggestedProviderId() != null) {
+                providerId = session.getLastSuggestedProviderId();
+                providerName = session.getLastSuggestedProviderName();
+                log.info("Using provider from session: {} (ID: {})", providerName, providerId);
+            }
+        }
+
+        // Try to resolve provider by name
+        if (providerId == null && StringUtils.hasText(providerName)) {
+            providerId = resolveProviderIdByName(providerName);
+            log.info("Resolved provider by name: {} -> {}", providerName, providerId);
+        }
+
+        if (providerId == null) {
+            return ChatResponse.builder()
+                    .sessionId(request.getSessionId())
+                    .message("محتاج اسم المزود عشان أقدر أوريك مواعيده. ممكن تقولي اسمه بالكامل؟")
+                    .timestamp(LocalDateTime.now())
+                    .detectedLanguage(detectLanguage(request.getMessage()))
+                    .responseType(ChatResponseType.CLARIFICATION)
+                    .build();
+        }
+
+        String dateStr = unifiedResponse.requestedDate != null ? unifiedResponse.requestedDate.format(DATE_FORMAT)
+                : null;
+
+        // Prepare MCP request for check_availability
+        Map<String, Object> arguments = new HashMap<>();
+        arguments.put("providerId", providerId);
+        if (dateStr != null) {
+            arguments.put("date", dateStr);
+        }
+
+        Map<String, Object> mcpRequest = buildMcpRequest("check_availability", arguments);
+
+        log.info("MCP Request: {}", mcpRequest);
+
+        Map<String, Object> mcpResponse = mcpServer.get().handleRequest(mcpRequest);
+        log.info("MCP Response: {}", mcpResponse);
+
+        // Parse MCP response for availability
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) mcpResponse.get("result");
+        if (result == null) {
+            return ChatResponse.builder()
+                    .sessionId(request.getSessionId())
+                    .message("حدث خطأ أثناء التحقق من المواعيد. حاول مرة أخرى.")
+                    .timestamp(LocalDateTime.now())
+                    .detectedLanguage(detectLanguage(request.getMessage()))
+                    .responseType(ChatResponseType.ERROR)
+                    .build();
+        }
+
+        // Check if it's a successful response
+        Map<String, Object> content = parseMcpContent(mcpResponse);
+        if (content == null || !Boolean.TRUE.equals(content.get("success"))) {
+            String error = content != null ? (String) content.get("error") : "Unknown error";
+            return ChatResponse.builder()
+                    .sessionId(request.getSessionId())
+                    .message("حدث خطأ: " + error)
+                    .timestamp(LocalDateTime.now())
+                    .detectedLanguage(detectLanguage(request.getMessage()))
+                    .responseType(ChatResponseType.ERROR)
+                    .build();
+        }
+
+        // Extract slots
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> slots = (List<Map<String, Object>>) content.get("slots");
+        String providerNameFromResponse = (String) content.get("providerName");
+        Integer count = (Integer) content.get("count");
+
+        List<ScheduleResponse.TimeSlotResponse> timeSlots = new ArrayList<>();
+        if (slots != null) {
+            for (Map<String, Object> slot : slots) {
+                ScheduleResponse.TimeSlotResponse timeSlot = new ScheduleResponse.TimeSlotResponse();
+                timeSlot.setDate((String) slot.get("date"));
+                timeSlot.setStartTime(LocalTime.parse((String) slot.get("startTime")));
+                timeSlot.setEndTime(LocalTime.parse((String) slot.get("endTime")));
+                timeSlots.add(timeSlot);
+            }
+        }
+
+        String replyMessage;
+        if (timeSlots.isEmpty()) {
+            replyMessage = "عذراً، لا توجد مواعيد متاحة لـ " + providerNameFromResponse + " في الفترة المطلوبة.";
+        } else {
+            replyMessage = formatAvailabilityMessageForMCP(providerNameFromResponse, timeSlots);
+        }
+
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message(replyMessage)
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.AVAILABLE_SLOTS)
+                .availableTimeSlots(timeSlots)
+                .build();
+    }
+
+    private ChatResponse handleCreateBookingWithMcp(AiChatRequest request, User currentUser,
+        UnifiedAssistantResponse unifiedResponse) {
+    
+    log.info("Using MCP for CREATE_BOOKING");
+
+    if (!isConsumer(currentUser)) {
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message("يرجى تسجيل الدخول كمستهلك لإنشاء حجز.")
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.CLARIFICATION)
+                .build();
+    }
+
+    Long providerId = unifiedResponse.providerId;
+    String providerName = unifiedResponse.providerName;
+
+    // Try to get provider from session
+    if (providerId == null) {
+        ChatSession session = chatSessionRepository.findById(request.getSessionId()).orElse(null);
+        if (session != null && session.getLastSuggestedProviderId() != null) {
+            providerId = session.getLastSuggestedProviderId();
+            providerName = session.getLastSuggestedProviderName();
+            log.info("Using provider from session: {} (ID: {})", providerName, providerId);
+        }
+    }
+
+    // Try to resolve by name
+    if (providerId == null && StringUtils.hasText(providerName)) {
+        providerId = resolveProviderIdByName(providerName);
+        log.info("Resolved provider by name: {} -> {}", providerName, providerId);
+    }
+
+    if (providerId == null) {
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message("ممكن توضح أي مزود تقصد؟")
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.CLARIFICATION)
+                .build();
+    }
+
+    if (unifiedResponse.requestedDate == null || unifiedResponse.requestedTime == null ||
+            !StringUtils.hasText(unifiedResponse.problemDescription)) {
+
+        List<String> missing = new ArrayList<>();
+        if (unifiedResponse.requestedDate == null) missing.add("التاريخ");
+        if (unifiedResponse.requestedTime == null) missing.add("الوقت");
+        if (!StringUtils.hasText(unifiedResponse.problemDescription)) missing.add("وصف المشكلة");
+
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message("محتاج هذه المعلومات لإتمام الحجز: " + String.join(", ", missing))
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.BOOKING_REDIRECT)
+                .build();
+    }
+
+    // Prepare MCP request for create_booking
+    Map<String, Object> arguments = new HashMap<>();
+    arguments.put("providerId", providerId);
+    arguments.put("date", unifiedResponse.requestedDate.format(DATE_FORMAT));
+    arguments.put("time", unifiedResponse.requestedTime.format(TIME_FORMAT));
+    arguments.put("problemDescription", unifiedResponse.problemDescription);
+    arguments.put("consumerId", currentUser.getId());
+
+    Map<String, Object> mcpRequest = buildMcpRequest("create_booking", arguments);
+
+    log.info("MCP Request: {}", mcpRequest);
+
+    Map<String, Object> mcpResponse = mcpServer.get().handleRequest(mcpRequest);
+    log.info("MCP Response: {}", mcpResponse);
+
+    // Parse response
+    Map<String, Object> content = parseMcpContent(mcpResponse);
+    if (content == null) {
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message("حدث خطأ أثناء إنشاء الحجز. حاول مرة أخرى.")
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.ERROR)
+                .build();
+    }
+
+    if (!Boolean.TRUE.equals(content.get("success"))) {
+        String error = (String) content.get("error");
+        // Check if there are available slots suggestions
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> availableSlots = (List<Map<String, Object>>) content.get("availableSlots");
+        
+        if (availableSlots != null && !availableSlots.isEmpty()) {
+            List<ScheduleResponse.TimeSlotResponse> slots = new ArrayList<>();
+            for (Map<String, Object> slot : availableSlots) {
+                ScheduleResponse.TimeSlotResponse timeSlot = new ScheduleResponse.TimeSlotResponse();
+                timeSlot.setDate(unifiedResponse.requestedDate.format(DATE_FORMAT));
+                timeSlot.setStartTime(LocalTime.parse((String) slot.get("time")));
+                timeSlot.setEndTime(LocalTime.parse((String) slot.get("endTime")));
+                slots.add(timeSlot);
+            }
+            
+            String slotMessage = "الموعد المطلوب غير متاح. المواعيد المتاحة:";
+            return ChatResponse.builder()
+                    .sessionId(request.getSessionId())
+                    .message(slotMessage)
+                    .timestamp(LocalDateTime.now())
+                    .detectedLanguage(detectLanguage(request.getMessage()))
+                    .responseType(ChatResponseType.AVAILABLE_SLOTS)
+                    .availableTimeSlots(slots)
+                    .build();
+        }
+
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message("فشل إنشاء الحجز: " + (error != null ? error : "خطأ غير معروف"))
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.ERROR)
+                .build();
+    }
+
+    // Parse booking response
+    Long bookingId = content.get("bookingId") != null ? 
+            Long.parseLong(content.get("bookingId").toString()) : null;
+    String status = (String) content.get("status");
+
+    return ChatResponse.builder()
+            .sessionId(request.getSessionId())
+            .message("تم إنشاء طلب الحجز بنجاح رقم #" + bookingId)
+            .timestamp(LocalDateTime.now())
+            .detectedLanguage(detectLanguage(request.getMessage()))
+            .responseType(ChatResponseType.BOOKING_CREATED)
+            .booking(BookingResponse.builder()
+                    .id(bookingId)
+                    .status(BookingStatus.valueOf(status != null ? status : "PENDING"))
+                    .build())
+            .build();
+}
+
+/**
+ * Handle GET_PROVIDER_DETAILS action using MCP
+ */
+private ChatResponse handleGetProviderDetailsWithMcp(AiChatRequest request, User currentUser,
+        UnifiedAssistantResponse unifiedResponse) {
+
+    log.info("🔍 Using MCP for GET_PROVIDER_DETAILS");
+
+    Long providerId = unifiedResponse.providerId;
+    String providerName = unifiedResponse.providerName;
+
+    // Try to get provider from session if not provided
+    if (providerId == null && !StringUtils.hasText(providerName)) {
+        ChatSession session = chatSessionRepository.findById(request.getSessionId()).orElse(null);
+        if (session != null && session.getLastSuggestedProviderId() != null) {
+            providerId = session.getLastSuggestedProviderId();
+            providerName = session.getLastSuggestedProviderName();
+            log.info("📌 Using provider from session: {} (ID: {})", providerName, providerId);
+        }
+    }
+
+    // Try to resolve provider by name
+    if (providerId == null && StringUtils.hasText(providerName)) {
+        providerId = resolveProviderIdByName(providerName);
+        log.info("📌 Resolved provider by name: {} -> {}", providerName, providerId);
+    }
+
+    if (providerId == null) {
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message("محتاج اسم المزود عشان أقدر أوريك معلوماته. ممكن تقولي اسمه بالكامل أو رقمه؟")
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.CLARIFICATION)
+                .build();
+    }
+
+    // Prepare MCP request for get_provider_details
+    Map<String, Object> arguments = new HashMap<>();
+    arguments.put("providerId", providerId);
+
+    Map<String, Object> mcpRequest = buildMcpRequest("get_provider_details", arguments);
+
+    log.info("📤 MCP Request: {}", mcpRequest);
+
+    Map<String, Object> mcpResponse = mcpServer.get().handleRequest(mcpRequest);
+    log.info("📥 MCP Response: {}", mcpResponse);
+
+    // Parse MCP response
+    Map<String, Object> content = parseMcpContent(mcpResponse);
+    if (content == null) {
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message("حدث خطأ أثناء جلب معلومات المزود. حاول مرة أخرى.")
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.ERROR)
+                .build();
+    }
+
+    if (!Boolean.TRUE.equals(content.get("success"))) {
+        String error = (String) content.get("error");
+        return ChatResponse.builder()
+                .sessionId(request.getSessionId())
+                .message("فشل جلب معلومات المزود: " + (error != null ? error : "خطأ غير معروف"))
+                .timestamp(LocalDateTime.now())
+                .detectedLanguage(detectLanguage(request.getMessage()))
+                .responseType(ChatResponseType.ERROR)
+                .build();
+    }
+
+    // Extract provider details
+    String name = (String) content.get("name");
+    String email = (String) content.get("email");
+    String phoneNumber = (String) content.get("phoneNumber");
+    String bio = (String) content.get("bio");
+    Double averageRating = (Double) content.get("averageRating");
+    Integer totalReviews = (Integer) content.get("totalReviews");
+    Integer yearsOfExperience = (Integer) content.get("yearsOfExperience");
+    String verificationStatus = (String) content.get("verificationStatus");
+    Boolean hasSchedule = (Boolean) content.get("hasSchedule");
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> serviceType = (Map<String, Object>) content.get("serviceType");
+    @SuppressWarnings("unchecked")
+    Map<String, Object> location = (Map<String, Object>) content.get("location");
+
+    // Build the response message
+    StringBuilder message = new StringBuilder();
+    message.append("📋 **معلومات المزود**\n\n");
+    message.append("👤 **الاسم**: ").append(name).append("\n");
+
+    if (verificationStatus != null) {
+        String statusEmoji = "VERIFIED".equals(verificationStatus) ? "✅" : "⏳";
+        message.append("📌 **الحالة**: ").append(statusEmoji).append(" ").append(verificationStatus).append("\n");
+    }
+
+    if (averageRating != null && averageRating > 0) {
+        message.append("⭐ **التقييم**: ").append(String.format("%.1f", averageRating)).append("/5");
+        if (totalReviews != null && totalReviews > 0) {
+            message.append(" (").append(totalReviews).append(" تقييم)");
+        }
+        message.append("\n");
+    }
+
+    if (yearsOfExperience != null && yearsOfExperience > 0) {
+        message.append("📅 **سنوات الخبرة**: ").append(yearsOfExperience).append("\n");
+    }
+
+    if (phoneNumber != null) {
+        message.append("📱 **الهاتف**: ").append(phoneNumber).append("\n");
+    }
+
+    if (email != null) {
+        message.append("📧 **البريد الإلكتروني**: ").append(email).append("\n");
+    }
+
+    if (bio != null && !bio.isEmpty()) {
+        message.append("\n📝 **عن المزود**:\n").append(bio).append("\n");
+    }
+
+    if (serviceType != null) {
+        String serviceName = (String) serviceType.get("name");
+        String serviceNameAr = (String) serviceType.get("nameAr");
+        message.append("\n🛠️ **الخدمة**: ").append(serviceNameAr != null ? serviceNameAr : serviceName).append("\n");
+    }
+
+    if (location != null) {
+        String address = (String) location.get("address");
+        if (address != null && !address.isEmpty()) {
+            message.append("📍 **العنوان**: ").append(address).append("\n");
+        }
+    }
+
+    if (hasSchedule != null && hasSchedule) {
+        message.append("\n✅ متاح للحجز");
+    }
+
+    // Create provider summary response for the provider list
+    ProviderSummaryResponse providerSummary = ProviderSummaryResponse.builder()
+            .id(providerId)
+            .name(name)
+            .averageRating(averageRating != null ? averageRating : 0.0)
+            .distance(0.0)
+            .build();
+
+    return ChatResponse.builder()
+            .sessionId(request.getSessionId())
+            .message(message.toString())
+            .timestamp(LocalDateTime.now())
+            .detectedLanguage(detectLanguage(request.getMessage()))
+            .responseType(ChatResponseType.PROVIDER_DETAILS)
+            .providers(List.of(providerSummary))
+            .build();
+}
+
+    /**
+ * Build MCP request for tool call
+ */
+private Map<String, Object> buildMcpRequest(String toolName, Map<String, Object> arguments) {
+    Map<String, Object> mcpRequest = new HashMap<>();
+    mcpRequest.put("jsonrpc", "2.0");
+    mcpRequest.put("method", "tools/call");
+    mcpRequest.put("id", UUID.randomUUID().toString());
+
+    Map<String, Object> params = new HashMap<>();
+    params.put("name", toolName);
+    params.put("arguments", arguments);
+    mcpRequest.put("params", params);
+
+    return mcpRequest;
+}
+
+/**
+ * Parse MCP content from response
+ */
+@SuppressWarnings("unchecked")
+private Map<String, Object> parseMcpContent(Map<String, Object> mcpResponse) {
+    try {
+        Map<String, Object> result = (Map<String, Object>) mcpResponse.get("result");
+        if (result == null) {
+            return null;
+        }
+
+        Boolean isError = (Boolean) result.get("isError");
+        if (isError != null && isError) {
+            return null;
+        }
+
+        Object contentObj = result.get("content");
+        if (contentObj == null) {
+            return null;
+        }
+
+        String text = null;
+        if (contentObj instanceof List) {
+            List<Map<String, Object>> contentList = (List<Map<String, Object>>) contentObj;
+            if (!contentList.isEmpty()) {
+                text = (String) contentList.get(0).get("text");
+            }
+        } else if (contentObj instanceof Object[]) {
+            Object[] contentArray = (Object[]) contentObj;
+            if (contentArray.length > 0) {
+                Map<String, Object> contentMap = (Map<String, Object>) contentArray[0];
+                text = (String) contentMap.get("text");
+            }
+        }
+
+        if (text == null || text.isEmpty()) {
+            return null;
+        }
+
+        return objectMapper.readValue(text, Map.class);
+
+    } catch (Exception e) {
+        log.error("Failed to parse MCP content: {}", e.getMessage(), e);
+        return null;
+    }
+}
+
+/**
+ * Format availability message for MCP response
+ */
+private String formatAvailabilityMessageForMCP(String providerName,
+        List<ScheduleResponse.TimeSlotResponse> slots) {
+    if (slots == null || slots.isEmpty()) {
+        return "لا توجد مواعيد متاحة لـ " + providerName;
+    }
+
+    Map<LocalDate, List<ScheduleResponse.TimeSlotResponse>> slotsByDate = slots.stream()
+            .collect(Collectors.groupingBy(slot -> parseDateSafe(slot.getDate())));
+
+    StringBuilder message = new StringBuilder();
+    message.append("المواعيد المتاحة لـ ").append(providerName).append(":\n\n");
+
+    int dateCount = 0;
+    for (Map.Entry<LocalDate, List<ScheduleResponse.TimeSlotResponse>> entry : slotsByDate.entrySet()) {
+        if (dateCount++ >= 7)
+            break;
+        message.append("📅 ").append(DATE_FORMAT.format(entry.getKey())).append(":\n");
+        String times = entry.getValue().stream()
+                .map(slot -> TIME_FORMAT.format(slot.getStartTime()) + " - " +
+                        TIME_FORMAT.format(slot.getEndTime()))
+                .collect(Collectors.joining(", "));
+        message.append("   🕐 ").append(times).append("\n");
+    }
+
+    return message.toString();
+}
+
+    @SuppressWarnings("unchecked")
+    private List<ProviderSummaryResponse> parseMcpResponse(Map<String, Object> mcpResponse) {
+        try {
+            Map<String, Object> result = (Map<String, Object>) mcpResponse.get("result");
+            if (result == null) {
+                log.warn("No 'result' field in MCP response");
+                return List.of();
+            }
+
+            Boolean isError = (Boolean) result.get("isError");
+            if (isError != null && isError) {
+                Object contentObj = result.get("content");
+                String errorText = null;
+                if (contentObj instanceof List) {
+                    List<Map<String, Object>> contentList = (List<Map<String, Object>>) contentObj;
+                    if (!contentList.isEmpty()) {
+                        errorText = (String) contentList.get(0).get("text");
+                    }
+                } else if (contentObj instanceof Object[]) {
+                    Object[] contentArray = (Object[]) contentObj;
+                    if (contentArray.length > 0) {
+                        Map<String, Object> contentMap = (Map<String, Object>) contentArray[0];
+                        errorText = (String) contentMap.get("text");
+                    }
+                }
+                if (errorText != null) {
+                    log.warn("MCP tool returned error: {}", errorText);
+                }
+                return List.of();
+            }
+
+            Object contentObj = result.get("content");
+            if (contentObj == null) {
+                log.warn("No content in MCP response");
+                return List.of();
+            }
+
+            String text = null;
+
+            if (contentObj instanceof List) {
+                List<Map<String, Object>> contentList = (List<Map<String, Object>>) contentObj;
+                if (!contentList.isEmpty()) {
+                    Map<String, Object> firstContent = contentList.get(0);
+                    text = (String) firstContent.get("text");
+                }
+            } else if (contentObj instanceof Object[]) {
+                Object[] contentArray = (Object[]) contentObj;
+                if (contentArray.length > 0) {
+                    Map<String, Object> firstContent = (Map<String, Object>) contentArray[0];
+                    text = (String) firstContent.get("text");
+                }
+            }
+
+            if (text == null || text.isEmpty()) {
+                log.warn("No text in content");
+                return List.of();
+            }
+
+            log.info("📄 MCP response text: {}", text);
+
+            if (text.equals("[]") || text.isEmpty()) {
+                return List.of();
+            }
+
+            List<ProviderSummaryResponse> providers = objectMapper.readValue(
+                    text,
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, ProviderSummaryResponse.class));
+
+            return providers != null ? providers : List.of();
+
+        } catch (Exception e) {
+            log.error("Failed to parse MCP response: {}", e.getMessage(), e);
+            return List.of();
+        }
+    }
+    
+    /**
+     * Existing chat implementation
+     */
+    private ChatResponse chatWithExisting(AiChatRequest request, User currentUser) {
         String userMessage = request.getMessage();
         boolean isVoiceNote = request.getVoiceNote() != null && !request.getVoiceNote().isEmpty();
 
@@ -437,7 +1162,6 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
                 ## CRITICAL RULES FOR SEARCH_PROVIDERS:
                 - Use SEARCH_PROVIDERS when user wants to FIND providers
-                - For urgent needs, set problemDescription="emergency" and searchRadiusKm=5
                 - Always set "serviceTypeName" to your best guess of the service category in Arabic or English
                 - Additionally set "serviceTypeId" using the catalog below when you can confidently match one
 
@@ -736,7 +1460,6 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
         String userMessage = request.getMessage();
 
-
         ServiceType selectedService = null;
         if (unified.serviceTypeId != null) {
             selectedService = getCachedServiceTypes().stream()
@@ -744,7 +1467,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                     .findFirst()
                     .orElse(null);
             log.info("Using serviceTypeId from Gemini: {} -> {}", unified.serviceTypeId,
-                    selectedService != null ? selectedService.getName() : "not found");        
+                    selectedService != null ? selectedService.getName() : "not found");
         }
 
         if (selectedService == null && StringUtils.hasText(unified.serviceTypeName)) {
@@ -1192,7 +1915,8 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                     .build();
         }
 
-        if (unified.requestedDate == null || unified.requestedTime == null || !StringUtils.hasText(unified.problemDescription)) {
+        if (unified.requestedDate == null || unified.requestedTime == null
+                || !StringUtils.hasText(unified.problemDescription)) {
 
             List<String> missing = new ArrayList<>();
             if (unified.requestedDate == null)
@@ -1682,11 +2406,11 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     private enum Intent {
-        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, GET_AVAILABILITY, CREATE_BOOKING, CLARIFICATION
+        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, GET_AVAILABILITY, CREATE_BOOKING, GET_PROVIDER_DETAILS, CLARIFICATION
     }
 
     private enum Action {
-        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, CHECK_AVAILABILITY, CREATE_BOOKING, ASK_CLARIFICATION
+        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, CHECK_AVAILABILITY, CREATE_BOOKING, GET_PROVIDER_DETAILS, ASK_CLARIFICATION
     }
 
     private static class CachedValue<T> {
