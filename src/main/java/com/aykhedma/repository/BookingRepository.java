@@ -158,7 +158,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
                                        @Param("currentDate") LocalDate currentDate,
                                        @Param("currentTime") LocalTime currentTime);
 
-    @Query("SELECT b FROM Booking b WHERE b.status = 'ACCEPTED' " +
+    @Query("SELECT b FROM Booking b WHERE (b.status = 'COMPLETED' OR (b.status = 'EXPIRED' AND b.acceptedAt IS NOT NULL)) " +
             "AND (b.consumerRating IS NULL OR b.providerRating IS NULL) " +
             "AND (b.requestedDate < :date OR (b.requestedDate = :date AND b.requestedStartTime <= :time))")
     List<Booking> findBookingsNeedingRating(@Param("date") LocalDate date, @Param("time") LocalTime time);

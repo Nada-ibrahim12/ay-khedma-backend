@@ -34,6 +34,8 @@ public interface EmergencyRequestService
 
     List<EmergencyRequestResponse> getEmergencyRequestsHistory (Long userId);
 
+    EmergencyRequestResponse completeEmergencyRequest (Long providerId, Long emergencyRequestId);
+
     EmergencyRequestResponse submitEmergencyRequestRating(Long consumerId, EmergencyRatingRequest ratingRequest);
 
     EmergencyRequestResponse submitConsumerEmergencyRequestRating(Long providerId, ProviderEmergencyRatingRequest ratingRequest);

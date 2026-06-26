@@ -214,6 +214,26 @@ public class EmergencyRequestController
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
+    @PreAuthorize("hasRole('PROVIDER')")
+    @PutMapping("/complete-emergency-request/{emergencyRequestId}")
+    @Operation(summary = "Complete an emergency request")
+    @ApiResponses(value =
+            {
+                   @ApiResponse(responseCode = "200", description = "Emergency request completed successfully",
+                           content = @Content(schema = @Schema(implementation = EmergencyRequestResponse.class))),
+                   @ApiResponse(responseCode = "400", description = "Invalid emergency request status or doesn't belong to the provider"),
+                   @ApiResponse(responseCode = "404", description = "Emergency request not found")
+            })
+    public ResponseEntity<EmergencyRequestResponse> completeEmergencyRequest(
+            @Parameter(description = "ID of the provider", required = true)
+            @AuthenticationPrincipal(expression = "user.id") Long providerId,
+            @Parameter(description = "ID of the emergency request", required = true)
+            @PathVariable Long emergencyRequestId)
+    {
+        EmergencyRequestResponse response = emergencyRequestService.completeEmergencyRequest(providerId, emergencyRequestId);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
     // =================================== User Side ===================================
 
     @PreAuthorize("hasAnyRole('PROVIDER','CONSUMER')")

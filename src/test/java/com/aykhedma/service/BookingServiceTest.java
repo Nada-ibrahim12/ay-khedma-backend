@@ -28,6 +28,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
@@ -551,6 +552,102 @@ class BookingServiceTest
             List<BookingResponse> result = bookingService.getUpcomingBookings(provider.getId());
 
             assertThat(result).hasSize(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("Submit Rating Tests")
+    class SubmitRatingTest
+    {
+        private com.aykhedma.dto.request.RatingRequest ratingRequest;
+        private com.aykhedma.dto.request.ProviderRatingRequest providerRatingRequest;
+
+        @BeforeEach
+        void setUp()
+        {
+            ratingRequest = com.aykhedma.dto.request.RatingRequest.builder()
+                    .bookingId(1L)
+                    .punctualityRating(5)
+                    .commitmentRating(5)
+                    .qualityOfWorkRating(5)
+                    .review("Great service!")
+                    .build();
+
+            providerRatingRequest = com.aykhedma.dto.request.ProviderRatingRequest.builder()
+                    .bookingId(1L)
+                    .rating(4)
+                    .review("Good client!")
+                    .build();
+
+            booking.setId(1L);
+            booking.setRequestedDate(today.minusDays(1));
+            booking.setRequestedStartTime(LocalTime.of(12, 0));
+        }
+
+        @Test
+        @DisplayName("Submit Rating Success for Completed Booking")
+        void submitRatingCompletedBookingSuccessTest()
+        {
+            booking.setStatus(BookingStatus.COMPLETED);
+            booking.setAcceptedAt(LocalDateTime.now().minusDays(1));
+
+            when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+            when(bookingRepository.countByProviderIdAndConsumerRatingIsNotNull(provider.getId())).thenReturn(1L);
+            when(bookingMapper.toBookingResponse(booking)).thenReturn(BookingResponse.builder().id(booking.getId()).build());
+
+            BookingResponse response = bookingService.submitRating(consumer.getId(), ratingRequest);
+
+            assertThat(response).isNotNull();
+            assertThat(booking.getConsumerRating()).isEqualTo(5.0);
+            assertThat(booking.getConsumerReview()).isEqualTo("Great service!");
+            assertThat(booking.getStatus()).isEqualTo(BookingStatus.COMPLETED); // Status remains COMPLETED
+            verify(bookingRepository).save(booking);
+        }
+
+        @Test
+        @DisplayName("Submit Rating Success for Expired Accepted Booking")
+        void submitRatingExpiredAcceptedBookingSuccessTest()
+        {
+            booking.setStatus(BookingStatus.EXPIRED);
+            booking.setAcceptedAt(LocalDateTime.now().minusDays(1));
+
+            when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+            when(bookingRepository.countByProviderIdAndConsumerRatingIsNotNull(provider.getId())).thenReturn(1L);
+            when(bookingMapper.toBookingResponse(booking)).thenReturn(BookingResponse.builder().id(booking.getId()).build());
+
+            BookingResponse response = bookingService.submitRating(consumer.getId(), ratingRequest);
+
+            assertThat(response).isNotNull();
+            assertThat(booking.getConsumerRating()).isEqualTo(5.0);
+            assertThat(booking.getStatus()).isEqualTo(BookingStatus.EXPIRED); // Status remains EXPIRED
+            verify(bookingRepository).save(booking);
+        }
+
+        @Test
+        @DisplayName("Throw BadRequestException for Expired Booking without Acceptance")
+        void submitRatingExpiredNotAcceptedBookingTest()
+        {
+            booking.setStatus(BookingStatus.EXPIRED);
+            booking.setAcceptedAt(null);
+
+            when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+
+            assertThatThrownBy(() -> bookingService.submitRating(consumer.getId(), ratingRequest))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("Rating and reviews are only allowed for completed bookings or expired bookings that were accepted.");
+        }
+
+        @Test
+        @DisplayName("Throw BadRequestException for Pending Booking")
+        void submitRatingPendingBookingTest()
+        {
+            booking.setStatus(BookingStatus.PENDING);
+
+            when(bookingRepository.findById(1L)).thenReturn(Optional.of(booking));
+
+            assertThatThrownBy(() -> bookingService.submitRating(consumer.getId(), ratingRequest))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("Rating and reviews are only allowed for completed bookings or expired bookings that were accepted.");
         }
     }
 }
