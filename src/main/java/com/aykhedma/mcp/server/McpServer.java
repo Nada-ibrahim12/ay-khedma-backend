@@ -31,6 +31,14 @@ public class McpServer {
         return toolHandlers.size();
     }
 
+    public List<Map<String, Object>> getToolSchemas() {
+        List<Map<String, Object>> schemas = new ArrayList<>();
+        for (McpToolHandler handler : toolHandlers.values()) {
+            schemas.add(handler.getSchema());
+        }
+        return schemas;
+    }
+
 
     public Map<String, Object> handleRequest(Map<String, Object> request) {
         String method = (String) request.get("method");
