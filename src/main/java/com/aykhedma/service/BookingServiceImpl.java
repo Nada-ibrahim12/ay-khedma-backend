@@ -581,11 +581,13 @@ public class BookingServiceImpl implements BookingService {
         if (serviceStartTime.plusMinutes(30).isAfter(LocalDateTime.now()))
             throw new BadRequestException("Rating is allowed only 30 minutes after service start");
 
-        if (booking.getStatus() == BookingStatus.CANCELLED)
-            throw new BadRequestException("Cancelled bookings cannot be rated");
+        BookingStatus status = booking.getStatus();
+        boolean isCompleted = status == BookingStatus.COMPLETED;
+        boolean isExpiredAndAccepted = status == BookingStatus.EXPIRED && booking.getAcceptedAt() != null;
 
-        if (booking.getStatus() != BookingStatus.ACCEPTED && booking.getStatus() != BookingStatus.COMPLETED)
-            throw new BadRequestException("Only accepted or completed bookings can be rated");
+        if (!isCompleted && !isExpiredAndAccepted) {
+            throw new BadRequestException("Rating and reviews are only allowed for completed bookings or expired bookings that were accepted.");
+        }
 
         if (booking.getConsumerRating() != null)
             throw new BadRequestException("You have already rated this booking");
@@ -601,16 +603,6 @@ public class BookingServiceImpl implements BookingService {
         booking.setConsumerRating(overallRating);
         booking.setConsumerReview(ratingRequest.getReview()); // consumerReview stores the review FROM consumer TO
                                                               // provider
-
-        // Mark as completed if both parties have rated
-        if (booking.getProviderRating() != null) {
-            booking.setStatus(BookingStatus.COMPLETED);
-            booking.setCompletedAt(LocalDateTime.now());
-            Provider provider = booking.getProvider();
-            provider.setCompletedJobs((provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0) + 1);
-            // No need to call updateProviderRates here separately if we call it below
-            // anyway
-        }
 
         bookingRepository.save(booking);
 
@@ -677,11 +669,13 @@ public class BookingServiceImpl implements BookingService {
         if (serviceStartTime.plusMinutes(30).isAfter(LocalDateTime.now()))
             throw new BadRequestException("Rating is allowed only 30 minutes after service start");
 
-        if (booking.getStatus() == BookingStatus.CANCELLED)
-            throw new BadRequestException("Cancelled bookings cannot be rated");
+        BookingStatus status = booking.getStatus();
+        boolean isCompleted = status == BookingStatus.COMPLETED;
+        boolean isExpiredAndAccepted = status == BookingStatus.EXPIRED && booking.getAcceptedAt() != null;
 
-        if (booking.getStatus() != BookingStatus.ACCEPTED && booking.getStatus() != BookingStatus.COMPLETED)
-            throw new BadRequestException("Only accepted or completed bookings can be rated");
+        if (!isCompleted && !isExpiredAndAccepted) {
+            throw new BadRequestException("Rating and reviews are only allowed for completed bookings or expired bookings that were accepted.");
+        }
 
         // providerRating stores score given BY provider TO consumer
         if (booking.getProviderRating() != null)
@@ -689,14 +683,6 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setProviderRating(ratingRequest.getRating().doubleValue());
         booking.setProviderReview(ratingRequest.getReview());
-
-        // Mark as completed if both parties have rated
-        if (booking.getConsumerRating() != null) {
-            booking.setStatus(BookingStatus.COMPLETED);
-            booking.setCompletedAt(LocalDateTime.now());
-            Provider provider = booking.getProvider();
-            provider.setCompletedJobs((provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0) + 1);
-        }
 
         bookingRepository.save(booking);
         updateProviderRates(booking.getProvider());

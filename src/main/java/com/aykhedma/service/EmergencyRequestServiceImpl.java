@@ -409,6 +409,14 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
         emergencyRequest.setSelectedProvider(providerResponse.getProvider());
         emergencyRequestRepository.save(emergencyRequest);
 
+        Provider provider = providerResponse.getProvider();
+        provider.setTotalBookings((provider.getTotalBookings() != null ? provider.getTotalBookings() : 0) + 1);
+        updateProviderRates(provider);
+        providerRepository.save(provider);
+
+        consumer.setTotalBookings((consumer.getTotalBookings() != null ? consumer.getTotalBookings() : 0) + 1);
+        consumerRepository.save(consumer);
+
         providerResponse.setSelected(true);
         providerResponseRepository.save(providerResponse);
 
@@ -589,6 +597,34 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
 
     @Override
     @Transactional
+    public EmergencyRequestResponse completeEmergencyRequest(Long providerId, Long emergencyRequestId) {
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        EmergencyRequest emergencyRequest = emergencyRequestRepository.findById(emergencyRequestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Emergency request not found"));
+
+        if (emergencyRequest.getSelectedProvider() == null || !providerId.equals(emergencyRequest.getSelectedProvider().getId())) {
+            throw new ForbiddenException("Emergency request does not belong to this provider");
+        }
+
+        if (emergencyRequest.getStatus() != EmergencyRequestStatus.ACCEPTED) {
+            throw new BadRequestException("Emergency request cannot be completed, it is " + emergencyRequest.getStatus());
+        }
+
+        emergencyRequest.setStatus(EmergencyRequestStatus.COMPLETED);
+        emergencyRequest.setCompletedAt(LocalDateTime.now());
+        emergencyRequestRepository.save(emergencyRequest);
+
+        provider.setCompletedJobs((provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0) + 1);
+        updateProviderRates(provider);
+        providerRepository.save(provider);
+
+        return emergencyRequestMapper.toEmergencyRequestResponse(emergencyRequest);
+    }
+
+    @Override
+    @Transactional
     public EmergencyRequestResponse submitEmergencyRequestRating(Long consumerId, EmergencyRatingRequest ratingRequest) {
         EmergencyRequest emergencyRequest = emergencyRequestRepository.findById(ratingRequest.getEmergencyRequestId())
                 .orElseThrow(() -> new ResourceNotFoundException("Emergency request not found"));
@@ -596,11 +632,13 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
         if (!consumerId.equals(emergencyRequest.getConsumer().getId()))
             throw new ForbiddenException("Emergency request does not belong to this consumer");
 
-        if (emergencyRequest.getStatus() == EmergencyRequestStatus.CANCELLED)
-            throw new BadRequestException("Cancelled emergency requests cannot be rated");
+        EmergencyRequestStatus status = emergencyRequest.getStatus();
+        boolean isCompleted = status == EmergencyRequestStatus.COMPLETED;
+        boolean isExpiredAndAccepted = status == EmergencyRequestStatus.EXPIRED && emergencyRequest.getSelectedProvider() != null;
 
-        if (emergencyRequest.getStatus() != EmergencyRequestStatus.ACCEPTED && emergencyRequest.getStatus() != EmergencyRequestStatus.COMPLETED)
-            throw new BadRequestException("Only accepted or completed emergency requests can be rated");
+        if (!isCompleted && !isExpiredAndAccepted) {
+            throw new BadRequestException("Rating and reviews are only allowed for completed emergency requests or expired emergency requests that were accepted.");
+        }
 
         if (emergencyRequest.getConsumerRating() != null)
             throw new BadRequestException("You have already rated this emergency request");
@@ -614,16 +652,6 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
         overallRating = Math.round(overallRating * 10.0) / 10.0;
         emergencyRequest.setConsumerRating(overallRating);
         emergencyRequest.setConsumerReview(ratingRequest.getReview());
-
-        // Mark as completed if both parties have rated
-        if (emergencyRequest.getProviderRating() != null) {
-            emergencyRequest.setStatus(EmergencyRequestStatus.COMPLETED);
-            emergencyRequest.setCompletedAt(LocalDateTime.now());
-            Provider provider = emergencyRequest.getSelectedProvider();
-            if (provider != null) {
-                provider.setCompletedJobs((provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0) + 1);
-            }
-        }
 
         emergencyRequestRepository.save(emergencyRequest);
 
@@ -669,27 +697,19 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
         if (emergencyRequest.getSelectedProvider() == null || !providerId.equals(emergencyRequest.getSelectedProvider().getId()))
             throw new ForbiddenException("Emergency request does not belong to this provider");
 
-        if (emergencyRequest.getStatus() == EmergencyRequestStatus.CANCELLED)
-            throw new BadRequestException("Cancelled emergency requests cannot be rated");
+        EmergencyRequestStatus status = emergencyRequest.getStatus();
+        boolean isCompleted = status == EmergencyRequestStatus.COMPLETED;
+        boolean isExpiredAndAccepted = status == EmergencyRequestStatus.EXPIRED && emergencyRequest.getSelectedProvider() != null;
 
-        if (emergencyRequest.getStatus() != EmergencyRequestStatus.ACCEPTED && emergencyRequest.getStatus() != EmergencyRequestStatus.COMPLETED)
-            throw new BadRequestException("Only accepted or completed emergency requests can be rated");
+        if (!isCompleted && !isExpiredAndAccepted) {
+            throw new BadRequestException("Rating and reviews are only allowed for completed emergency requests or expired emergency requests that were accepted.");
+        }
 
         if (emergencyRequest.getProviderRating() != null)
             throw new BadRequestException("You have already rated this emergency request");
 
         emergencyRequest.setProviderRating(ratingRequest.getRating().doubleValue());
         emergencyRequest.setProviderReview(ratingRequest.getReview());
-
-        // Mark as completed if both parties have rated
-        if (emergencyRequest.getConsumerRating() != null) {
-            emergencyRequest.setStatus(EmergencyRequestStatus.COMPLETED);
-            emergencyRequest.setCompletedAt(LocalDateTime.now());
-            Provider provider = emergencyRequest.getSelectedProvider();
-            if (provider != null) {
-                provider.setCompletedJobs((provider.getCompletedJobs() != null ? provider.getCompletedJobs() : 0) + 1);
-            }
-        }
 
         emergencyRequestRepository.save(emergencyRequest);
 
