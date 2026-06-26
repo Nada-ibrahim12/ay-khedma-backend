@@ -1,12 +1,9 @@
 package com.aykhedma.service;
 
-import com.aykhedma.dto.request.EmergencyRatingRequest;
-import com.aykhedma.dto.request.ProviderEmergencyRatingRequest;
+import com.aykhedma.dto.request.*;
 import com.aykhedma.dto.location.LocationDTO;
-import com.aykhedma.dto.request.EmergencyRequestRequest;
-import com.aykhedma.dto.request.ProviderResponseRequest;
-import com.aykhedma.dto.request.UpdateEmergencyRequestPriceRequest;
 import com.aykhedma.dto.response.EmergencyRequestResponse;
+import com.aykhedma.dto.response.PriceRecommendationResponse;
 import com.aykhedma.dto.response.ProviderResponseResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ForbiddenException;
@@ -104,6 +101,27 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
         }
 
         return emergencyRequestMapper.toEmergencyRequestResponse(currentEmergencyRequest);
+    }
+
+    @Override
+    public PriceRecommendationResponse getEmergencyRequestPriceRecommendation (Long consumerId, PriceRecommendationRequest request)
+    {
+        Consumer consumer = consumerRepository.findById(consumerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consumer not found"));
+
+        ServiceType serviceType = serviceTypeRepository.findById(request.getServiceTypeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Service type not found"));
+
+        LocationDTO locationDTO = request.getLocation();
+        String area = locationDTO.getArea();
+        if (area.equals(" "))
+            return PriceRecommendationResponse.builder().price(null).build();
+
+        Double price = providerRepository.getAveragePrice(serviceType, area);
+        if (price == null)
+            return PriceRecommendationResponse.builder().price(null).build();
+        else
+            return PriceRecommendationResponse.builder().price(Math.ceil(price * 1.25)).build();
     }
 
     @Override

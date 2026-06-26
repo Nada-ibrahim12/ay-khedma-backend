@@ -1,10 +1,12 @@
 package com.aykhedma.controller;
 
 import com.aykhedma.dto.request.EmergencyRequestRequest;
+import com.aykhedma.dto.request.PriceRecommendationRequest;
 import com.aykhedma.dto.request.ProviderResponseRequest;
 import com.aykhedma.dto.request.UpdateEmergencyRequestPriceRequest;
 import com.aykhedma.dto.response.BookingResponse;
 import com.aykhedma.dto.response.EmergencyRequestResponse;
+import com.aykhedma.dto.response.PriceRecommendationResponse;
 import com.aykhedma.dto.response.ProviderResponseResponse;
 import com.aykhedma.service.EmergencyRequestService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -50,6 +52,29 @@ public class EmergencyRequestController
     }
 
     @PreAuthorize("hasRole('CONSUMER')")
+    @GetMapping("/get-emergency-request-price-recommendation")
+    @Operation(summary = "Returns a price recommendation for an emergency request")
+    @ApiResponses(value =
+            {
+                   @ApiResponse(responseCode = "200", description = "Price recommendation returned successfully",
+                           content = @Content(schema = @Schema(implementation = EmergencyRequestResponse.class))),
+                   @ApiResponse(responseCode = "204", description = "No price to be recommend"),
+                   @ApiResponse(responseCode = "404", description = "Consumer or service type not found")
+            })
+    public ResponseEntity<PriceRecommendationResponse> getEmergencyRequestPriceRecommendation(
+            @Parameter(description = "ID of the consumer", required = true)
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+            @Parameter(description = "Price Recommendation request data (service type ID, location)", required = true)
+            @Valid @RequestBody PriceRecommendationRequest request)
+    {
+        PriceRecommendationResponse response = emergencyRequestService.getEmergencyRequestPriceRecommendation(consumerId, request);
+        if (response.getPrice() == null)
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        else
+            return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @PreAuthorize("hasRole('CONSUMER')")
     @PostMapping("/request-emergency-request")
     @Operation(summary = "Request an emergency request")
     @ApiResponses(value =
@@ -62,7 +87,7 @@ public class EmergencyRequestController
     public ResponseEntity<EmergencyRequestResponse> requestEmergency(
             @Parameter(description = "ID of the consumer", required = true)
             @AuthenticationPrincipal(expression = "user.id") Long consumerId,
-            @Parameter(description = "Emergency request data (service type ID, location, suggested price, request description)", required = true)
+            @Parameter(description = "Emergency request request data (service type ID, location, suggested price, request description)", required = true)
             @Valid @RequestBody EmergencyRequestRequest request)
     {
         EmergencyRequestResponse response = emergencyRequestService.requestEmergencyRequest(consumerId, request);
