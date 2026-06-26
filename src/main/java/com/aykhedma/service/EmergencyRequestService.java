@@ -30,11 +30,13 @@ public interface EmergencyRequestService
 
     EmergencyRequestResponse updateEmergencyRequestPrice (Long consumerId, UpdateEmergencyRequestPriceRequest request);
 
+    EmergencyRequestResponse completeEmergencyRequest (Long consumerId, Long emergencyRequestId);
+
     EmergencyRequestResponse cancelEmergencyRequest (Long consumerId, Long emergencyRequestId);
 
-    List<EmergencyRequestResponse> getEmergencyRequestsHistory (Long userId);
+    List<EmergencyRequestResponse> getAcceptedEmergencyRequests (Long userId);
 
-    EmergencyRequestResponse completeEmergencyRequest (Long providerId, Long emergencyRequestId);
+    List<EmergencyRequestResponse> getEmergencyRequestsHistory (Long userId);
 
     EmergencyRequestResponse submitEmergencyRequestRating(Long consumerId, EmergencyRatingRequest ratingRequest);
 

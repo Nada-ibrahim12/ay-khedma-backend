@@ -8,7 +8,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Repository
@@ -26,11 +28,7 @@ public interface EmergencyRequestRepository extends JpaRepository<EmergencyReque
 
     EmergencyRequest findTopByConsumerIdAndStatusInOrderByCreatedAtDesc(Long consumerId, List<EmergencyRequestStatus> statuses);
 
-    List<EmergencyRequest> findByConsumerIdAndStatusOrderByCreatedAtDesc(Long consumerId, EmergencyRequestStatus status);
-
-    List<EmergencyRequest> findBySelectedProviderIdAndStatusOrderByCreatedAtDesc(Long providerId, EmergencyRequestStatus status);
-
-    List<EmergencyRequest> findByConsumerIdAndStatusInOrderByCreatedAtDesc(Long consumerId, List<EmergencyRequestStatus> statuses);
+    List<EmergencyRequest> findByConsumerIdAndStatusInAndSelectedProviderNotNullOrderByCreatedAtDesc(Long consumerId, List<EmergencyRequestStatus> statuses);
 
     List<EmergencyRequest> findBySelectedProviderIdAndStatusInOrderByCreatedAtDesc(Long providerId, List<EmergencyRequestStatus> statuses);
 
@@ -51,5 +49,12 @@ public interface EmergencyRequestRepository extends JpaRepository<EmergencyReque
             "SET er.status = 'EXPIRED' " +
             "WHERE er.status = 'WAITING_ACCEPTANCE' " +
             "AND er.createdAt + 1 hour < :currentTimestamp ")
-    void expireEmergencyRequests(@Param("currentTimestamp")LocalDateTime currentTimestamp);
+    void expirePendingEmergencyRequests(@Param("currentTimestamp")LocalDateTime currentTimestamp);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE EmergencyRequest er " +
+            "SET er.status = 'EXPIRED' " +
+            "WHERE er.status = 'ACCEPTED' " +
+            "AND er.createdAt + 1 day < :currentTimestamp ")
+    void expireAcceptedEmergencyRequests(@Param("currentTimestamp") LocalDateTime currentTimestamp);
 }

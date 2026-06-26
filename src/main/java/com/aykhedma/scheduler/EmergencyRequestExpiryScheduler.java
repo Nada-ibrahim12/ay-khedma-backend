@@ -18,6 +18,7 @@ public class EmergencyRequestExpiryScheduler
     @Transactional
     public void expireEmergencyRequests ()
     {
-        emergencyRequestRepository.expireEmergencyRequests(LocalDateTime.now());
+        emergencyRequestRepository.expirePendingEmergencyRequests(LocalDateTime.now());
+        emergencyRequestRepository.expireAcceptedEmergencyRequests(LocalDateTime.now());
     }
 }

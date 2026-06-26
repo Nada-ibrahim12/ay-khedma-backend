@@ -4,8 +4,8 @@ public enum EmergencyRequestStatus {
     BROADCASTING,
     WAITING_ACCEPTANCE,
     ACCEPTED,
+    COMPLETED,
     CANCELLED,
     NO_PROVIDERS,
-    EXPIRED,
-    COMPLETED
+    EXPIRED
 }

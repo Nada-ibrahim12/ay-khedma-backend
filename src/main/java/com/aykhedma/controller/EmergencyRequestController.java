@@ -80,7 +80,7 @@ public class EmergencyRequestController
                    @ApiResponse(responseCode = "403", description = "Consumer does not own the emergency request of this provider response"),
                    @ApiResponse(responseCode = "404", description = "consumer, response or emergency request not found")
             })
-        public ResponseEntity<ProviderResponseResponse> acceptProviderResponse(
+    public ResponseEntity<ProviderResponseResponse> acceptProviderResponse(
             @Parameter(description = "ID of the consumer", required = true)
             @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @Parameter(description = "ID of the provider response", required = true)
@@ -101,7 +101,7 @@ public class EmergencyRequestController
                    @ApiResponse(responseCode = "403", description = "Consumer does not own the emergency request of this provider response"),
                    @ApiResponse(responseCode = "404", description = "consumer, response or emergency request not found")
             })
-        public ResponseEntity<ProviderResponseResponse> declineProviderResponse(
+    public ResponseEntity<ProviderResponseResponse> declineProviderResponse(
             @Parameter(description = "ID of the consumer", required = true)
             @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @Parameter(description = "ID of the provider response", required = true)
@@ -133,8 +133,29 @@ public class EmergencyRequestController
     }
 
     @PreAuthorize("hasRole('CONSUMER')")
+    @PutMapping("/complete-emergency-request/{emergencyRequestId}")
+    @Operation(summary = "Complete an emergency request")
+    @ApiResponses(value =
+            {
+                   @ApiResponse(responseCode = "200", description = "Emergency request completed successfully",
+                           content = @Content(schema = @Schema(implementation = EmergencyRequestResponse.class))),
+                   @ApiResponse(responseCode = "400", description = "Invalid emergency request to be completed"),
+                   @ApiResponse(responseCode = "403", description = "Consumer does not own the emergency request"),
+                   @ApiResponse(responseCode = "404", description = "consumer or emergency request not found")
+            })
+    public ResponseEntity<EmergencyRequestResponse> completeEmergencyRequest(
+            @Parameter(description = "ID of the consumer", required = true)
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId,
+            @Parameter(description = "ID of the emergency request", required = true)
+            @PathVariable Long emergencyRequestId)
+    {
+        EmergencyRequestResponse response = emergencyRequestService.completeEmergencyRequest(consumerId, emergencyRequestId);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @PreAuthorize("hasRole('CONSUMER')")
     @PutMapping("/cancel-emergency-request/{emergencyRequestId}")
-    @Operation(summary = "Decline a provider's response")
+    @Operation(summary = "Cancel an emergency request")
     @ApiResponses(value =
             {
                    @ApiResponse(responseCode = "200", description = "Emergency request cancelled successfully",
@@ -143,7 +164,7 @@ public class EmergencyRequestController
                    @ApiResponse(responseCode = "403", description = "Consumer does not own the emergency request"),
                    @ApiResponse(responseCode = "404", description = "consumer or emergency request not found")
             })
-        public ResponseEntity<EmergencyRequestResponse> cancelEmergencyRequest(
+    public ResponseEntity<EmergencyRequestResponse> cancelEmergencyRequest(
             @Parameter(description = "ID of the consumer", required = true)
             @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @Parameter(description = "ID of the emergency request", required = true)
@@ -204,7 +225,7 @@ public class EmergencyRequestController
                    @ApiResponse(responseCode = "403", description = "Provider does not own this provider response"),
                    @ApiResponse(responseCode = "404", description = "Provider, response or emergency request not found")
             })
-        public ResponseEntity<ProviderResponseResponse> declineEmergencyRequest(
+    public ResponseEntity<ProviderResponseResponse> declineEmergencyRequest(
             @Parameter(description = "ID of the provider", required = true)
             @AuthenticationPrincipal(expression = "user.id") Long providerId,
             @Parameter(description = "ID of the provider response", required = true)
@@ -214,27 +235,25 @@ public class EmergencyRequestController
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
-    @PreAuthorize("hasRole('PROVIDER')")
-    @PutMapping("/complete-emergency-request/{emergencyRequestId}")
-    @Operation(summary = "Complete an emergency request")
-    @ApiResponses(value =
+    // =================================== User Side ===================================
+
+    @PreAuthorize("hasAnyRole('PROVIDER','CONSUMER')")
+    @GetMapping("/get-accepted-emergency-requests")
+    @Operation(summary = "Get user's emergency requests history")
+        @ApiResponses(value =
             {
-                   @ApiResponse(responseCode = "200", description = "Emergency request completed successfully",
-                           content = @Content(schema = @Schema(implementation = EmergencyRequestResponse.class))),
-                   @ApiResponse(responseCode = "400", description = "Invalid emergency request status or doesn't belong to the provider"),
-                   @ApiResponse(responseCode = "404", description = "Emergency request not found")
+                   @ApiResponse(responseCode = "200", description = "Emergency requests retrieved successfully",
+                           content = @Content(schema = @Schema(implementation = BookingResponse.class))),
+                   @ApiResponse(responseCode = "403", description = "User is not a provider or a consumer"),
+                   @ApiResponse(responseCode = "404", description = "User not found")
             })
-    public ResponseEntity<EmergencyRequestResponse> completeEmergencyRequest(
-            @Parameter(description = "ID of the provider", required = true)
-            @AuthenticationPrincipal(expression = "user.id") Long providerId,
-            @Parameter(description = "ID of the emergency request", required = true)
-            @PathVariable Long emergencyRequestId)
+    public ResponseEntity<List<EmergencyRequestResponse>> getAcceptedEmergencyRequests(
+            @Parameter(description = "ID of the user", required = true)
+            @AuthenticationPrincipal(expression = "user.id") Long userId)
     {
-        EmergencyRequestResponse response = emergencyRequestService.completeEmergencyRequest(providerId, emergencyRequestId);
+        List<EmergencyRequestResponse> response = emergencyRequestService.getAcceptedEmergencyRequests(userId);
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
-
-    // =================================== User Side ===================================
 
     @PreAuthorize("hasAnyRole('PROVIDER','CONSUMER')")
     @GetMapping("/get-emergency-requests-history")
