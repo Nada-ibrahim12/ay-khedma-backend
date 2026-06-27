@@ -260,4 +260,24 @@ AND ST_DWithin(
                 @Param("radiusMeters") double radiusMeters,
                 Pageable pageable
         );
+
+        @Query("SELECT p FROM Provider p " +
+                "LEFT JOIN FETCH p.location " +
+                "LEFT JOIN FETCH p.serviceType " +
+                "WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))")
+        List<Provider> findByNameContainingIgnoreCaseWithDetails(@Param("name") String name);
+
+        @Query("SELECT p FROM Provider p " +
+                "LEFT JOIN FETCH p.location " +
+                "LEFT JOIN FETCH p.serviceType " +
+                "WHERE p.serviceType.id = :serviceTypeId " +
+                "AND p.verificationStatus = :status")
+        List<Provider> findByServiceTypeIdAndVerificationStatusWithDetails(
+                @Param("serviceTypeId") Long serviceTypeId,
+                @Param("status") VerificationStatus status);
+
+        @Query("SELECT p.id FROM Provider p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%'))")
+        Optional<Long> findIdByNameContainingIgnoreCase(@Param("name") String name);
+
+        List<Provider> findByNameContainingIgnoreCase(String name);
 }

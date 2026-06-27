@@ -129,13 +129,11 @@ public class GetProviderDetailsTool implements McpTool {
         }
 
         if (providerName != null && !providerName.isEmpty()) {
-            List<Provider> providers = providerRepository.findAll();
-            String normalized = providerName.toLowerCase().trim();
-            return providers.stream()
-                    .filter(p -> p.getName() != null &&
-                            p.getName().toLowerCase().contains(normalized))
-                    .findFirst()
-                    .orElse(null);
+            List<Provider> providers = providerRepository
+                    .findByNameContainingIgnoreCaseWithDetails(providerName.trim());
+            if (!providers.isEmpty()) {
+                return providers.get(0);
+            }
         }
 
         return null;

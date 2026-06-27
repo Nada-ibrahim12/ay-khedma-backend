@@ -144,13 +144,7 @@ public class CheckAvailabilityTool implements McpTool {
         }
 
         if (providerName != null && !providerName.isEmpty()) {
-            List<Provider> providers = providerRepository.findAll();
-            String normalized = providerName.toLowerCase().trim();
-            return providers.stream()
-                    .filter(p -> p.getName() != null &&
-                            p.getName().toLowerCase().contains(normalized))
-                    .findFirst()
-                    .map(Provider::getId)
+            return providerRepository.findIdByNameContainingIgnoreCase(providerName.trim())
                     .orElse(null);
         }
 

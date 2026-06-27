@@ -53,4 +53,10 @@ public interface ServiceTypeRepository extends JpaRepository<ServiceType, Long> 
         Optional<ServiceType> findByNameIgnoreCase(String name);
 
         Optional<ServiceType> findByNameArIgnoreCase(String nameAr);
+
+         Optional<ServiceType> findByNameAr(String nameAr);
+    
+        @Query("SELECT s FROM ServiceType s WHERE LOWER(s.nameAr) = LOWER(:name) OR LOWER(s.name) = LOWER(:name)")
+        Optional<ServiceType> findByNameArOrName(String name);
+
 }

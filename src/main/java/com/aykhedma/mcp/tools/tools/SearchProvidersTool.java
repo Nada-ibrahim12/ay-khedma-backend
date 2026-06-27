@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -52,9 +53,11 @@ public class SearchProvidersTool implements McpTool {
         Map<String, Object> properties = new LinkedHashMap<>();
 
         Map<String, Object> serviceTypeProp = new HashMap<>();
-        serviceTypeProp.put("type", "string");
-        serviceTypeProp.put("description", "The type of service needed (e.g., 'electrician', 'plumber')");
-        properties.put("serviceType", serviceTypeProp);
+        serviceTypeProp.put("type", "array");
+        serviceTypeProp.put("items", Map.of("type", "string"));
+        serviceTypeProp.put("description",
+                "List of service types needed (e.g., ['Plumbing', 'Pipe Installation', 'Drain Cleaning'])");
+        properties.put("serviceTypes", serviceTypeProp);
 
         Map<String, Object> latProp = new HashMap<>();
         latProp.put("type", "number");
@@ -72,9 +75,8 @@ public class SearchProvidersTool implements McpTool {
         radiusProp.put("default", 10);
         properties.put("radiusKm", radiusProp);
 
-
         inputSchema.put("properties", properties);
-        inputSchema.put("required", List.of("serviceType", "latitude", "longitude"));
+        inputSchema.put("required", List.of("serviceTypes", "latitude", "longitude"));
 
         schema.put("inputSchema", inputSchema);
         return schema;
@@ -82,65 +84,141 @@ public class SearchProvidersTool implements McpTool {
 
     @Override
     public Object execute(Map<String, Object> arguments) {
-        String serviceType = (String) arguments.get("serviceType");
+        List<String> serviceTypes = (List<String>) arguments.get("serviceTypes");
+
+        if (serviceTypes == null && arguments.get("serviceType") != null) {
+            serviceTypes = List.of((String) arguments.get("serviceType"));
+        }
+
+        if (serviceTypes == null || serviceTypes.isEmpty()) {
+            log.warn("No service types provided");
+            Map<String, Object> emptyResult = new LinkedHashMap<>();
+            emptyResult.put("providers", List.of());
+            emptyResult.put("count", 0);
+            emptyResult.put("message", "No service types specified");
+            emptyResult.put("serviceTypesMatched", List.of());
+            return emptyResult;
+        }
+
         Double latitude = ((Number) arguments.get("latitude")).doubleValue();
         Double longitude = ((Number) arguments.get("longitude")).doubleValue();
         Integer radiusKm = arguments.get("radiusKm") != null ? ((Number) arguments.get("radiusKm")).intValue() : 10;
 
-        log.info("search_providers: serviceType={}, location=({},{}), radius={}",
-                serviceType, latitude, longitude, radiusKm);
+        log.info("search_providers: serviceTypes={}, location=({},{}), radius={}",
+                serviceTypes, latitude, longitude, radiusKm);
 
         try {
-            ServiceType resolvedService = serviceTypeResolver.resolveByMeaning(serviceType);
-            if (resolvedService == null) {
-                log.warn("No service type found for: {}", serviceType);
-                return List.of();
+            List<ServiceType> resolvedServices = new ArrayList<>();
+            List<String> matchedServiceNames = new ArrayList<>();
+
+            for (String serviceType : serviceTypes) {
+                ServiceType resolved = serviceTypeResolver.resolveByMeaning(serviceType);
+                if (resolved != null) {
+                    resolvedServices.add(resolved);
+                    matchedServiceNames.add(resolved.getNameAr() + " (" + resolved.getName() + ")");
+                    log.info("Resolved '{}' to service type: {} ({})",
+                            serviceType, resolved.getName(), resolved.getNameAr());
+                } else {
+                    log.warn("No service type found for: {}", serviceType);
+                }
             }
 
-            List<Provider> providers = providerRepository
-                    .findByServiceTypeIdAndVerificationStatus(resolvedService.getId(), VerificationStatus.VERIFIED);
-
-            if (providers.isEmpty()) {
-                log.info("No providers found for service: {}", serviceType);
-                return List.of();
+            if (resolvedServices.isEmpty()) {
+                log.warn("No service types could be resolved for: {}", serviceTypes);
+                Map<String, Object> emptyResult = new LinkedHashMap<>();
+                emptyResult.put("providers", List.of());
+                emptyResult.put("count", 0);
+                emptyResult.put("message", "لم نجد خدمات تطابق طلبك");
+                emptyResult.put("serviceTypesMatched", List.of());
+                return emptyResult;
             }
 
-            int limit = 5;
-            providers = providers.stream().limit(limit).toList();
+            Set<Long> providerIds = new HashSet<>();
+            List<Provider> allProviders = new ArrayList<>();
 
-            List<Map<String, Object>> responses = providers.stream()
-                    .map(provider -> toProviderMap(provider, latitude, longitude))
-                    .toList();
+            for (ServiceType service : resolvedServices) {
+                List<Provider> providers = providerRepository
+                        .findByServiceTypeIdAndVerificationStatusWithDetails(service.getId(),
+                                VerificationStatus.VERIFIED);
+                for (Provider p : providers) {
+                    if (providerIds.add(p.getId())) {
+                        allProviders.add(p);
+                    }
+                }
+            }
 
-            log.info("Found {} providers", responses.size());
-            return responses;
+            if (allProviders.isEmpty()) {
+                log.info("No providers found for services: {}", serviceTypes);
+                Map<String, Object> emptyResult = new LinkedHashMap<>();
+                emptyResult.put("providers", List.of());
+                emptyResult.put("count", 0);
+                emptyResult.put("message", "لم نجد مقدمي خدمة في منطقتك حالياً");
+                emptyResult.put("serviceTypesMatched", matchedServiceNames);
+                return emptyResult;
+            }
+
+            Location consumerLocation = Location.builder()
+                    .latitude(latitude)
+                    .longitude(longitude)
+                    .build();
+
+            int limit = 10;
+            List<Map<String, Object>> responses = allProviders.stream()
+                    .filter(p -> p.getLocation() != null)
+                    .map(provider -> toProviderMap(provider, consumerLocation))
+                    .filter(providerMap -> (double) providerMap.get("distance") <= radiusKm)
+                    .sorted(
+                            Comparator.comparingDouble((Map<String, Object> p) -> (double) p.get("averageRating"))
+                                    .reversed()
+                                    .thenComparingDouble(p -> (double) p.get("distance")))
+                    .limit(limit)
+                    .collect(Collectors.toList());
+
+            log.info("Found {} providers within {} km for service types: {}",
+                    responses.size(), radiusKm, matchedServiceNames);
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("providers", responses);
+            result.put("count", responses.size());
+            result.put("serviceTypesMatched", matchedServiceNames);
+            result.put("message", responses.isEmpty()
+                    ? "لم نجد مقدمي خدمة في منطقتك حالياً"
+                    : String.format("وجدنا %d مقدم خدمة في منطقتك", responses.size()));
+
+            return result;
 
         } catch (Exception e) {
             log.error("Error in search_providers: {}", e.getMessage(), e);
-            return List.of();
+            Map<String, Object> errorResult = new LinkedHashMap<>();
+            errorResult.put("providers", List.of());
+            errorResult.put("count", 0);
+            errorResult.put("message", "حدث خطأ أثناء البحث");
+            errorResult.put("serviceTypesMatched", List.of());
+            return errorResult;
         }
     }
 
-    private Map<String, Object> toProviderMap(Provider provider, double consumerLat, double consumerLng) {
+    private Map<String, Object> toProviderMap(Provider provider, Location consumerLocation) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", provider.getId());
         result.put("name", provider.getName());
         result.put("averageRating", provider.getAverageRating() != null ? provider.getAverageRating() : 0.0);
 
         double distanceKm = 0.0;
-        if (provider.getLocation() != null && provider.getLocation().getLatitude() != null
-                && provider.getLocation().getLongitude() != null) {
-            Location consumerLocation = Location.builder()
-                    .latitude(consumerLat)
-                    .longitude(consumerLng)
-                    .build();
+        if (provider.getLocation() != null) {
             distanceKm = provider.getLocation().calculateDistance(consumerLocation);
         }
         result.put("distance", distanceKm);
 
         if (provider.getServiceType() != null) {
             result.put("serviceType", provider.getServiceType().getName());
+            result.put("serviceTypeAr", provider.getServiceType().getNameAr());
         }
+
+        if (provider.getLocation() != null) {
+            result.put("area", provider.getLocation().getArea());
+        }
+
         return result;
     }
 }
