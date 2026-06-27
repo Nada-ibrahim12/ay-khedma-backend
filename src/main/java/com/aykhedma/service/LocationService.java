@@ -56,7 +56,6 @@ public class LocationService {
         if (consumer.getLocation() != null) {
             throw new IllegalStateException("Consumer already has a location. Use update instead.");
         }
-
         // Create new location
         Location location = locationMapper.toEntity(locationDTO);
         location = locationRepository.save(location);
@@ -81,18 +80,24 @@ public class LocationService {
             throw new ResourceNotFoundException("Consumer has no location to update. Please save location first.");
         }
 
-        Location location = consumer.getLocation();
+        Location existingLocation = consumer.getLocation();
 
-        // Update existing location using mapper
-        locationMapper.updateEntity(locationDTO, location);
-        location = locationRepository.save(location);
+        if (isLocationSame(existingLocation, locationDTO)) {
+            log.info("Location data identical for consumer {}; no update performed.", consumerId);
+            return locationMapper.toResponseWithMessage(existingLocation,
+                    "Location data unchanged; no update performed", false);
+        }
+
+        locationMapper.updateEntity(locationDTO, existingLocation);
+        Location updatedLocation = locationRepository.save(existingLocation);
 
         log.info("Location updated successfully for consumer ID: {}", consumerId);
 
-        sendLocationUpdateNotification(consumerId, "updated", location);
+        sendLocationUpdateNotification(consumerId, "updated", updatedLocation);
 
-        return locationMapper.toResponseWithMessage(location, "Location updated successfully", true);
+        return locationMapper.toResponseWithMessage(updatedLocation, "Location updated successfully", true);
     }
+
 
     @Transactional
     public LocationResponse patchConsumerLocation(Long consumerId, LocationDTO locationDTO) {
@@ -214,17 +219,22 @@ public class LocationService {
             throw new ResourceNotFoundException("Provider has no location to update. Please save location first.");
         }
 
-        Location location = provider.getLocation();
+        Location existingLocation = provider.getLocation();
 
-        // Update existing location using mapper
-        locationMapper.updateEntity(locationDTO, location);
-        location = locationRepository.save(location);
+        if (isLocationSame(existingLocation, locationDTO)) {
+            log.info("Location data identical for provider {}; no update performed.", providerId);
+            return locationMapper.toResponseWithMessage(existingLocation,
+                    "Location data unchanged; no update performed", false);
+        }
+
+        locationMapper.updateEntity(locationDTO, existingLocation);
+        Location updatedLocation = locationRepository.save(existingLocation);
 
         log.info("Location updated successfully for provider ID: {}", providerId);
 
-        sendLocationUpdateNotification(providerId, "updated", location);
+        sendLocationUpdateNotification(providerId, "updated", updatedLocation);
 
-        return locationMapper.toResponseWithMessage(location, "Location updated successfully", true);
+        return locationMapper.toResponseWithMessage(updatedLocation, "Location updated successfully", true);
     }
 
     @Transactional
@@ -479,4 +489,13 @@ public class LocationService {
                 .sorted(Comparator.comparing(ProviderSummaryResponse::getDistance))
                 .collect(Collectors.toList());
     }
+
+    private boolean isLocationSame(Location existing, LocationDTO dto) {
+        return Objects.equals(existing.getLatitude(), dto.getLatitude()) &&
+                Objects.equals(existing.getLongitude(), dto.getLongitude()) &&
+                Objects.equals(existing.getAddress(), dto.getAddress()) &&
+                Objects.equals(existing.getArea(), dto.getArea()) &&
+                Objects.equals(existing.getCity(), dto.getCity());
+    }
+
 }

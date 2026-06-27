@@ -141,6 +141,10 @@ public class ProviderServiceImpl implements ProviderService {
             provider.setEmergencyEnabled(request.getEmergencyEnabled());
         }
 
+        if (request.getPreferredLanguage() != null) {
+            consumer.setPreferredLanguage(request.getPreferredLanguage());
+        }
+
         // update location info
         if (request.getLocation() != null) {
             locationService.updateProviderLocation(providerId, request.getLocation());
