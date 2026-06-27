@@ -60,6 +60,9 @@ __pycache__/
 *.pth
 *.h5
 
+# Keep YOLO weights for the verification service
+!verification-service/OCR_DeepFace/weights/*.pt
+
 # IDE files
 .vscode/
 .idea/
