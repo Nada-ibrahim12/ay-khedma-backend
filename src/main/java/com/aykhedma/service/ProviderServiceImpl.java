@@ -142,7 +142,7 @@ public class ProviderServiceImpl implements ProviderService {
         }
 
         if (request.getPreferredLanguage() != null) {
-            consumer.setPreferredLanguage(request.getPreferredLanguage());
+            provider.setPreferredLanguage(request.getPreferredLanguage());
         }
 
         // update location info
