@@ -20,6 +20,7 @@ public class ProviderSummaryResponse {
     private Double averageRating;
     private Double price;
     private PriceType priceType;
+    private String priceTypeAr;
     private LocationDTO location;
     private Double distance; // In KM
     private Integer estimatedArrivalTime; // In minutes

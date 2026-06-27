@@ -46,6 +46,7 @@ public class ProviderResponse {
     private Double averageJobs;
     private Double price;
     private PriceType priceType;
+    private String priceTypeAr;
     private Integer averageTime;
     private Integer acceptanceRate;
     private Double cancellationRate;
