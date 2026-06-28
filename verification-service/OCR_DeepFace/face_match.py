@@ -9,6 +9,25 @@ def read_image(file_bytes):
     return img
 
 
+def detect_face_exists(img):
+    """
+    Check whether a face can actually be detected in the image
+    using RetinaFace. Returns True only if at least one face is found.
+    This prevents non-face images (blank photos, gradients, etc.)
+    from being accepted.
+    """
+    try:
+        faces = DeepFace.extract_faces(
+            img_path=img,
+            detector_backend="retinaface",
+            enforce_detection=True
+        )
+        return len(faces) > 0
+    except Exception as e:
+        print(f"  face detection check failed: {str(e)}")
+        return False
+
+
 def extract_face_from_id(id_img, object_model):
     """
     Use the YOLO object model to crop the 'photo' region from
@@ -40,13 +59,24 @@ def face_match(img1, img2, object_model=None):
     Compare the face on the national ID (img1) against the selfie (img2).
 
     Steps:
-    1. Try all 4 rotations of the ID image.
-    2. For each rotation, try to extract the face photo region using YOLO.
-    3. Compare the extracted face (or full ID if extraction fails) to the selfie.
+    1. Pre-validate that the selfie contains a real, detectable face.
+    2. Try all 4 rotations of the ID image.
+    3. For each rotation, try to extract the face photo region using YOLO.
+    4. Compare the extracted face (or full ID if extraction fails) to the selfie.
 
     Returns a dict with key "match" (bool) to align with the Java
     FaceMatchResponse DTO.
     """
+
+    # ── Pre-check: reject selfies with no detectable face ──
+    if not detect_face_exists(img2):
+        print("REJECTED: No face detected in the selfie image")
+        return {
+            "match": False,
+            "distance": 0.0,
+            "threshold": 0.0,
+            "error": "No face detected in the selfie image"
+        }
 
     id_rotations = [
         img1,
@@ -78,7 +108,7 @@ def face_match(img1, img2, object_model=None):
                 img1_path=compare_img,
                 img2_path=img2,
                 model_name="VGG-Face",
-                enforce_detection=False,
+                enforce_detection=True,
                 detector_backend="retinaface"
             )
 
@@ -101,6 +131,10 @@ def face_match(img1, img2, object_model=None):
                 best_distance = distance
                 best_result = result
 
+        except ValueError as e:
+            # DeepFace raises ValueError when enforce_detection=True
+            # and no face is found in the image
+            print(f"  rotation {i}: no face detected — {str(e)}")
         except Exception as e:
             print(f"  rotation {i} error: {str(e)}")
 
