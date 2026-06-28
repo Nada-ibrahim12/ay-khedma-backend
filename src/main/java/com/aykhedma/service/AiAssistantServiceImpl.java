@@ -260,6 +260,10 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         log.info("Processing chat with MCP - message: {}", request.getMessage());
 
         try {
+
+            Long userId = currentUser != null ? currentUser.getId() : null;
+            ChatSession session = resolveSession(request, userId);
+
             List<ChatMessage> recentHistory = getRecentHistory(
                     chatMessageRepository.findByChatSessionSessionIdOrderByTimestampAsc(request.getSessionId()),
                     MAX_HISTORY_TURNS);
@@ -282,13 +286,19 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             if (toolResponse.needsClarification) {
                 String reply = toolResponse.reply != null ? toolResponse.reply
                         : "محتاج هذه المعلومات لإتمام طلبك: " + String.join(", ", toolResponse.missingFields);
-                return ChatResponse.builder()
+                
+                saveUserMessage(session, userId != null ? userId : 0L, request.getMessage());
+
+                ChatResponse clarificationResponse = ChatResponse.builder()
                         .sessionId(request.getSessionId())
                         .message(reply)
                         .timestamp(LocalDateTime.now())
                         .detectedLanguage(detectLanguage(request.getMessage()))
                         .responseType(ChatResponseType.CLARIFICATION)
                         .build();
+                saveAssistantMessage(session, clarificationResponse);
+
+                return clarificationResponse;
             }
 
             // Step 4: Execute the tool via MCP
@@ -328,8 +338,12 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             log.info("MCP Response: {}", mcpResponse);
 
             // Step 6: Build response based on tool
-            return buildResponseFromMcpResult(toolName, mcpResponse, request, toolResponse.reply);
+            ChatResponse chatResponse = buildResponseFromMcpResult(toolName, mcpResponse, request, toolResponse.reply);
 
+            saveUserMessage(session, userId != null ? userId : 0L, request.getMessage());
+            saveAssistantMessage(session, chatResponse);
+
+            return chatResponse;
         } catch (Exception e) {
             log.error("MCP chat failed: {}", e.getMessage(), e);
             return chatWithExisting(request, currentUser);
