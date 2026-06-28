@@ -65,4 +65,17 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
     boolean isTimeWithinAvailableSlot(@Param("scheduleId") Long scheduleId,
                                       @Param("date") LocalDate date,
                                       @Param("time") LocalTime time);
+    
+    @Query("SELECT CASE WHEN COUNT(ts) > 0 THEN true ELSE false END " +
+                    "FROM TimeSlot ts " +
+                    "JOIN ts.schedule s " +
+                    "JOIN Provider p ON p.schedule.id = s.id " +
+                    "WHERE p.id = :providerId " +
+                    "AND ts.date = :date " +
+                    "AND ts.status = 'AVAILABLE' " +
+                    "AND ts.startTime <= :time " +
+                    "AND ts.endTime >= :time")
+    boolean isTimeWithinAvailableSlotByProviderId(@Param("providerId") Long providerId,
+                    @Param("date") LocalDate date,
+                    @Param("time") LocalTime time);
 }

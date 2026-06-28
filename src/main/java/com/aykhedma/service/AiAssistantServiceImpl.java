@@ -330,6 +330,29 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 arguments.put("longitude", userLongitude);
                 log.info("Overrode location to REAL user coordinates: {}, {}", userLatitude, userLongitude);
             }
+
+            if ("create_booking".equals(toolName)) {
+                Long consumerId = null;
+                if (currentUser != null && currentUser.getRole() == UserType.CONSUMER) {
+                    consumerId = currentUser.getId();
+                    log.info("Injecting consumer ID for booking: {}", consumerId);
+                }
+                if (consumerId != null) {
+                    arguments.put("consumerId", consumerId);
+                } else {
+                    log.warn("No consumer ID available for booking");
+                    ChatResponse errorResponse = ChatResponse.builder()
+                            .sessionId(request.getSessionId())
+                            .message("يجب تسجيل الدخول كمستهلك لحجز خدمة. يرجى تسجيل الدخول والمحاولة مرة أخرى.")
+                            .timestamp(LocalDateTime.now())
+                            .detectedLanguage("ar")
+                            .responseType(ChatResponseType.ERROR)
+                            .build();
+                    saveUserMessage(session, userId != null ? userId : 0L, request.getMessage());
+                    saveAssistantMessage(session, errorResponse);
+                    return errorResponse;
+                }
+            }
             Map<String, Object> mcpRequest = buildMcpRequest(toolName, arguments);
 
             log.info("MCP Request: {}", mcpRequest);
@@ -459,6 +482,41 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 + toolsDesc.toString()
                 + """
 
+                - Today Date is %s
+
+                ## DATE AND TIME HANDLING
+
+                ### Input Formats
+                - **Dates**: "30/6" or "30/6/2026" → June 30, 2026 | "15-6" → June 15 | "يوم 30" → 30th of current month
+                - **Days**: "الجمعة", "السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس" → Next [day]
+                - **Relative**: "بعد اسبوع" → +7 days | "بعد 3 ايام" → +3 days
+                - **Times**: "7" or "7 صباحاً" → 07:00 | "7 مساءً" → 19:00 | "الظهر" → 12:00 | "العصر" → 16:00 | "المغرب" → 18:00 | "العشاء" → 20:00
+
+                ### Day Rules (CRITICAL)
+                - **"الجمعة"/Friday** → FIRST Friday AFTER today (if today IS Friday → next Friday, +7 days)
+                - **Other days** → NEXT occurrence of that day
+                - **"الجمعة الجاي"** → Friday of next week (not this coming Friday)
+
+                ### Day Mapping
+                - الأحد → Sunday | الاثنين → Monday | الثلاثاء → Tuesday | الأربعاء → Wednesday | الخميس → Thursday | الجمعة → Friday | السبت → Saturday
+
+                ### Date Parsing Rules
+                1. **Day+Month only** (e.g., "30/6"): Use current year (2026); if date passed → ADD 1 YEAR
+                2. **Day only** (e.g., "يوم 30"): Use current month; if day passed → ADD 1 MONTH
+                3. **Relative**: "بعد X يوم/اسبوع" → Today + X days
+                4. **Output**: Always `"yyyy-MM-dd"` (e.g., "2026-06-30")
+
+                ### Time Parsing Rules
+                1. **Number 1-12** → AM (morning) | **13-24** → 24-hour format
+                2. **Arabic references**: "صباحاً/صبح" → AM | "مساءً/مغرب" → PM (+12) | "ظهراً" → 12:00 | "العصر" → 16:00 | "المغرب" → 18:00 | "العشاء" → 20:00
+                3. **Output**: Always `"HH:mm"` (e.g., "07:00", "19:00")
+
+                ### Examples
+                1. User: "الجمعة الساعة 10" (Today Monday) → date="2026-07-03", time="10:00"
+                2. User: "السبت الجاي الساعة 4 العصر" (Today Monday) → date="2026-07-04", time="16:00"
+                3. User: "يوم 30/6 الساعة 7" (Today June 28) → date="2026-06-30", time="07:00"
+                4. User: "يوم 15/6 الساعة 8" (Today June 28, past) → date="2027-06-15", time="08:00"
+
                         you need to analyze service categories and service types from the database
                         """
                 + categoriesStr
@@ -509,6 +567,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                         - Use when user wants to BOOK or RESERVE an appointment
                         - Required: providerId, date, time, problemDescription
                         - If any required field is missing, set needsClarification=true
+                        - Apply the date/time/day-of-week parsing rules above
                         - Example: "احجز معاه/ مع احمد الساعة 4 يوم السبت" → tool="create_booking"
 
                         ### get_provider_details
@@ -526,12 +585,17 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                         
                         ## REMEMBER:
                         - Return ONLY valid JSON
+                        - Dates: ALWAYS use "yyyy-MM-dd" format
+                        - Times: ALWAYS use "HH:mm" 24-hour format
+                        - If a date is in the past, add 1 year
+                        - Days of the week = next occurrence of that day
                         - No explanation outside JSON
                         - No markdown formatting around JSON
                         - Always use double quotes for JSON properties
                         - For Arabic user messages, respond in Arabic in the reply field
                         - For English user messages, respond in English
-                        """.formatted(userLocationInfo, userLatitude, userLongitude, userLatitude, userLongitude);
+                        """.formatted(userLocationInfo, userLatitude, userLongitude, 
+                        LocalDate.now().toString(), userLatitude, userLongitude);
     }
 
     /**

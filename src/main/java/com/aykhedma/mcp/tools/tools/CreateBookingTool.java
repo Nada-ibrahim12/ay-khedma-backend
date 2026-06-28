@@ -162,7 +162,7 @@ public class CreateBookingTool implements McpTool {
                         "error", "Cannot book in the past. Please provide a future date.");
             }
 
-            boolean isAvailable = timeSlotRepository.isTimeWithinAvailableSlot(
+            boolean isAvailable = timeSlotRepository.isTimeWithinAvailableSlotByProviderId(
                     providerId,
                     date,
                     time);
