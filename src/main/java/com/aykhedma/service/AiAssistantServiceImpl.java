@@ -202,69 +202,6 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
 // =======================================================================================================
-
-// private ChatResponse chatWithMcp(AiChatRequest request, User currentUser) {
-//     String userMessage = request.getMessage();
-//         boolean isVoiceNote = request.getVoiceNote() != null && !request.getVoiceNote().isEmpty();
-
-//         if (isVoiceNote) {
-//             try {
-//                 String transcribedText = speechToTextService.transcribeAudio(request.getVoiceNote());
-//                 if (StringUtils.hasText(transcribedText)) {
-//                     userMessage = transcribedText;
-//                     request.setMessage(userMessage);
-//                     log.info("Voice transcribed for MCP: {}", userMessage);
-//                 } else {
-//                     // Transcription failed – return clarification
-//                     Long userId = currentUser != null ? currentUser.getId() : null;
-//                     ChatSession session = resolveSession(request, userId);
-//                     saveUserMessage(session, userId != null ? userId : 0L, "[Voice note - transcription failed]");
-//                     saveAssistantMessage(session, ChatResponse.builder()
-//                             .sessionId(session.getSessionId())
-//                             .timestamp(LocalDateTime.now())
-//                             .message("عذراً، لم أتمكن من تحويل الرسالة الصوتية. ممكن تعيد تسجيلها أو تكتبها نصياً؟")
-//                             .responseType(ChatResponseType.CLARIFICATION)
-//                             .detectedLanguage("ar")
-//                             .build());
-//                     return ChatResponse.builder()
-//                             .sessionId(session.getSessionId())
-//                             .timestamp(LocalDateTime.now())
-//                             .message("عذراً، لم أتمكن من تحويل الرسالة الصوتية. ممكن تعيد تسجيلها أو تكتبها نصياً؟")
-//                             .responseType(ChatResponseType.CLARIFICATION)
-//                             .detectedLanguage("ar")
-//                             .build();
-//                 }
-//             } catch (IOException e) {
-//                 log.error("Voice transcription error in MCP", e);
-//                 // Fallback: use original message if any, else return error
-//                 if (!StringUtils.hasText(userMessage)) {
-//                     ChatSession session = resolveSession(request, currentUser != null ? currentUser.getId() : null);
-//                     return ChatResponse.builder()
-//                             .sessionId(session.getSessionId())
-//                             .timestamp(LocalDateTime.now())
-//                             .message("عذراً، حدث خطأ أثناء معالجة الصوت. حاول مرة أخرى.")
-//                             .responseType(ChatResponseType.ERROR)
-//                             .detectedLanguage("ar")
-//                             .build();
-//                 }
-//             }
-//         }
-
-//         if (!StringUtils.hasText(userMessage)) {
-//             throw new BadRequestException("Message or voice note is required");
-//         }
-
-
-//     // Use the new MCP native function calling service
-//     String response = mcpNativeFunctionCallingService.chatWithMcp(userMessage, request.getSessionId());
-
-//     return ChatResponse.builder()
-//         .sessionId(request.getSessionId())
-//         .message(response)
-//         .timestamp(LocalDateTime.now())
-//         .detectedLanguage(detectLanguage(request.getMessage()))
-//         .build();
-// }
     /**
      * MCP-based chat implementation with AI Tool Calling
      */
@@ -363,6 +300,26 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
             // Step 5: Build and execute MCP request
             Map<String, Object> arguments = toolResponse.arguments != null ? toolResponse.arguments : new HashMap<>();
+
+            if ("search_providers".equals(toolName)) {
+                double userLatitude = 0.0;
+                double userLongitude = 0.0;
+
+                if (currentUser != null && currentUser.getRole() == UserType.CONSUMER) {
+                    if (currentUser instanceof Consumer) {
+                        Consumer consumer = (Consumer) currentUser;
+                        if (consumer.getLocation() != null) {
+                            userLatitude = consumer.getLocation().getLatitude();
+                            userLongitude = consumer.getLocation().getLongitude();
+                            log.info("Using REAL consumer location: {}, {}", userLatitude, userLongitude);
+                        }
+                    }
+                }
+
+                arguments.put("latitude", userLatitude);
+                arguments.put("longitude", userLongitude);
+                log.info("Overrode location to REAL user coordinates: {}, {}", userLatitude, userLongitude);
+            }
             Map<String, Object> mcpRequest = buildMcpRequest(toolName, arguments);
 
             log.info("MCP Request: {}", mcpRequest);
@@ -405,6 +362,28 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         String userRole = (currentUser != null && currentUser.getRole() != null)
                 ? currentUser.getRole().name()
                 : "anonymous";
+        
+
+        double userLatitude = 0.0;
+        double userLongitude = 0.0;
+        String userLocationInfo = "";
+
+        if (currentUser != null) {
+        if (currentUser.getRole() == UserType.CONSUMER) {
+            if (currentUser instanceof Consumer) {
+                Consumer consumer = (Consumer) currentUser;
+                if (consumer.getLocation() != null) {
+                    userLatitude = consumer.getLocation().getLatitude();
+                    userLongitude = consumer.getLocation().getLongitude();
+                    userLocationInfo = String.format("User location (from consumer): (%.4f, %.4f)", userLatitude, userLongitude);
+                    log.info("Using consumer location: {}, {}", userLatitude, userLongitude);
+                }
+            }
+        } else {
+            log.info("User is not a consumer");
+        }
+    }
+
 
         // Build tools description
         StringBuilder toolsDesc = new StringBuilder();
@@ -434,76 +413,111 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             }
             toolsDesc.append("\n");
         }
+
+        List<ServiceType> allServices = getCachedServiceTypes();
+        List<ServiceCategory> allCategories = getCachedCategories();
+
+        String categoriesStr = allCategories.stream()
+                .map(cat -> "- Category: " + cat.getName() + " (ID: " + cat.getId() + " description: "
+                        + cat.getDescription() + ")")
+                .collect(Collectors.joining("\n"));
+
+        String servicesStr = allServices.stream()
+                .map(st -> "- Service Type: " + st.getName() + " (ID: " + st.getId() + ", Category ID: "
+                        + (st.getCategory() != null ? st.getCategory().getId() : "null") + ", description: "
+                        + st.getDescription() + ")")
+                .collect(Collectors.joining("\n"));
+
         return """
                 You are Ay Khedma AI Assistant - a comprehensive service marketplace assistant.
+
+                 ## USER LOCATION INFORMATION:
+                %s
+                - Latitude: %.4f
+                - Longitude: %.4f
+                - ALWAYS use these coordinates when calling search_providers
+                - Do NOT ask the user for their location - you already have it!
 
                 ## YOUR TASK:
                 Analyze the user's message and decide which tool to call.
 
-                """ + toolsDesc.toString() + """
+                """
+                + toolsDesc.toString()
+                + """
 
-                ## INSTRUCTIONS:
-                1. Choose the most appropriate tool based on the user's request
-                2. Extract all required parameters from the user's message
-                3. If required parameters are missing, set needsClarification=true and list missing fields
-                4. If the user is not authenticated and booking is needed, ask them to login
-                5. For dates, always use format "yyyy-MM-dd"
-                6. For times, always use format "HH:mm" (24-hour format)
-                7. For service type, try to match the service type name from the user's message
+                        you need to analyze service categories and service types from the database
+                        """
+                + categoriesStr
+                + "\n\n"
+                + servicesStr
+                + """
 
-                ## OUTPUT FORMAT:
-                Return ONLY valid JSON. No extra text, no explanation, no markdown.
+                        ## INSTRUCTIONS:
+                        1. Analyze user's problem, there is no unauthenticated user can access the chatbot
+                        2. Choose the most appropriate tool based on the user's request
+                        3. Extract all required parameters from the user's message
+                        4. Choose the most appropriate services can solve the user's issue
+                        5. If required parameters are missing, set needsClarification=true and list missing fields
+                        6. For dates, always use format "yyyy-MM-dd"
+                        7. For times, always use format "HH:mm" (24-hour format)
+                        8. For search_providers, ALWAYS include the user's latitude and longitude from above
 
-                {
-                  "tool": "tool_name",
-                  "arguments": {
-                    "param1": "value1",
-                    "param2": "value2"
-                  },
-                  "needsClarification": false,
-                  "missingFields": ["field1", "field2"] or null,
-                  "reply": "natural language response to user"
-                }
+                        ## OUTPUT FORMAT:
+                        Return ONLY valid JSON. No extra text, no explanation, no markdown.
 
-                ## TOOL USAGE RULES:
+                        {
+                          "tool": "tool_name",
+                          "arguments": {
+                            "param1": "value1",
+                            "param2": "value2"
+                          },
+                          "needsClarification": false,
+                          "missingFields": ["field1", "field2"] or null,
+                          "reply": "natural language response to user"
+                        }
 
-                ### search_providers
-                - Use when user wants to FIND or SEARCH for providers
-                - Extract serviceType from user message (e.g., "electrician", "plumber", "AC Repair")
-                - Use default location if not provided: latitude=30.0444, longitude=31.2357
-                - Example: "محتاج فني تكييف" → tool="search_providers", serviceType="AC Repair"
+                        ## TOOL USAGE RULES:
 
-                ### check_availability
-                - Use when user wants to SEE available time slots for a SPECIFIC provider
-                - Must have providerId or providerName
-                - Date is optional - if not provided, show next 7 days
-                - Example: "وريني مواعيده / وريني مواعيد احمد ابراهيم" → tool="check_availability", providerId=20
+                        ### search_providers
+                        - Use when user wants to FIND or SEARCH for providers
+                        - Extract serviceTypes from understanding of user message (e.g., "electrician", "plumbing", "AC Repair")
+                        - Use consumer location to calculate distance between them
+                        - IMPORTANT: serviceTypes must be a JSON ARRAY (list), not a string!
+                        - Example: "محتاج فني تكييف" → tool="search_providers", serviceTypes=["AC Repair", "HVAC", "Air Conditioner Maintenance"], latitude=%.4f, longitude=%.4f
 
-                ### create_booking
-                - Use when user wants to BOOK or RESERVE an appointment
-                - Required: providerId, date, time, problemDescription
-                - If any required field is missing, set needsClarification=true
-                - Example: "احجز معاه/ مع احمد الساعة 4 يوم السبت" → tool="create_booking"
+                        ### check_availability
+                        - Use when user wants to SEE available time slots for a SPECIFIC provider
+                        - Must have providerId or providerName
+                        - Date is optional - if not provided, show next 7 days
+                        - Example: "وريني مواعيده / وريني مواعيد احمد ابراهيم" → tool="check_availability", providerId=20
 
-                ### get_provider_details
-                - Use when user wants DETAILED information about a provider
-                - Must have providerId or providerName
-                - Example: "عايز معلومات عنه/عن ياسر عبده" → tool="get_provider_details"
+                        ### create_booking
+                        - Use when user wants to BOOK or RESERVE an appointment
+                        - Required: providerId, date, time, problemDescription
+                        - If any required field is missing, set needsClarification=true
+                        - Example: "احجز معاه/ مع احمد الساعة 4 يوم السبت" → tool="create_booking"
 
-                ## CONTEXT:
-                Current user role: """ + userRole + """
-                - If role = "anonymous" or role = "null" or role = "ANONYMOUS", user is NOT logged in
-                - For create_booking when user is anonymous, set needsClarification=true
-                - For search_providers and check_availability, anonymous users ARE allowed
+                        ### get_provider_details
+                        - Use when user wants DETAILED information about a provider
+                        - Must have providerId or providerName
+                        - Example: "عايز معلومات عنه/عن ياسر عبده" → tool="get_provider_details"
 
-                ## REMEMBER:
-                - Return ONLY valid JSON
-                - No explanation outside JSON
-                - No markdown formatting around JSON
-                - Always use double quotes for JSON properties
-                - For Arabic user messages, respond in Arabic in the reply field
-                - For English user messages, respond in English
-                """;
+                        ## CONTEXT:
+                        Current user role: """
+                + userRole
+                + """
+
+                        - If role = "anonymous" or role = "null" or role = "ANONYMOUS" , user is NOT logged in
+                        - The user must be authenticated to access any tool
+                        
+                        ## REMEMBER:
+                        - Return ONLY valid JSON
+                        - No explanation outside JSON
+                        - No markdown formatting around JSON
+                        - Always use double quotes for JSON properties
+                        - For Arabic user messages, respond in Arabic in the reply field
+                        - For English user messages, respond in English
+                        """.formatted(userLocationInfo, userLatitude, userLongitude, userLatitude, userLongitude);
     }
 
     /**
@@ -533,14 +547,52 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 response.arguments = new HashMap<>();
                 argsNode.fields().forEachRemaining(entry -> {
                     JsonNode value = entry.getValue();
-                    if (value.isTextual()) {
-                        response.arguments.put(entry.getKey(), value.asText());
-                    } else if (value.isNumber()) {
-                        response.arguments.put(entry.getKey(), value.asDouble());
-                    } else if (value.isBoolean()) {
-                        response.arguments.put(entry.getKey(), value.asBoolean());
+                    String key = entry.getKey();
+                    if ("serviceTypes".equals(key)) {
+                        try {
+                            if (value.isArray()) {
+                                List<String> serviceList = new ArrayList<>();
+                                for (JsonNode item : value) {
+                                    serviceList.add(item.asText());
+                                }
+                                response.arguments.put(key, serviceList);
+                            }
+                            else if (value.isTextual()) {
+                                String strValue = value.asText().trim();
+                                if (strValue.startsWith("[") && strValue.endsWith("]")) {
+                                    try {
+                                        JsonNode parsedArray = objectMapper.readTree(strValue);
+                                        if (parsedArray.isArray()) {
+                                            List<String> serviceList = new ArrayList<>();
+                                            for (JsonNode item : parsedArray) {
+                                                serviceList.add(item.asText());
+                                            }
+                                            response.arguments.put(key, serviceList);
+                                            log.info("Parsed serviceTypes from string to list: {}", serviceList);
+                                            return;
+                                        }
+                                    } catch (Exception e) {
+                                        log.warn("Failed to parse serviceTypes as JSON array: {}", e.getMessage());
+                                    }
+                                }
+                                response.arguments.put(key, List.of(strValue));
+                            } else {
+                                response.arguments.put(key, value.toString());
+                            }
+                        } catch (Exception e) {
+                            log.warn("Error processing serviceTypes: {}", e.getMessage());
+                            response.arguments.put(key, value.toString());
+                        }
                     } else {
-                        response.arguments.put(entry.getKey(), value.toString());
+                        if (value.isTextual()) {
+                            response.arguments.put(key, value.asText());
+                        } else if (value.isNumber()) {
+                            response.arguments.put(key, value.asDouble());
+                        } else if (value.isBoolean()) {
+                            response.arguments.put(key, value.asBoolean());
+                        } else {
+                            response.arguments.put(key, value.toString());
+                        }
                     }
                 });
             }
@@ -968,8 +1020,17 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 return List.of();
             }
 
+            Map<String, Object> responseMap = objectMapper.readValue(text, Map.class);
+
+            Object providersObj = responseMap.get("providers");
+            if (providersObj == null) {
+                log.warn("No providers array in response");
+                return List.of();
+            }
+
+            String providersJson = objectMapper.writeValueAsString(providersObj);
             List<ProviderSummaryResponse> providers = objectMapper.readValue(
-                    text,
+                    providersJson,
                     objectMapper.getTypeFactory().constructCollectionType(List.class, ProviderSummaryResponse.class));
 
             return providers != null ? providers : List.of();
