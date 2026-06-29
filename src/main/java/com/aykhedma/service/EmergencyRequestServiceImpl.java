@@ -113,8 +113,11 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
                 .orElseThrow(() -> new ResourceNotFoundException("Service type not found"));
 
         LocationDTO locationDTO = request.getLocation();
-        String area = locationDTO.getArea();
-        if (area.equals(" "))
+        GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
+
+        String area = locationDetails.getArea();
+        if (area == null)
             return PriceRecommendationResponse.builder().price(null).build();
 
         Double price = providerRepository.getAveragePrice(serviceType, area);
@@ -143,12 +146,20 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
                     "Cannot request an emergency request. A currently ongoing emergency request for this consumer already exists");
 
         LocationDTO locationDTO = request.getLocation();
+        GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
+
         Location location = Location.builder()
                 .latitude(locationDTO.getLatitude())
                 .longitude(locationDTO.getLongitude())
-                .address(locationDTO.getAddress())
-                .area(locationDTO.getArea())
-                .city(locationDTO.getCity())
+                .address(locationDetails.getAddress())
+                .area(locationDetails.getArea())
+                .city(locationDetails.getCity())
+                .country(locationDetails.getCountry())
+                .addressAr(locationDetails.getAddressAr())
+                .areaAr(locationDetails.getAreaAr())
+                .cityAr(locationDetails.getCityAr())
+                .countryAr(locationDetails.getCountryAr())
                 .build();
         locationRepository.save(location);
 

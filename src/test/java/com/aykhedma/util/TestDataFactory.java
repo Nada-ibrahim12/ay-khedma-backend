@@ -78,9 +78,6 @@ public class TestDataFactory {
         return LocationDTO.builder()
                 .latitude(30.0444)
                 .longitude(31.2357)
-                .address("123 Test Street")
-                .area("Maadi")
-                .city("Cairo")
                 .build();
     }
 
@@ -177,7 +174,6 @@ public class TestDataFactory {
                 .profileImage("http://test.com/image.jpg")
                 .preferredLanguage("en")
                 .role(UserType.CONSUMER)
-                .location(createLocationDTO())
                 .averageRating(4.5)
                 .totalBookings(10)
                 .savedProviders(List.of(createProviderSummaryResponse(1L)))

@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.aykhedma.mapper.ProviderMapper;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +39,8 @@ public class LocationService {
     private final LocationMapper locationMapper;
     private final ProviderMapper providerMapper;
     private final NotificationFactory notificationFactory;
+    private final GoogleMapsService googleMapsService;
+    private final RestTemplate restTemplate;
 
     // ====== CONSUMER LOCATION METHODS ======
 
@@ -115,14 +118,20 @@ public class LocationService {
         if (locationDTO.getLongitude() != null) {
             location.setLongitude(locationDTO.getLongitude());
         }
-        if (locationDTO.getAddress() != null) {
-            location.setAddress(locationDTO.getAddress());
-        }
-        if (locationDTO.getArea() != null) {
-            location.setArea(locationDTO.getArea());
-        }
-        if (locationDTO.getCity() != null) {
-            location.setCity(locationDTO.getCity());
+
+        if (location.getLatitude() != null && location.getLongitude() != null)
+        {
+            GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(location.getLatitude(), location.getLongitude());
+
+                location.setAddress(locationDetails.getAddress());
+                location.setArea(locationDetails.getArea());
+                location.setCity(locationDetails.getCity());
+                location.setCountry(locationDetails.getCountry());
+                location.setAddressAr(locationDetails.getAddressAr());
+                location.setAreaAr(locationDetails.getAreaAr());
+                location.setCityAr(locationDetails.getCityAr());
+                location.setCountryAr(locationDetails.getCountryAr());
         }
 
         location = locationRepository.save(location);
@@ -247,14 +256,20 @@ public class LocationService {
         if (locationDTO.getLongitude() != null) {
             location.setLongitude(locationDTO.getLongitude());
         }
-        if (locationDTO.getAddress() != null) {
-            location.setAddress(locationDTO.getAddress());
-        }
-        if (locationDTO.getArea() != null) {
-            location.setArea(locationDTO.getArea());
-        }
-        if (locationDTO.getCity() != null) {
-            location.setCity(locationDTO.getCity());
+
+        if (location.getLatitude() != null && location.getLongitude() != null)
+        {
+            GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(location.getLatitude(), location.getLongitude());
+
+                location.setAddress(locationDetails.getAddress());
+                location.setArea(locationDetails.getArea());
+                location.setCity(locationDetails.getCity());
+                location.setCountry(locationDetails.getCountry());
+                location.setAddressAr(locationDetails.getAddressAr());
+                location.setAreaAr(locationDetails.getAreaAr());
+                location.setCityAr(locationDetails.getCityAr());
+                location.setCountryAr(locationDetails.getCountryAr());
         }
 
         location = locationRepository.save(location);

@@ -160,7 +160,7 @@ class LocationServiceTest {
         @DisplayName("Should patch consumer location with partial data")
         void patchConsumerLocation_PartialUpdate_UpdatesOnlyProvidedFields() {
             consumer.setLocation(location);
-            LocationDTO patchDto = LocationDTO.builder().city("Giza").build();
+            LocationDTO patchDto = LocationDTO.builder().latitude(29.5558484).build();
 
             when(consumerRepository.findById(CONSUMER_ID)).thenReturn(Optional.of(consumer));
             when(locationRepository.save(any(Location.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -169,7 +169,7 @@ class LocationServiceTest {
 
             locationService.patchConsumerLocation(CONSUMER_ID, patchDto);
 
-            assertThat(location.getCity()).isEqualTo("Giza");
+            assertThat(location.getLatitude()).isEqualTo(29.5558484);
             assertThat(location.getAddress()).isEqualTo(TestDataFactory.createLocation(10L).getAddress());
         }
 

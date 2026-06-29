@@ -70,7 +70,7 @@ public class ProviderResponse {
     {
         if (this.emergencyRequest.getLocation() != null && this.provider.getLocation() != null)
         {
-            this.distance = this.provider.getLocation().calculateDistance(this.emergencyRequest.getLocation());
+            this.distance = Math.min(this.provider.getLocation().calculateDistance(this.emergencyRequest.getLocation()), 100);
             // Assuming an average speed of 30 km/h in a city
             int estimatedMinutes = (int) Math.ceil(this.distance / 30 * 60);
             this.estimatedArrivalTime = Math.min(estimatedMinutes, 120);

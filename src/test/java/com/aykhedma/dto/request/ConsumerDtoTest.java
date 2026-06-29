@@ -41,9 +41,6 @@ class ConsumerDtoTest {
                     .location(LocationDTO.builder()
                             .latitude(30.0444)
                             .longitude(31.2357)
-                            .address("123 Street")
-                            .area("Maadi")
-                            .city("Cairo")
                             .build())
                     .build();
 

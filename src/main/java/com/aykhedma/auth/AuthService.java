@@ -19,6 +19,7 @@ import com.aykhedma.repository.ServiceTypeRepository;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.service.FileStorageService;
 import com.aykhedma.security.JwtService;
+import com.aykhedma.service.GoogleMapsService;
 import com.aykhedma.service.verification.VerificationService;
 import com.aykhedma.dto.response.verification.NidExtractionResponse;
 import com.aykhedma.dto.response.verification.FaceMatchResponse;
@@ -26,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +49,8 @@ public class AuthService {
     private final FileStorageService fileStorageService;
     private final OtpService otpService;
     private final VerificationService verificationService;
+    private final GoogleMapsService googleMapsService;
+    private final RestTemplate restTemplate;
 
     @Value("${jwt.expiration:3600000}")
     private long jwtExpirationMs;
@@ -113,12 +117,20 @@ public class AuthService {
 
         if (request.getUserType() == UserType.CONSUMER) {
 
+            GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(request.getLatitude(), request.getLongitude());
+
             Location location = Location.builder()
                     .latitude(request.getLatitude())
                     .longitude(request.getLongitude())
-                    .address(request.getAddress())
-                    .area(request.getArea())
-                    .city(request.getCity())
+                    .address(locationDetails.getAddress())
+                    .area(locationDetails.getArea())
+                    .city(locationDetails.getCity())
+                    .country(locationDetails.getCountry())
+                    .addressAr(locationDetails.getAddressAr())
+                    .areaAr(locationDetails.getAreaAr())
+                    .cityAr(locationDetails.getCityAr())
+                    .countryAr(locationDetails.getCountryAr())
                     .build();
 
             Consumer consumer = Consumer.builder()
@@ -176,12 +188,20 @@ public class AuthService {
                 throw new BadRequestException("Invalid price type: " + request.getPriceType());
             }
 
+            GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(request.getLatitude(), request.getLongitude());
+
             Location location = Location.builder()
                     .latitude(request.getLatitude())
                     .longitude(request.getLongitude())
-                    .address(request.getAddress())
-                    .area(request.getArea())
-                    .city(request.getCity())
+                    .address(locationDetails.getAddress())
+                    .area(locationDetails.getArea())
+                    .city(locationDetails.getCity())
+                    .country(locationDetails.getCountry())
+                    .addressAr(locationDetails.getAddressAr())
+                    .areaAr(locationDetails.getAreaAr())
+                    .cityAr(locationDetails.getCityAr())
+                    .countryAr(locationDetails.getCountryAr())
                     .build();
 
             Schedule schedule = Schedule.builder().build();

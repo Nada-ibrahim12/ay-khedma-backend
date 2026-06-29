@@ -13,12 +13,9 @@ import java.util.List;
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface LocationMapper {
 
-    // Entity to DTO mapping - LocationDTO doesn't have id
+    // Entity to DTO mapping - LocationDTO doesn't have an id
     @Mapping(source = "latitude", target = "latitude")
     @Mapping(source = "longitude", target = "longitude")
-    @Mapping(source = "address", target = "address")
-    @Mapping(source = "area", target = "area")
-    @Mapping(source = "city", target = "city")
     // Note: id is not in LocationDTO
     LocationDTO toDto(Location location);
 
@@ -39,12 +36,16 @@ public interface LocationMapper {
     @Mapping(source = "address", target = "address")
     @Mapping(source = "area", target = "area")
     @Mapping(source = "city", target = "city")
-    @Mapping(expression = "java(location.getFormattedAddress())", target = "formattedAddress")
+    @Mapping(source = "country", target = "country")
+    @Mapping(source = "addressAr", target = "addressAr")
+    @Mapping(source = "areaAr", target = "areaAr")
+    @Mapping(source = "cityAr", target = "cityAr")
+    @Mapping(source = "countryAr", target = "countryAr")
     @Mapping(target = "success", constant = "true")
     @Mapping(target = "message", constant = "Location processed successfully")
     LocationResponse toResponse(Location location);
 
-    // Custom response with message
+    // Custom response with a message
     default LocationResponse toResponseWithMessage(Location location, String message, boolean success) {
         LocationResponse response = toResponse(location);
         response.setMessage(message);

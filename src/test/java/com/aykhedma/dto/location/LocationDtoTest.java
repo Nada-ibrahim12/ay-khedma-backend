@@ -34,9 +34,6 @@ class LocationDtoTest {
             LocationDTO dto = LocationDTO.builder()
                     .latitude(30.0444)
                     .longitude(31.2357)
-                    .address("123 Street")
-                    .area("Maadi")
-                    .city("Cairo")
                     .build();
 
             Set<ConstraintViolation<LocationDTO>> violations = validator.validate(dto);
@@ -101,59 +98,6 @@ class LocationDtoTest {
 
             assertThat(violations).isNotEmpty();
             assertThat(violations).anyMatch(v -> v.getMessage().contains("between -180 and 180"));
-        }
-    }
-
-    @Nested
-    @DisplayName("Field Length Validation Tests")
-    class FieldLengthValidationTests {
-
-        @Test
-        @DisplayName("Should fail when address is too long")
-        void addressTooLong_HasViolation() {
-            String longAddress = "A".repeat(300);
-            LocationDTO dto = LocationDTO.builder()
-                    .latitude(30.0444)
-                    .longitude(31.2357)
-                    .address(longAddress)
-                    .build();
-
-            Set<ConstraintViolation<LocationDTO>> violations = validator.validate(dto);
-
-            assertThat(violations).isNotEmpty();
-            assertThat(violations).anyMatch(v -> v.getMessage().contains("Address cannot exceed"));
-        }
-
-        @Test
-        @DisplayName("Should fail when area is too long")
-        void areaTooLong_HasViolation() {
-            String longArea = "A".repeat(120);
-            LocationDTO dto = LocationDTO.builder()
-                    .latitude(30.0444)
-                    .longitude(31.2357)
-                    .area(longArea)
-                    .build();
-
-            Set<ConstraintViolation<LocationDTO>> violations = validator.validate(dto);
-
-            assertThat(violations).isNotEmpty();
-            assertThat(violations).anyMatch(v -> v.getMessage().contains("Area cannot exceed"));
-        }
-
-        @Test
-        @DisplayName("Should fail when city is too long")
-        void cityTooLong_HasViolation() {
-            String longCity = "A".repeat(120);
-            LocationDTO dto = LocationDTO.builder()
-                    .latitude(30.0444)
-                    .longitude(31.2357)
-                    .city(longCity)
-                    .build();
-
-            Set<ConstraintViolation<LocationDTO>> violations = validator.validate(dto);
-
-            assertThat(violations).isNotEmpty();
-            assertThat(violations).anyMatch(v -> v.getMessage().contains("City cannot exceed"));
         }
     }
 }
