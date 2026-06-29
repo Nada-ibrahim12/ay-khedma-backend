@@ -438,8 +438,13 @@ public class ProviderServiceImpl implements ProviderService {
         res.setAverageRating(p.getAverageRating());
 
         res.setPrice(p.getPrice());
-        res.setPriceType(
-                p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null);
+
+        PriceType priceType = p.getPriceType() != null
+                ? PriceType.valueOf(p.getPriceType())
+                : null;
+
+        res.setPriceType(priceType);
+        res.setPriceTypeAr(getArabicPriceType(priceType));
 
         res.setServiceAreaRadius(p.getServiceAreaRadius());
 
@@ -453,6 +458,18 @@ public class ProviderServiceImpl implements ProviderService {
         res.setEstimatedArrivalTime(p.getEstimatedArrivalTime());
 
         return res;
+    }
+
+    private String getArabicPriceType(PriceType priceType) {
+        if (priceType == null) {
+            return null;
+        }
+
+        return switch (priceType) {
+            case HOUR -> "الساعة";
+            case SESSION -> "الجلسة";
+            case VISIT -> "الزيارة";
+        };
     }
 
     @Override
