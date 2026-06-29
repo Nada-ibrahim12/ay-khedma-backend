@@ -409,57 +409,80 @@ public class ProviderServiceImpl implements ProviderService {
     //
     // return toPage(ranked, pageable);
     // }
-    @Transactional(readOnly = true)
-    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
+//    @Transactional(readOnly = true)
+//    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
+//
+//        double radiusMeters = radius * 1000;
+//
+//        Page<ProviderDistanceProjection> result = providerRepository.findTopRatedNearConsumer(
+//                consumerId,
+//                radiusMeters,
+//                pageable);
+//
+//        List<SearchResponse> mapped = result.getContent()
+//                .stream()
+//                .map(this::map)
+//                .toList();
+//
+//        return new PageImpl<>(mapped, pageable, result.getTotalElements());
+//    }
 
-        double radiusMeters = radius * 1000;
 
-        Page<ProviderDistanceProjection> result = providerRepository.findTopRatedNearConsumer(
-                consumerId,
-                radiusMeters,
-                pageable);
+//    private SearchResponse map(ProviderDistanceProjection p) {
+//
+//        SearchResponse res = new SearchResponse();
+//
+//        res.setId(p.getId());
+//        res.setName(p.getName());
+//        res.setProfileImage(p.getProfileImage());
+//
+//        res.setServiceType(p.getServiceType());
+//        res.setServiceTypeAr(p.getServiceTypeAr());
+//        res.setCategoryName(p.getCategoryName());
+//
+//        res.setAverageRating(p.getAverageRating());
+//
+//        res.setPrice(p.getPrice());
+//        PriceType priceType = p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null;
+//        res.setPriceType(priceType);
+//        res.setPriceTypeAr(priceType != null ? priceType.getArabicLabel() : null);
+//
+//        res.setServiceAreaRadius(p.getServiceAreaRadius());
+//
+//        res.setAveragePunctualityRating(p.getAveragePunctualityRating());
+//        res.setAverageCommitmentRating(p.getAverageCommitmentRating());
+//        res.setAverageQualityOfWorkRating(p.getAverageQualityOfWorkRating());
+//
+//        res.setArea(p.getArea());
+//
+//        res.setDistance(p.getDistanceKm());
+//        res.setEstimatedArrivalTime(p.getEstimatedArrivalTime());
+//
+//        return res;
+//    }
+@Transactional(readOnly = true)
+public Page<SearchResponse> topRatedNearMe(
+        Long consumerId,
+        Double radius,
+        Pageable pageable) {
 
-        List<SearchResponse> mapped = result.getContent()
-                .stream()
-                .map(this::map)
-                .toList();
+    List<SearchResponse> list =
+            searchCacheService.topRatedNearMe(consumerId, radius);
 
-        return new PageImpl<>(mapped, pageable, result.getTotalElements());
-    }
+    int start = (int) pageable.getOffset();
+    int end = Math.min(start + pageable.getPageSize(), list.size());
 
-    private SearchResponse map(ProviderDistanceProjection p) {
+    List<SearchResponse> pageContent =
+            start >= list.size()
+                    ? Collections.emptyList()
+                    : list.subList(start, end);
 
-        SearchResponse res = new SearchResponse();
-
-        res.setId(p.getId());
-        res.setName(p.getName());
-        res.setProfileImage(p.getProfileImage());
-
-        res.setServiceType(p.getServiceType());
-        res.setServiceTypeAr(p.getServiceTypeAr());
-        res.setCategoryName(p.getCategoryName());
-
-        res.setAverageRating(p.getAverageRating());
-
-        res.setPrice(p.getPrice());
-        PriceType priceType = p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null;
-        res.setPriceType(priceType);
-        res.setPriceTypeAr(priceType != null ? priceType.getArabicLabel() : null);
-
-        res.setServiceAreaRadius(p.getServiceAreaRadius());
-
-        res.setAveragePunctualityRating(p.getAveragePunctualityRating());
-        res.setAverageCommitmentRating(p.getAverageCommitmentRating());
-        res.setAverageQualityOfWorkRating(p.getAverageQualityOfWorkRating());
-
-        res.setArea(p.getArea());
-
-        res.setDistance(p.getDistanceKm());
-        res.setEstimatedArrivalTime(p.getEstimatedArrivalTime());
-
-        return res;
-    }
-
+    return new PageImpl<>(
+            pageContent,
+            pageable,
+            list.size()
+    );
+}
     @Override
     @Transactional
     public ScheduleResponse addWorkingDay(Long providerId, WorkingDayRequest request) {

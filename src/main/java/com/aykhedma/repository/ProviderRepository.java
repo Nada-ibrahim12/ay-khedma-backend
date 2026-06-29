@@ -167,7 +167,7 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
                                              @Param("requestCoordinates") Point requestCoordinates,
                                              @Param("radiusMeters") double radiusMeters);
 
-        @Query(value = """
+    @Query(value = """
 WITH consumer_location AS (
     SELECT cl.coordinates AS consumer_coords
     FROM consumers c
@@ -206,6 +206,7 @@ provider_distance AS (
     JOIN service_types st ON p.service_type_id = st.id
     JOIN service_categories sc ON st.category_id = sc.id
     CROSS JOIN consumer_location cl
+
     WHERE p.verification_status = 'VERIFIED'
 )
 
@@ -230,14 +231,24 @@ SELECT
     area,
 
     distanceMeters,
+
     (distanceMeters / 1000.0) AS distanceKm,
-    CAST((distanceMeters / 1000.0 / 30.0) * 60 AS INTEGER) AS estimatedArrivalTime
+
+    CAST((distanceMeters / 1000.0 / 30.0) * 60 AS INTEGER) AS estimatedArrivalTime,
+
+    (
+        (COALESCE(averageRating, 0) * 20 * 0.5)
+        +
+        (GREATEST(0, 100 - ((distanceMeters / 1000.0) * 10)) * 0.5)
+    ) AS score
 
 FROM provider_distance
+
 WHERE distanceMeters <= :radiusMeters
-ORDER BY distanceMeters ASC
+
+ORDER BY score DESC
 """,
-                countQuery = """
+            countQuery = """
 SELECT COUNT(*)
 FROM providers p
 JOIN locations l ON p.location_id = l.id
@@ -254,12 +265,12 @@ AND ST_DWithin(
     :radiusMeters
 )
 """,
-                nativeQuery = true)
-        Page<ProviderDistanceProjection> findTopRatedNearConsumer(
-                @Param("consumerId") Long consumerId,
-                @Param("radiusMeters") double radiusMeters,
-                Pageable pageable
-        );
+            nativeQuery = true)
+    Page<ProviderDistanceProjection> findTopRatedNearConsumer(
+            @Param("consumerId") Long consumerId,
+            @Param("radiusMeters") double radiusMeters,
+            Pageable pageable
+    );
 
         @Query("SELECT p FROM Provider p " +
                 "LEFT JOIN FETCH p.location " +

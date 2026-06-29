@@ -1,9 +1,11 @@
 package com.aykhedma.service;
 
+import com.aykhedma.dto.response.ProviderDistanceProjection;
 import com.aykhedma.dto.response.SearchResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
+import com.aykhedma.model.service.PriceType;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.repository.ProviderRepository;
 import lombok.RequiredArgsConstructor;
@@ -159,6 +161,69 @@ class SearchCacheService {
                         .collect(Collectors.toList());
         }
     }
+    //    @Transactional(readOnly = true)
+//    @Cacheable(
+//            value = "topRatedNearMeCache",
+//            key = "#consumerId + '_' + #radius + '_' + #pageable.pageNumber + '_' + #pageable.pageSize"
+//    )
+//    public List<SearchResponse> topRatedNearMe(Long consumerId, Double radius) {
+//
+//        if (consumerId == null) {
+//            throw new BadRequestException("consumerId is required");
+//        }
+//        if (radius == null || radius <= 0) {
+//            throw new BadRequestException("radius must be greater than 0");
+//        }
+//
+//        Page<Provider> providersPage =
+//                providerRepository.searchProviders(null, null, null, Pageable.unpaged());
+//
+//        return providersPage.getContent().stream()
+//                .filter(p -> p.getLocation() != null)
+//                .map(provider -> {
+//
+//                    try {
+//                        double distance = locationService
+//                                .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
+//                                .getDistanceKm();
+//
+//                        if (distance > radius) return null;
+//
+//                        SearchResponse res = providerMapper.toSearchResponse(provider);
+//
+//                        res.setDistance(distance);
+//                        res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
+//
+//                        double score = calculateScore(provider, distance);
+//                        res.setScore(score);
+//
+//                        return res;
+//
+//                    } catch (Exception e) {
+//                        throw new BadRequestException("Distance calculation failed");
+//                    }
+//                })
+//                .filter(Objects::nonNull)
+//                .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
+//                .toList();
+//    }
+//
+//    private double calculateScore(Provider p, double distance) {
+//
+//        double ratingWeight = 0.5;
+//        double distanceWeight = 0.3;
+//        double experienceWeight = 0.2;
+//
+//        double ratingScore = (p.getAverageRating() != null ? p.getAverageRating() : 0) * 20;
+//
+//        double distanceScore = Math.max(0, 100 - (distance * 10));
+//
+//        double experienceScore = (p.getCompletedJobs() != null ? p.getCompletedJobs() : 0) / 10.0;
+//
+//        return (ratingScore * ratingWeight)
+//                + (distanceScore * distanceWeight)
+//                + (experienceScore * experienceWeight);
+//    }
     @Transactional(readOnly = true)
     @Cacheable(
             value = "topRatedNearMeCache",
@@ -169,57 +234,58 @@ class SearchCacheService {
         if (consumerId == null) {
             throw new BadRequestException("consumerId is required");
         }
+
         if (radius == null || radius <= 0) {
             throw new BadRequestException("radius must be greater than 0");
         }
 
-        Page<Provider> providersPage =
-                providerRepository.searchProviders(null, null, null, Pageable.unpaged());
+        double radiusMeters = radius * 1000;
 
-        return providersPage.getContent().stream()
-                .filter(p -> p.getLocation() != null)
-                .map(provider -> {
+        Page<ProviderDistanceProjection> result =
+                providerRepository.findTopRatedNearConsumer(
+                        consumerId,
+                        radiusMeters,
+                        Pageable.unpaged()
+                );
 
-                    try {
-                        double distance = locationService
-                                .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
-                                .getDistanceKm();
-
-                        if (distance > radius) return null;
-
-                        SearchResponse res = providerMapper.toSearchResponse(provider);
-
-                        res.setDistance(distance);
-                        res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
-
-                        double score = calculateScore(provider, distance);
-                        res.setScore(score);
-
-                        return res;
-
-                    } catch (Exception e) {
-                        throw new BadRequestException("Distance calculation failed");
-                    }
-                })
-                .filter(Objects::nonNull)
-                .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
+        return result.getContent()
+                .stream()
+                .map(this::map)
                 .toList();
     }
 
-    private double calculateScore(Provider p, double distance) {
+    private SearchResponse map(ProviderDistanceProjection p) {
 
-        double ratingWeight = 0.5;
-        double distanceWeight = 0.3;
-        double experienceWeight = 0.2;
+        SearchResponse res = new SearchResponse();
 
-        double ratingScore = (p.getAverageRating() != null ? p.getAverageRating() : 0) * 20;
+        res.setId(p.getId());
+        res.setName(p.getName());
+        res.setProfileImage(p.getProfileImage());
 
-        double distanceScore = Math.max(0, 100 - (distance * 10));
+        res.setServiceType(p.getServiceType());
+        res.setServiceTypeAr(p.getServiceTypeAr());
+        res.setCategoryName(p.getCategoryName());
 
-        double experienceScore = (p.getCompletedJobs() != null ? p.getCompletedJobs() : 0) / 10.0;
+        res.setAverageRating(p.getAverageRating());
 
-        return (ratingScore * ratingWeight)
-                + (distanceScore * distanceWeight)
-                + (experienceScore * experienceWeight);
+        res.setPrice(p.getPrice());
+        PriceType priceType = p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null;
+        res.setPriceType(priceType);
+        res.setPriceTypeAr(priceType != null ? priceType.getArabicLabel() : null);
+
+        res.setServiceAreaRadius(p.getServiceAreaRadius());
+
+        res.setAveragePunctualityRating(p.getAveragePunctualityRating());
+        res.setAverageCommitmentRating(p.getAverageCommitmentRating());
+        res.setAverageQualityOfWorkRating(p.getAverageQualityOfWorkRating());
+
+        res.setArea(p.getArea());
+
+        res.setScore(p.getScore());
+
+        res.setDistance(p.getDistanceKm());
+        res.setEstimatedArrivalTime(p.getEstimatedArrivalTime());
+
+        return res;
     }
 }
