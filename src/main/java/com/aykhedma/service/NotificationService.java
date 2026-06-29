@@ -205,6 +205,7 @@ public class NotificationService {
         templateVars.put("title", request.getTitle());
         templateVars.put("content", request.getContent());
         templateVars.put("type", request.getType());
+        templateVars.put("deepLink", request.getDeepLink());
 
         if (request.getData() != null) {
             templateVars.putAll(request.getData());

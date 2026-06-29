@@ -142,8 +142,9 @@
         <div class="notification-message" th:text="${content}">
           Your notification content appears here.
         </div>
-        <div class="button-container">
-          <a href="#" class="btn-primary">View in app</a>
+        <a th:href="${deepLink != null ? deepLink : '#'}" 
+              th:unless="${deepLink == null}" 
+              class="btn-primary">View in app</a>
         </div>
         <div class="signature">
           <p>Best regards,</p>

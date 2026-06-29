@@ -306,7 +306,9 @@
           </ul>
         </div>
         <div class="button-container">
-          <a href="#" class="btn-primary">View booking details</a>
+          <a th:href="${deepLink != null ? deepLink : '#'}" 
+              th:unless="${deepLink == null}" 
+              class="btn-primary"> View booking details</a>
         </div>
         <div class="support-line">
           Need assistance? Contact support@aykhedma.com

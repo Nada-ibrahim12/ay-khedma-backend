@@ -252,7 +252,9 @@
           as possible so the customer can finalize their booking.
         </div>
         <div class="button-container">
-          <a href="#" class="btn-primary">View and respond</a>
+          <a th:href="${deepLink != null ? deepLink : '#'}" 
+              th:unless="${deepLink == null}" 
+              class="btn-primary">View and respond</a>
         </div>
         <div class="signature">
           <p>Best regards,</p>

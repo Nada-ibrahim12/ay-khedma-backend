@@ -263,8 +263,9 @@
           <strong>Impact</strong
           ><span th:text="${impact}">Explanation of impact.</span>
         </div>
-        <div class="button-container">
-          <a href="#" class="btn-primary">Review alert details</a>
+        <a th:href="${deepLink != null ? deepLink : '#'}" 
+              th:unless="${deepLink == null}" 
+              class="btn-primary"> Review alert details</a>
         </div>
         <div class="signature">
           <p>Best regards,</p>
