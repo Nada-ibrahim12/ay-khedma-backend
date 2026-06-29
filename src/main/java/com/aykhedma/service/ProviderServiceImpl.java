@@ -1162,6 +1162,50 @@ public class ProviderServiceImpl implements ProviderService {
         return a.isBefore(b) ? a : b;
     }
 
+    @Transactional(readOnly = true)
+    public List<ScheduleResponse.TimeSlotResponse> getRealAvailableSlotsOnly(Long providerId,
+            LocalDate startDate, LocalDate endDate) {
+
+        if (providerId == null) {
+            log.warn("Provider ID is null in getRealAvailableSlotsOnly");
+            return new ArrayList<>();
+        }
+        
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        if (provider.getSchedule() == null) {
+            return new ArrayList<>();
+        }
+
+        List<TimeSlot> availableSlots = timeSlotRepository.findByScheduleIdAndDateBetweenAndStatus(
+                provider.getSchedule().getId(),
+                startDate,
+                endDate,
+                TimeSlotStatus.AVAILABLE);
+
+        if (availableSlots.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return availableSlots.stream()
+                .map(this::toTimeSlotResponse)
+                .sorted(Comparator
+                        .comparing(ScheduleResponse.TimeSlotResponse::getDate)
+                        .thenComparing(ScheduleResponse.TimeSlotResponse::getStartTime))
+                .collect(Collectors.toList());
+    }
+
+
+    private ScheduleResponse.TimeSlotResponse toTimeSlotResponse(TimeSlot timeSlot) {
+        ScheduleResponse.TimeSlotResponse response = new ScheduleResponse.TimeSlotResponse();
+        response.setDate(timeSlot.getDate().toString());
+        response.setStartTime(timeSlot.getStartTime());
+        response.setEndTime(timeSlot.getEndTime());
+        response.setStatus(timeSlot.getStatus().name());
+        return response;
+    }
+
     /**
      * Helper method to map TimeSlot to TimeSlotResponse
      */

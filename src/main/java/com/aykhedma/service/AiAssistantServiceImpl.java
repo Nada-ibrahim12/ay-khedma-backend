@@ -549,45 +549,114 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         }
 
         if (providers.size() == 1) {
-            ProviderSummaryResponse p = providers.get(0);
-            String distanceText = p.getDistance() != null ? " (يبعد " + p.getDistance() + " كم)" : "";
-            String ratingText = p.getAverageRating() != null ? " - تقييم " + p.getAverageRating() + "/5" : "";
-            return "وجدت " + serviceName + " واحد مناسب" + distanceText + ratingText + ".\n" +
-                    "الاسم: " + p.getName();
+            return buildSingleProviderReply(providers.get(0));
         }
 
-        String topProviders = providers.stream()
-                .limit(3)
-                .map(p -> {
-                    String name = p.getName();
-                    String rating = p.getAverageRating() != null ? " ⭐" + p.getAverageRating() : "";
-                    String distance = p.getDistance() != null ? " 📍" + p.getDistance() + "km" : "";
-                    return name + rating + distance;
-                })
-                .collect(Collectors.joining("\n• ", "• ", ""));
-
-        return "وجدت " + providers.size() + " " + serviceName + " مناسبين:\n" + topProviders;
+        return buildMultipleProvidersReply(providers, serviceName);
     }
 
-    public String buildSolutionSuggestionReply(String normalizedMessage) {
-        if (containsAny(normalizedMessage, "كهرب", "electric", "power", "نور", "لمبة", "فيشة", "breaker", "قاطع")) {
-            return "جرب أولاً: 1) تأكد إن القاطع الرئيسي شغال، 2) راجع الفيشة والريموت، 3) افصل الجهاز 5 دقائق ورجعه تاني، 4) لو في شرر أو سخونة، افصل الكهرباء فوراً. لو المشكلة مستمرة أقدر أدورلك على كهربائي.";
+    private String buildSingleProviderReply(ProviderSummaryResponse p) {
+        StringBuilder reply = new StringBuilder();
+        reply.append("🔍 وجدت مزود خدمة واحد مناسب:\n\n");
+
+        reply.append("👤").append(p.getName());
+        reply.append("\n");
+
+        if (p.getServiceTypeAr() != null) {
+            reply.append("🔧 الخدمة: ").append(p.getServiceTypeAr());
+            reply.append("\n");
         }
 
-        if (containsAny(normalizedMessage, "تكييف", "ac", "air", "cool", "برد")) {
-            return "جرب أولاً: 1) تأكد من وضع التبريد والحرارة، 2) نظف الفلتر، 3) راجع البطاريات والريموت، 4) افصل التكييف 5 دقائق ثم شغله. لو ما اتحلّش أقدر أدورلك على فني تكييف.";
+        if (p.getAverageRating() != null && p.getAverageRating() > 0) {
+            reply.append("⭐ التقييم: ").append(String.format("%.1f", p.getAverageRating())).append("/5\n");
         }
 
-        if (containsAny(normalizedMessage, "مياه", "water", "تسريب", "بيسرب", "حنفية", "ماسورة", "صرف")) {
-            return "جرب أولاً: 1) اقفل مصدر المياه، 2) راقب مكان التسريب، 3) تأكد إن الوصلات مش مفكوكة، 4) لو في كسر واضح أو التسريب كبير أقدر أدورلك على سباك.";
+        if (p.getDistance() != null) {
+            reply.append("📍 المسافة: ").append(String.format("%.1f", p.getDistance())).append(" كم\n");
+        }
+        if (p.getArea() != null) {
+            reply.append("🏙️ المنطقة: ").append(p.getArea());
+            reply.append("\n");
         }
 
-        if (containsAny(normalizedMessage, "باب", "قفل", "lock", "مفتاح", "handle")) {
-            return "جرب أولاً: 1) تأكد إن الباب مش عالق، 2) استخدم زيت خفيف للمفصلة لو بتحتك، 3) راجع المفتاح/القفل، 4) لو القفل مكسور أقدر أدورلك على فني.";
+        if (p.getPrice() != null) {
+            reply.append("💰 السعر: ").append(p.getPrice()).append(" جنيه");
+            if (p.getPriceTypeAr() != null) {
+                reply.append(" (").append(p.getPriceTypeAr()).append(")");
+            }
+            reply.append("\n");
         }
 
-        return "ممكن نبدأ بخطوات بسيطة: 1) تأكد من مصدر المشكلة، 2) افصل/شغّل الجهاز لو ده آمن، 3) راقب إذا كان في جزء مفكوك أو توقف مفاجئ. لو المشكلة مستمرة أقدر أدورلك على مختص مناسب.";
+        if (p.getCancellationRate() != null) {
+            reply.append("📊 معدل الإلغاء: ").append(String.format("%.1f", p.getCancellationRate())).append("%\n");
+        }
+
+        if (p.getEstimatedArrivalTime() != null) {
+            reply.append("⏱️ وقت الوصول المتوقع: ").append(p.getEstimatedArrivalTime()).append(" دقيقة\n");
+        }
+
+        reply.append("\n💡 هل تريد حجز موعد معه؟ أو معرفة مواعيده المتاحة؟");
+        return reply.toString();
     }
+
+    private String buildMultipleProvidersReply(List<ProviderSummaryResponse> providers, String serviceName) {
+        StringBuilder reply = new StringBuilder();
+        reply.append("🔍 وجدت ").append(providers.size()).append(" ").append(serviceName).append(" مناسبين:\n\n");
+
+        for (int i = 0; i < Math.min(5, providers.size()); i++) {
+            ProviderSummaryResponse p = providers.get(i);
+            reply.append(i + 1).append(". ").append(p.getName());
+
+            if (p.getAverageRating() != null && p.getAverageRating() > 0) {
+                reply.append(" ⭐").append(String.format("%.1f", p.getAverageRating()));
+            }
+
+            if (p.getDistance() != null) {
+                reply.append(" 📍").append(String.format("%.1f", p.getDistance())).append("كم");
+            }
+
+            if (p.getPrice() != null) {
+                reply.append(" 💰").append(p.getPrice());
+                if (p.getPriceTypeAr() != null) {
+                    reply.append("/").append(p.getPriceTypeAr());
+                }
+            }
+
+            if (p.getArea() != null) {
+                reply.append(" 🏙️").append(p.getArea());
+            }
+
+            reply.append("\n");
+        }
+
+        if (providers.size() > 5) {
+            reply.append("\nو ").append(providers.size() - 5).append(" آخرين...");
+        }
+
+        reply.append("\n\n💡 اختر رقم المزود المناسب أو اسألني عن تفاصيل أكثر.");
+        return reply.toString();
+    }
+
+
+    // public String buildSolutionSuggestionReply(String normalizedMessage) {
+    //     if (containsAny(normalizedMessage, "كهرب", "electric", "power", "نور", "لمبة", "فيشة", "breaker", "قاطع")) {
+    //         return "جرب أولاً: 1) تأكد إن القاطع الرئيسي شغال، 2) راجع الفيشة والريموت، 3) افصل الجهاز 5 دقائق ورجعه تاني، 4) لو في شرر أو سخونة، افصل الكهرباء فوراً. لو المشكلة مستمرة أقدر أدورلك على كهربائي.";
+    //     }
+
+    //     if (containsAny(normalizedMessage, "تكييف", "ac", "air", "cool", "برد")) {
+    //         return "جرب أولاً: 1) تأكد من وضع التبريد والحرارة، 2) نظف الفلتر، 3) راجع البطاريات والريموت، 4) افصل التكييف 5 دقائق ثم شغله. لو ما اتحلّش أقدر أدورلك على فني تكييف.";
+    //     }
+
+    //     if (containsAny(normalizedMessage, "مياه", "water", "تسريب", "بيسرب", "حنفية", "ماسورة", "صرف")) {
+    //         return "جرب أولاً: 1) اقفل مصدر المياه، 2) راقب مكان التسريب، 3) تأكد إن الوصلات مش مفكوكة، 4) لو في كسر واضح أو التسريب كبير أقدر أدورلك على سباك.";
+    //     }
+
+    //     if (containsAny(normalizedMessage, "باب", "قفل", "lock", "مفتاح", "handle")) {
+    //         return "جرب أولاً: 1) تأكد إن الباب مش عالق، 2) استخدم زيت خفيف للمفصلة لو بتحتك، 3) راجع المفتاح/القفل، 4) لو القفل مكسور أقدر أدورلك على فني.";
+    //     }
+
+    //     return "ممكن نبدأ بخطوات بسيطة: 1) تأكد من مصدر المشكلة، 2) افصل/شغّل الجهاز لو ده آمن، 3) راقب إذا كان في جزء مفكوك أو توقف مفاجئ. لو المشكلة مستمرة أقدر أدورلك على مختص مناسب.";
+    // }
 
     public String formatAvailabilityMessage(Long providerId, LocalDate date,
             List<ScheduleResponse.TimeSlotResponse> slots) {

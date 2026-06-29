@@ -5,6 +5,7 @@ import com.aykhedma.dto.response.*;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.model.chat.ChatMessage;
 import com.aykhedma.model.chat.ChatSession;
+import com.aykhedma.model.service.PriceType;
 import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Consumer;
@@ -309,29 +310,29 @@ public class AiAssistantMcpService {
                         ## DATE AND TIME HANDLING
 
                         ### Input Formats
-                        - **Dates**: "30/6" or "30/6/2026" → June 30, 2026 | "15-6" → June 15 | "يوم 30" → 30th of current month
-                        - **Days**: "الجمعة", "السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس" → Next [day]
-                        - **Relative**: "بعد اسبوع" → +7 days | "بعد 3 ايام" → +3 days
-                        - **Times**: "7" or "7 صباحاً" → 07:00 | "7 مساءً" → 19:00 | "الظهر" → 12:00 | "العصر" → 16:00 | "المغرب" → 18:00 | "العشاء" → 20:00
+                        - Dates: "30/6" or "30/6/2026" → June 30, 2026 | "15-6" → June 15 | "يوم 30" → 30th of current month
+                        - Days: "الجمعة", "السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس" → Next [day]
+                        - Relative: "بعد اسبوع" → +7 days | "بعد 3 ايام" → +3 days
+                        - Times: "7" or "7 صباحاً" → 07:00 | "7 مساءً" → 19:00 | "الظهر" → 12:00 | "العصر" → 16:00 | "المغرب" → 18:00 | "العشاء" → 20:00
 
                         ### Day Rules (CRITICAL)
-                        - **"الجمعة"/Friday** → FIRST Friday AFTER today (if today IS Friday → next Friday, +7 days)
-                        - **Other days** → NEXT occurrence of that day
-                        - **"الجمعة الجاي"** → Friday of next week (not this coming Friday)
+                        - "الجمعة"/Friday → FIRST Friday AFTER today (if today IS Friday → next Friday, +7 days)
+                        - Other days → NEXT occurrence of that day
+                        - "الجمعة الجاي" → Friday of next week (not this coming Friday)
 
                         ### Day Mapping
                         - الأحد → Sunday | الاثنين → Monday | الثلاثاء → Tuesday | الأربعاء → Wednesday | الخميس → Thursday | الجمعة → Friday | السبت → Saturday
 
                         ### Date Parsing Rules
-                        1. **Day+Month only** (e.g., "30/6"): Use current year (2026); if date passed → ADD 1 YEAR
-                        2. **Day only** (e.g., "يوم 30"): Use current month; if day passed → ADD 1 MONTH
-                        3. **Relative**: "بعد X يوم/اسبوع" → Today + X days
-                        4. **Output**: Always `"yyyy-MM-dd"` (e.g., "2026-06-30")
+                        1. Day+Month only (e.g., "30/6"): Use current year (2026); if date passed → ADD 1 YEAR
+                        2. Day only (e.g., "يوم 30"): Use current month; if day passed → ADD 1 MONTH
+                        3. Relative: "بعد X يوم/اسبوع" → Today + X days
+                        4. Output: Always `"yyyy-MM-dd"` (e.g., "2026-06-30")
 
                         ### Time Parsing Rules
-                        1. **Number 1-12** → AM (morning) | **13-24** → 24-hour format
-                        2. **Arabic references**: "صباحاً/صبح" → AM | "مساءً/مغرب" → PM (+12) | "ظهراً" → 12:00 | "العصر" → 16:00 | "المغرب" → 18:00 | "العشاء" → 20:00
-                        3. **Output**: Always `"HH:mm"` (e.g., "07:00", "19:00")
+                        1. Number 1-12 → AM (morning) | 13-24 → 24-hour format
+                        2. Arabic references: "صباحاً/صبح" → AM | "مساءً/مغرب" → PM (+12) | "ظهراً" → 12:00 | "العصر" → 16:00 | "المغرب" → 18:00 | "العشاء" → 20:00
+                        3. Output: Always `"HH:mm"` (e.g., "07:00", "19:00")
 
                         ### Examples
                         1. User: "الجمعة الساعة 10" (Today Monday) → date="2026-07-03", time="10:00"
@@ -665,20 +666,182 @@ public class AiAssistantMcpService {
                     .build();
         }
 
-        Long bookingId = content.get("bookingId") != null ? Long.parseLong(content.get("bookingId").toString()) : null;
-        String status = (String) content.get("status");
+        Object bookingObj = content.get("booking");
+        BookingResponse bookingResponse = null;
+
+        if (bookingObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> bookingMap = (Map<String, Object>) bookingObj;
+
+
+            ConsumerSummaryResponse consumer = null;
+            if (bookingMap.get("consumer") instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> consumerMap = (Map<String, Object>) bookingMap.get("consumer");
+                consumer = ConsumerSummaryResponse.builder()
+                        .id(consumerMap.get("id") != null ? ((Number) consumerMap.get("id")).longValue() : null)
+                        .name((String) consumerMap.get("name"))
+                        .profileImage((String) consumerMap.get("profileImage"))
+                        .phoneNumber((String) consumerMap.get("phoneNumber"))
+                        .email((String) consumerMap.get("email"))
+                        .build();
+            }
+
+            ProviderSummaryResponse provider = null;
+            if (bookingMap.get("provider") instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> providerMap = (Map<String, Object>) bookingMap.get("provider");
+                provider = ProviderSummaryResponse.builder()
+                        .id(providerMap.get("id") != null ? ((Number) providerMap.get("id")).longValue() : null)
+                        .name((String) providerMap.get("name"))
+                        .profileImage((String) providerMap.get("profileImage"))
+                        .serviceType((String) providerMap.get("serviceType"))
+                        .serviceTypeAr((String) providerMap.get("serviceTypeAr"))
+                        .averageRating(providerMap.get("averageRating") != null
+                                ? ((Number) providerMap.get("averageRating")).doubleValue()
+                                : null)
+                        .price(providerMap.get("price") != null ? ((Number) providerMap.get("price")).doubleValue()
+                                : null)
+                        .priceType(providerMap.get("priceType") != null ? 
+                                PriceType.valueOf((String) providerMap.get("priceType")) : null)
+                        .priceTypeAr((String) providerMap.get("priceTypeAr"))
+                        .area((String) providerMap.get("area"))
+                        .cancellationRate(providerMap.get("cancellationRate") != null
+                                ? ((Number) providerMap.get("cancellationRate")).doubleValue()
+                                : null)
+                        .build();
+            }
+
+            LocalDate requestedDate = null;
+            if (bookingMap.get("requestedDate") != null) {
+                try {
+                    requestedDate = LocalDate.parse((String) bookingMap.get("requestedDate"));
+                } catch (Exception e) {
+                    log.warn("Failed to parse date: {}", e.getMessage());
+                }
+            }
+
+            LocalTime requestedTime = null;
+            if (bookingMap.get("requestedStartTime") != null) {
+                try {
+                    requestedTime = LocalTime.parse((String) bookingMap.get("requestedStartTime"));
+                } catch (Exception e) {
+                    log.warn("Failed to parse time: {}", e.getMessage());
+                }
+            }
+
+            LocalDateTime createdAt = null;
+            if (bookingMap.get("createdAt") != null) {
+                try {
+                    createdAt = LocalDateTime.parse((String) bookingMap.get("createdAt"));
+                } catch (Exception e) {
+                    log.warn("Failed to parse createdAt: {}", e.getMessage());
+                }
+            }
+
+
+                bookingResponse = BookingResponse.builder()
+                    .id(bookingMap.get("id") != null ? ((Number) bookingMap.get("id")).longValue() : null)
+                    .consumer(consumer)
+                    .provider(provider)
+                    .requestedDate(requestedDate)
+                    .requestedStartTime(requestedTime)
+                    .estimatedDuration(bookingMap.get("estimatedDuration") != null
+                            ? ((Number) bookingMap.get("estimatedDuration")).longValue()
+                            : null)
+                    .problemDescription((String) bookingMap.get("problemDescription"))
+                    .status(bookingMap.get("status") != null ? BookingStatus.valueOf((String) bookingMap.get("status"))
+                            : null)
+                    .createdAt(createdAt)
+                    .build();
+        }
+
+        if (bookingResponse == null) {
+            Long bookingId = content.get("bookingId") != null ? Long.parseLong(content.get("bookingId").toString())
+                    : null;
+            String status = (String) content.get("status");
+            String providerName = (String) content.get("providerName");
+            String date = (String) content.get("date");
+            String time = (String) content.get("time");
+
+            String message = String.format(
+                    "✅ تم إنشاء طلب الحجز بنجاح!\n\n" +
+                            "📋 رقم الحجز: #%d\n" +
+                            "👤 المزود: %s\n" +
+                            "📅 التاريخ: %s\n" +
+                            "⏰ الوقت: %s\n" +
+                            "📊 الحالة: %s\n\n" +
+                            "سنقوم بإعلامك عند قبول طلبك.",
+                    bookingId, providerName != null ? providerName : "غير محدد",
+                    date != null ? date : "غير محدد",
+                    time != null ? time : "غير محدد",
+                    status != null ? status : "قيد الانتظار");
+
+            bookingResponse = BookingResponse.builder()
+                    .id(bookingId)
+                    .status(status != null ? BookingStatus.valueOf(status) : BookingStatus.PENDING)
+                    .build();
+
+            return ChatResponse.builder()
+                    .sessionId(request.getSessionId())
+                    .message(message)
+                    .timestamp(LocalDateTime.now())
+                    .detectedLanguage(baseService.detectLanguage(request.getMessage()))
+                    .responseType(ChatResponseType.BOOKING_CREATED)
+                    .booking(bookingResponse)
+                    .build();
+        }
+
+        String message = buildBookingConfirmationMessage(bookingResponse);
 
         return ChatResponse.builder()
                 .sessionId(request.getSessionId())
-                .message("تم إنشاء طلب الحجز بنجاح رقم #" + bookingId)
+                .message(message)
                 .timestamp(LocalDateTime.now())
                 .detectedLanguage(baseService.detectLanguage(request.getMessage()))
                 .responseType(ChatResponseType.BOOKING_CREATED)
-                .booking(BookingResponse.builder()
-                        .id(bookingId)
-                        .status(BookingStatus.valueOf(status != null ? status : "PENDING"))
-                        .build())
+                .booking(bookingResponse)
                 .build();
+    }
+
+    private String buildBookingConfirmationMessage(BookingResponse booking) {
+        StringBuilder message = new StringBuilder();
+        message.append("✅ تم إنشاء طلب الحجز بنجاح!\n\n");
+
+        message.append("📋 رقم الحجز: #").append(booking.getId()).append("\n");
+
+        if (booking.getProvider() != null) {
+            message.append("👤 المزود: ").append(booking.getProvider().getName()).append("\n");
+        }
+
+        if (booking.getRequestedDate() != null) {
+            message.append("📅 التاريخ: ").append(booking.getRequestedDate()).append("\n");
+        }
+
+        if (booking.getRequestedStartTime() != null) {
+            message.append("⏰ الوقت: ").append(booking.getRequestedStartTime()).append("\n");
+        }
+
+        if (booking.getProblemDescription() != null) {
+            message.append("📝 وصف المشكلة: ").append(booking.getProblemDescription()).append("\n");
+        }
+
+        if (booking.getStatus() != null) {
+            String statusEmoji = switch (booking.getStatus()) {
+                case PENDING -> "⏳";
+                case ACCEPTED -> "✅";
+                case DECLINED -> "❌";
+                case COMPLETED -> "🎉";
+                case CANCELLED -> "🚫";
+                case EXPIRED -> "⌛";
+                default -> "📊";
+            };
+            message.append("📊 الحالة: ").append(statusEmoji).append(" ").append(booking.getStatus()).append("\n");
+        }
+
+        message.append("\n📌 سنقوم بإعلامك عند قبول طلبك.");
+
+        return message.toString();
     }
 
     private ChatResponse handleGetProviderDetailsResponse(Map<String, Object> mcpResponse,
@@ -700,67 +863,142 @@ public class AiAssistantMcpService {
         String email = (String) content.get("email");
         String phoneNumber = (String) content.get("phoneNumber");
         String bio = (String) content.get("bio");
+        String profileImage = (String) content.get("profileImage");
         Double avgRating = content.get("averageRating") != null ? ((Number) content.get("averageRating")).doubleValue()
                 : 0.0;
         Integer totalReviews = (Integer) content.get("totalReviews");
         Integer yearsExp = (Integer) content.get("yearsOfExperience");
         String verificationStatus = (String) content.get("verificationStatus");
         Boolean hasSchedule = (Boolean) content.get("hasSchedule");
+        Integer completedJobs = (Integer) content.get("completedJobs");
+        Double cancellationRate = content.get("cancellationRate") != null
+                ? ((Number) content.get("cancellationRate")).doubleValue()
+                : 0.0;
+        Integer acceptanceRate = (Integer) content.get("acceptanceRate");
+        Boolean emergencyEnabled = (Boolean) content.get("emergencyEnabled");
+        Double serviceAreaRadius = (Double) content.get("serviceAreaRadius");
 
         @SuppressWarnings("unchecked")
         Map<String, Object> serviceType = (Map<String, Object>) content.get("serviceType");
         @SuppressWarnings("unchecked")
         Map<String, Object> location = (Map<String, Object>) content.get("location");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> ratings = (Map<String, Object>) content.get("ratings");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> pricing = (Map<String, Object>) content.get("pricing");
 
         StringBuilder message = new StringBuilder();
-        message.append("**معلومات المزود**\n\n");
-        message.append("**الاسم**: ").append(name).append("\n");
+        message.append("📋 معلومات المزود\n\n");
+        message.append("👤 الاسم: ").append(name).append("\n");
 
         if (verificationStatus != null) {
             String statusEmoji = "VERIFIED".equals(verificationStatus) ? "✅" : "⏳";
-            message.append("**الحالة**: ").append(statusEmoji).append(" ").append(verificationStatus).append("\n");
+            message.append("الحالة: ").append(statusEmoji).append(" ").append(verificationStatus).append("\n");
         }
 
         if (avgRating > 0) {
-            message.append("⭐ **التقييم**: ").append(String.format("%.1f", avgRating)).append("/5");
+            message.append("⭐ التقييم العام: ").append(String.format("%.1f", avgRating)).append("/5");
             if (totalReviews != null && totalReviews > 0) {
                 message.append(" (").append(totalReviews).append(" تقييم)");
             }
             message.append("\n");
         }
 
+        if (ratings != null) {
+            Double punctuality = (Double) ratings.get("averagePunctualityRating");
+            Double quality = (Double) ratings.get("averageQualityOfWorkRating");
+            Double commitment = (Double) ratings.get("averageCommitmentRating");
+            Double interaction = (Double) ratings.get("averageInteractionRating");
+
+            if (punctuality != null || quality != null || commitment != null || interaction != null) {
+                message.append("📊 تفاصيل التقييم:\n");
+                if (punctuality != null)
+                    message.append("   ⏱️ الالتزام بالمواعيد: ").append(String.format("%.1f", punctuality))
+                            .append("/5\n");
+                if (quality != null)
+                    message.append("   💎 جودة العمل: ").append(String.format("%.1f", quality)).append("/5\n");
+                if (commitment != null)
+                    message.append("   🤝 الالتزام: ").append(String.format("%.1f", commitment)).append("/5\n");
+                if (interaction != null)
+                    message.append("   💬 التفاعل: ").append(String.format("%.1f", interaction)).append("/5\n");
+            }
+        }
+
         if (yearsExp != null && yearsExp > 0) {
-            message.append("**سنوات الخبرة**: ").append(yearsExp).append("\n");
+            message.append("📅 سنوات الخبرة: ").append(yearsExp).append("\n");
+        }
+
+        if (completedJobs != null && completedJobs > 0) {
+            message.append("✅ مهام مكتملة: ").append(completedJobs).append("\n");
+        }
+
+        if (acceptanceRate != null) {
+            message.append("📊 معدل القبول: ").append(acceptanceRate).append("%\n");
+        }
+
+        if (cancellationRate != null && cancellationRate > 0) {
+            message.append("📊 معدل الإلغاء: ").append(String.format("%.1f", cancellationRate)).append("%\n");
         }
 
         if (phoneNumber != null) {
-            message.append("**الهاتف**: ").append(phoneNumber).append("\n");
+            message.append("📱 الهاتف: ").append(phoneNumber).append("\n");
         }
 
         if (email != null) {
-            message.append("**البريد الإلكتروني**: ").append(email).append("\n");
-        }
-
-        if (bio != null && !bio.isEmpty()) {
-            message.append("\n**عن المزود**:\n").append(bio).append("\n");
+            message.append("📧 البريد الإلكتروني: ").append(email).append("\n");
         }
 
         if (serviceType != null) {
             String serviceName = (String) serviceType.get("name");
             String serviceNameAr = (String) serviceType.get("nameAr");
-            message.append("\n **الخدمة**: ").append(serviceNameAr != null ? serviceNameAr : serviceName)
-                    .append("\n");
+            message.append("🔧 الخدمة: ").append(serviceNameAr != null ? serviceNameAr : serviceName);
+            String categoryAr = (String) serviceType.get("categoryAr");
+            if (categoryAr != null) {
+                message.append(" (").append(categoryAr).append(")");
+            }
+            message.append("\n");
         }
 
         if (location != null) {
             String address = (String) location.get("address");
+            String area = (String) location.get("area");
             if (address != null && !address.isEmpty()) {
-                message.append("**العنوان**: ").append(address).append("\n");
+                message.append("📍 العنوان: ").append(address);
+                if (area != null) {
+                    message.append(" (").append(area).append(")");
+                }
+                message.append("\n");
+            } else if (area != null) {
+                message.append("📍 المنطقة: ").append(area).append("\n");
             }
         }
 
+        if (serviceAreaRadius != null) {
+            message.append("📏 نطاق الخدمة: ").append(serviceAreaRadius).append(" كم\n");
+        }
+
+        if (pricing != null) {
+            Double price = (Double) pricing.get("price");
+            String priceTypeAr = (String) pricing.get("priceTypeAr");
+            if (price != null) {
+                message.append("💰 السعر: ").append(price).append(" جنيه");
+                if (priceTypeAr != null) {
+                    message.append(" (").append(priceTypeAr).append(")");
+                }
+                message.append("\n");
+            }
+        }
+
+        if (Boolean.TRUE.equals(emergencyEnabled)) {
+            message.append("🚨 خدمات الطوارئ متاحة\n");
+        }
+
         if (hasSchedule != null && hasSchedule) {
-            message.append("\n✅ متاح للحجز");
+            message.append("📅 متاح للحجز\n");
+        }
+
+        if (bio != null && !bio.isEmpty()) {
+            message.append("\n📝 نبذة:\n").append(bio).append("\n");
         }
 
         ProviderSummaryResponse providerSummary = ProviderSummaryResponse.builder()
@@ -768,6 +1006,8 @@ public class AiAssistantMcpService {
                 .name(name)
                 .averageRating(avgRating)
                 .distance(0.0)
+                .profileImage(profileImage)
+                .area(location != null ? (String) location.get("area") : null)
                 .build();
 
         return ChatResponse.builder()
@@ -914,30 +1154,71 @@ public class AiAssistantMcpService {
     private String formatAvailabilityMessageForMCP(String providerName,
             List<ScheduleResponse.TimeSlotResponse> slots) {
         if (slots == null || slots.isEmpty()) {
-            return "لا توجد مواعيد متاحة لـ " + providerName;
+            return "❌ لا توجد مواعيد متاحة لـ " + providerName;
         }
 
         Map<LocalDate, List<ScheduleResponse.TimeSlotResponse>> slotsByDate = slots.stream()
                 .collect(Collectors.groupingBy(slot -> baseService.parseDateSafe(slot.getDate())));
 
         StringBuilder message = new StringBuilder();
-        message.append("المواعيد المتاحة لـ ").append(providerName).append(":\n\n");
+        message.append("📋 المواعيد المتاحة لـ ").append(providerName).append("\n\n");
 
         int dateCount = 0;
         for (Map.Entry<LocalDate, List<ScheduleResponse.TimeSlotResponse>> entry : slotsByDate.entrySet()) {
             if (dateCount++ >= 7)
                 break;
-            message.append("📅 ").append(AiAssistantServiceImpl.DATE_FORMAT.format(entry.getKey())).append(":\n");
-            String times = entry.getValue().stream()
-                    .map(slot -> AiAssistantServiceImpl.TIME_FORMAT.format(slot.getStartTime()) + " - " +
-                            AiAssistantServiceImpl.TIME_FORMAT.format(slot.getEndTime()))
-                    .collect(Collectors.joining(", "));
-            message.append("   🕐 ").append(times).append("\n");
+
+            LocalDate date = entry.getKey();
+            List<ScheduleResponse.TimeSlotResponse> daySlots = entry.getValue();
+
+            // Format date
+            String formattedDate = formatDateReadable(date);
+            message.append("📅 ").append(formattedDate).append("\n");
+
+            // Show each available slot
+            for (ScheduleResponse.TimeSlotResponse slot : daySlots) {
+                String startTime = AiAssistantServiceImpl.TIME_FORMAT.format(slot.getStartTime());
+                String endTime = AiAssistantServiceImpl.TIME_FORMAT.format(slot.getEndTime());
+
+                // Calculate duration
+                long durationMinutes = java.time.Duration.between(slot.getStartTime(), slot.getEndTime()).toMinutes();
+                String durationText = "";
+                if (durationMinutes >= 60) {
+                    long hours = durationMinutes / 60;
+                    long minutes = durationMinutes % 60;
+                    durationText = minutes > 0 ? String.format(" (%d ساعة %d دقيقة)", hours, minutes)
+                            : String.format(" (%d ساعة)", hours);
+                } else {
+                    durationText = String.format(" (%d دقيقة)", durationMinutes);
+                }
+
+                message.append("   🕐 ").append(startTime).append(" - ").append(endTime)
+                        .append(durationText).append("\n");
+            }
+            message.append("\n");
         }
 
+        message.append("💡 اختر الوقت المناسب وسأساعدك في الحجز.");
         return message.toString();
     }
 
+    private String formatDateReadable(LocalDate date) {
+        String dayOfWeek = switch (date.getDayOfWeek()) {
+            case SATURDAY -> "السبت";
+            case SUNDAY -> "الأحد";
+            case MONDAY -> "الاثنين";
+            case TUESDAY -> "الثلاثاء";
+            case WEDNESDAY -> "الأربعاء";
+            case THURSDAY -> "الخميس";
+            case FRIDAY -> "الجمعة";
+        };
+
+        String[] monthNames = { "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر" };
+        String month = monthNames[date.getMonthValue() - 1];
+
+        return String.format("%s %d %s %d", dayOfWeek, date.getDayOfMonth(), month, date.getYear());
+    }
     // ===== INNER CLASS =====
     
     @Data

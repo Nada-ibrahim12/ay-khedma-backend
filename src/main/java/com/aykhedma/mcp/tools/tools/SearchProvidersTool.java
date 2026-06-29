@@ -1,5 +1,7 @@
 package com.aykhedma.mcp.tools.tools;
 
+import com.aykhedma.dto.response.ProviderSummaryResponse;
+import com.aykhedma.mapper.ProviderMapper;
 import com.aykhedma.mcp.tools.McpTool;
 import com.aykhedma.mcp.tools.McpToolRegistry;
 import com.aykhedma.model.service.ServiceType;
@@ -24,6 +26,7 @@ public class SearchProvidersTool implements McpTool {
     private final McpToolRegistry toolRegistry;
     private final ProviderRepository providerRepository;
     private final ServiceTypeResolver serviceTypeResolver;
+    private final ProviderMapper providerMapper;
 
     @PostConstruct
     public void init() {
@@ -200,23 +203,32 @@ public class SearchProvidersTool implements McpTool {
 
     private Map<String, Object> toProviderMap(Provider provider, Location consumerLocation) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", provider.getId());
-        result.put("name", provider.getName());
-        result.put("averageRating", provider.getAverageRating() != null ? provider.getAverageRating() : 0.0);
+
+        ProviderSummaryResponse response = providerMapper.toProviderSummaryResponse(provider);
+
+        result.put("id", response.getId());
+        result.put("name", response.getName());
+        result.put("profileImage", response.getProfileImage()); 
+        result.put("serviceType", response.getServiceType());
+        result.put("serviceTypeAr", response.getServiceTypeAr());
+        result.put("averageRating", response.getAverageRating());
+        result.put("price", response.getPrice());
+        result.put("priceType", response.getPriceType());
+        result.put("priceTypeAr", response.getPriceTypeAr());
+        result.put("area", response.getArea());
+        result.put("cancellationRate", response.getCancellationRate()); 
 
         double distanceKm = 0.0;
-        if (provider.getLocation() != null) {
+        if (provider.getLocation() != null && consumerLocation != null) {
             distanceKm = provider.getLocation().calculateDistance(consumerLocation);
         }
-        result.put("distance", distanceKm);
+        result.put("distance", Math.round(distanceKm * 10.0) / 10.0);
 
-        if (provider.getServiceType() != null) {
-            result.put("serviceType", provider.getServiceType().getName());
-            result.put("serviceTypeAr", provider.getServiceType().getNameAr());
-        }
-
-        if (provider.getLocation() != null) {
-            result.put("area", provider.getLocation().getArea());
+        if (distanceKm > 0) {
+            int estimatedMinutes = (int) Math.ceil(distanceKm * 5);
+            result.put("estimatedArrivalTime", estimatedMinutes);
+        } else {
+            result.put("estimatedArrivalTime", null);
         }
 
         return result;

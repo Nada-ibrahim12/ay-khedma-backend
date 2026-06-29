@@ -200,13 +200,9 @@ public class CreateBookingTool implements McpTool {
             return Map.of(
                     "success", true,
                     "message", "Booking created successfully!",
-                    "bookingId", bookingResponse.getId(),
-                    "providerId", providerId,
-                    "providerName", provider.getName(),
-                    "date", dateStr,
-                    "time", timeStr,
-                    "status", bookingResponse.getStatus() != null ? bookingResponse.getStatus().name() : "PENDING");
-
+                    "booking", bookingResponse 
+            );
+            
         } catch (Exception e) {
             log.error("Error in create_booking: {}", e.getMessage(), e);
             return Map.of(

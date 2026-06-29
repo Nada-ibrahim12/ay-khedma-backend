@@ -98,4 +98,7 @@ public interface ProviderService {
 
         List<ScheduleResponse.TimeSlotResponse> getAvailableTimeSlotsForDateRange(Long providerId, LocalDate startDate,
                         LocalDate endDate);
+
+        List<ScheduleResponse.TimeSlotResponse> getRealAvailableSlotsOnly(Long providerId,
+            LocalDate startDate, LocalDate endDate);
 }

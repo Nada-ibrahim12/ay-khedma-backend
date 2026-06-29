@@ -10,6 +10,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import java.time.format.DateTimeParseException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -77,7 +78,18 @@ public class CheckAvailabilityTool implements McpTool {
         Long providerId = arguments.get("providerId") != null ? ((Number) arguments.get("providerId")).longValue()
                 : null;
         String providerName = (String) arguments.get("providerName");
-        String dateStr = (String) arguments.get("date");
+        Object dateObj = arguments.get("date");
+        String dateStr = null;
+        if (dateObj != null) {
+            if (dateObj instanceof String) {
+                String dateValue = ((String) dateObj).trim();
+                if (!"null".equalsIgnoreCase(dateValue) && !dateValue.isEmpty()) {
+                    dateStr = dateValue;
+                }
+            } else if (dateObj instanceof Map) {
+                dateStr = null;
+            }
+        }
 
         log.info("check_availability: providerId={}, providerName={}, date={}",
                 providerId, providerName, dateStr);
@@ -98,17 +110,24 @@ public class CheckAvailabilityTool implements McpTool {
                         "error", "Provider not found in database.");
             }
 
+            LocalDate targetDate = null;
+            if (dateStr != null) {
+                try {
+                    targetDate = LocalDate.parse(dateStr, DATE_FORMAT);
+                } catch (DateTimeParseException e) {
+                    return Map.of("success", false, "error",
+                            "Invalid date format. Please use yyyy-MM-dd format.");
+                }
+            }
+
             List<ScheduleResponse.TimeSlotResponse> slots;
-            if (dateStr == null || dateStr.isEmpty()) {
-                slots = providerService.getAvailableTimeSlotsForDateRange(
+            if (targetDate == null) {
+                slots = providerService.getRealAvailableSlotsOnly(
                         resolvedProviderId,
                         LocalDate.now().plusDays(1),
                         LocalDate.now().plusDays(7));
-                log.info("Found {} slots for next 7 days", slots.size());
             } else {
-                LocalDate date = LocalDate.parse(dateStr, DATE_FORMAT);
-                slots = providerService.getAvailableTimeSlots(resolvedProviderId, date);
-                log.info("Found {} slots for {}", slots.size(), dateStr);
+                slots = providerService.getRealAvailableSlotsOnly(resolvedProviderId, targetDate, targetDate);
             }
 
             List<Map<String, Object>> result = slots.stream()
