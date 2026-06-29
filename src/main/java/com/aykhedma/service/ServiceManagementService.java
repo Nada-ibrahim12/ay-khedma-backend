@@ -5,6 +5,7 @@ import com.aykhedma.dto.service.CategoryWithServicesDTO;
 import com.aykhedma.dto.service.ServiceCategoryDTO;
 import com.aykhedma.dto.service.ServiceTypeDTO;
 import com.aykhedma.dto.service.ServicesResponse;
+import com.aykhedma.model.service.PriceType;
 import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
@@ -41,4 +42,6 @@ public interface ServiceManagementService {
                                     Long consumerId,
                                     Double radius,
                                     String sortBy);
+
+    List<PriceType> getAllPriceTypes();
 }

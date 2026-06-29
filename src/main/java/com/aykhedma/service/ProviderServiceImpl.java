@@ -1086,44 +1086,7 @@ public class ProviderServiceImpl implements ProviderService {
                         .thenComparing(ScheduleResponse.TimeSlotResponse::getStartTime))
                 .collect(Collectors.toList());
     }
-    // /**
-    // * Helper method to generate time slots for a working day
-    // */
-    // private void generateTimeSlotsForWorkingDay(Schedule schedule, WorkingDay
-    // workingDay) {
-    // LocalDate startDate = LocalDate.now();
-    // LocalDate endDate = startDate.plusDays(30); // Generate slots for next 30
-    // days
-    //
-    // List<TimeSlot> newSlots = new ArrayList<>();
-    //
-    // for (LocalDate date = startDate; !date.isAfter(endDate); date =
-    // date.plusDays(1)) {
-    // if (date == workingDay.getDate()) {
-    // // Check if slot already exists for this date
-    // LocalDate finalDate = date;
-    // boolean exists = schedule.getTimeSlots().stream()
-    // .anyMatch(slot -> slot.getDate().equals(finalDate));
-    //
-    // if (!exists) {
-    // TimeSlot timeSlot = TimeSlot.builder()
-    // .date(date)
-    // .startTime(workingDay.getStartTime())
-    // .endTime(workingDay.getEndTime())
-    // .status(TimeSlotStatus.AVAILABLE)
-    // .schedule(schedule)
-    // .build();
-    // newSlots.add(timeSlot);
-    // }
-    // }
-    // }
-    //
-    // if (!newSlots.isEmpty()) {
-    // timeSlotRepository.saveAll(newSlots);
-    // schedule.getTimeSlots().addAll(newSlots);
-    // }
-    // }
-
+    
     private List<ScheduleResponse.TimeSlotResponse> toDiscreteStartTimeResponses(List<TimeSlot> availableSlots,
             LocalDate fallbackDate) {
         if (availableSlots == null || availableSlots.isEmpty()) {
@@ -1284,18 +1247,6 @@ public class ProviderServiceImpl implements ProviderService {
                 .message("Document deleted successfully")
                 .build();
     }
-
-    // @Override
-    // public ProviderResponse updateEmergencyStatus(Long providerId, boolean
-    // enabled) {
-    // Provider provider = providerRepository.findById(providerId)
-    // .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
-    //
-    // provider.setEmergencyEnabled(enabled);
-    // Provider updatedProvider = providerRepository.save(provider);
-    //
-    // return providerMapper.toProviderResponse(updatedProvider);
-    // }
 
     @Override
     public VerificationStatus getVerificationStatus(Long providerId) {

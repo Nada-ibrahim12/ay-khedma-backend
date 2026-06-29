@@ -70,6 +70,8 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/services/categories",
                                                                 "/api/services/types")
                                                 .permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/services/price-types")
+                                                .permitAll()
                                                 .requestMatchers(
                                                                 RegexRequestMatcher.regexMatcher(HttpMethod.GET,
                                                                                 "^/api/services/categories/[0-9]+$"),
