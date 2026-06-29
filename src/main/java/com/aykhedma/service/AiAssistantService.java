@@ -14,4 +14,6 @@ public interface AiAssistantService {
     ChatResponse getChat(String sessionId, User currentUser);
 
     List<ChatResponse> getUserChats(User currentUser);
+
+    boolean deleteChatbotChatSession(String sessionId, User currentUser);
 }

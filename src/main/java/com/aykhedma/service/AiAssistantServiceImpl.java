@@ -26,6 +26,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -89,8 +90,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     public AiAssistantMcpService mcpService;
     public AiAssistantOldService oldService;
 
-
-     @Autowired
+    @Autowired
     public void setMcpService(@Lazy AiAssistantMcpService mcpService) {
         this.mcpService = mcpService;
     }
@@ -107,7 +107,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private final Map<String, CachedValue<Long>> serviceTypeByMeaningCache = new ConcurrentHashMap<>();
 
     // ===== INTERFACE METHODS =====
-    
+
     @Override
     public ChatResponse chat(AiChatRequest request, User currentUser) {
         if (mcpEnabled && useMcp && mcpServer.isPresent()) {
@@ -131,18 +131,20 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                     List<ChatMessage> messages = chatMessageRepository
                             .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId());
 
-                    String lastMessageContent = messages.isEmpty() ? ""
-                            : messages.get(messages.size() - 1).getContent();
+                    String firstMessageContent = messages.isEmpty() ? "New Chat"
+                            : messages.get(0).getContent();
+
                     LocalDateTime lastMessageTime = messages.isEmpty() ? session.getStartTime()
                             : messages.get(messages.size() - 1).getTimestamp();
 
                     return ChatResponse.builder()
                             .sessionId(session.getSessionId())
                             .timestamp(lastMessageTime)
-                            .message(lastMessageContent)
+                            .message(firstMessageContent)
                             .detectedLanguage(session.getDetectedLanguage())
                             .build();
                 })
+                .sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
                 .collect(Collectors.toList());
     }
 
@@ -237,8 +239,67 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 .build();
     }
 
+    @Scheduled(fixedDelay = 3600000)
+    public void deleteEmptySessions() {
+        log.info("Starting cleanup of empty chat sessions");
+
+        LocalDateTime cutoffTime = LocalDateTime.now().minusHours(1);
+        List<ChatSession> oldSessions = chatSessionRepository
+                .findByStartTimeBefore(cutoffTime);
+
+        int deletedCount = 0;
+
+        for (ChatSession session : oldSessions) {
+            List<ChatMessage> messages = chatMessageRepository
+                    .findByChatSessionSessionId(session.getSessionId());
+
+            if (messages.isEmpty()) {
+                chatSessionRepository.delete(session);
+                deletedCount++;
+                log.debug("Deleted empty session: {}", session.getSessionId());
+            }
+        }
+
+        log.info("Cleanup completed. Deleted {} empty sessions.", deletedCount);
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteChatbotChatSession(String sessionId, User currentUser) {
+        log.info("User {} deleting chat with session: {}", currentUser.getId(), sessionId);
+
+        if (sessionId == null || sessionId.trim().isEmpty()) {
+            log.warn("Attempted to delete chat with null or empty session ID");
+            return false;
+        }
+
+        try {
+            Optional<ChatSession> sessionOptional = chatSessionRepository.findById(sessionId);
+
+            if (sessionOptional.isEmpty()) {
+                log.warn("Chat session not found with ID: {}", sessionId);
+                return false;
+            }
+
+            ChatSession session = sessionOptional.get();
+
+            if (!session.getUserId().equals(currentUser.getId())) {
+                log.warn("User {} attempted to delete session {} owned by user {}",
+                        currentUser.getId(), sessionId, session.getUserId());
+                return false;
+            }
+
+            chatSessionRepository.delete(session);
+            log.info("Successfully deleted chat session: {}", sessionId);
+            return true;
+
+        } catch (Exception e) {
+            log.error("Error deleting chat session {}: {}", sessionId, e.getMessage(), e);
+            return false;
+        }
+    }
     // ===== SESSION MANAGEMENT =====
-    
+
     public ChatSession resolveSession(AiChatRequest request, Long userId) {
         if (StringUtils.hasText(request.getSessionId())) {
             ChatSession session = chatSessionRepository.findBySessionIdAndIsActiveTrue(request.getSessionId())
@@ -267,7 +328,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     // ===== MESSAGE PERSISTENCE =====
-    
+
     public void saveUserMessage(ChatSession session, Long userId, String content) {
         ChatMessage userMessage = ChatMessage.builder()
                 .chatSession(session)
@@ -324,7 +385,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     // ===== CACHING =====
-    
+
     public List<ServiceType> getCachedServiceTypes() {
         CachedValue<List<ServiceType>> cached = serviceTypesCache;
         if (cached != null && !cached.isExpired()) {
@@ -367,7 +428,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     // ===== SERVICE RESOLUTION =====
-    
+
     public ServiceType resolveServiceTypeByMeaning(String userMessage) {
         List<ServiceType> allServices = getCachedServiceTypes();
 
@@ -434,7 +495,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     // ===== PROVIDER SEARCH =====
-    
+
     public List<ProviderSummaryResponse> findAndSortProviders(Long serviceTypeId,
             LocationDTO userLocation, Integer radiusKm, User currentUser) {
 
@@ -476,7 +537,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     // ===== RESPONSE BUILDING =====
-    
+
     public String buildSmartReply(List<ProviderSummaryResponse> providers, ServiceType serviceType,
             String userMessage) {
 
@@ -574,7 +635,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     // ===== UTILITY METHODS =====
-    
+
     public String extractJson(String text) {
         int start = text.indexOf('{');
         int end = text.lastIndexOf('}');
@@ -673,7 +734,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     // ===== SERIALIZATION =====
-    
+
     private String serializeProviders(List<ProviderSummaryResponse> providers) {
         if (providers == null) {
             return "[]";
@@ -726,7 +787,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     // ===== PRIVATE HELPERS =====
-    
+
     private ProviderSummaryResponse toProviderSummaryWithDistance(Provider provider, LocationDTO userLocation,
             User currentUser) {
         ProviderSummaryResponse response = providerMapper.toProviderSummaryResponse(provider);
@@ -903,11 +964,13 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     public enum Intent {
-        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, GET_AVAILABILITY, CREATE_BOOKING, GET_PROVIDER_DETAILS, CLARIFICATION
+        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, GET_AVAILABILITY, CREATE_BOOKING, GET_PROVIDER_DETAILS,
+        CLARIFICATION
     }
 
     public enum Action {
-        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, CHECK_AVAILABILITY, CREATE_BOOKING, GET_PROVIDER_DETAILS, ASK_CLARIFICATION
+        GENERAL, SEARCH_PROVIDERS, SUGGEST_SOLUTIONS, CHECK_AVAILABILITY, CREATE_BOOKING, GET_PROVIDER_DETAILS,
+        ASK_CLARIFICATION
     }
 
     private static class CachedValue<T> {

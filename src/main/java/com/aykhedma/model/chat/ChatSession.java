@@ -31,7 +31,7 @@ public class ChatSession {
     @PastOrPresent(message = "End time cannot be in the future")
     private LocalDateTime endTime;
 
-    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @JoinColumn(name = "session_id")
     @OrderBy("timestamp ASC")
     @Builder.Default

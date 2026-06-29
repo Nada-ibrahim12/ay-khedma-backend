@@ -12,6 +12,8 @@ import java.util.Optional;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, String> {
 
+  List<ChatMessage> findByChatSessionSessionId(String sessionId);
+
   Page<ChatMessage> findByChatRoomId(String roomId, Pageable pageable);
 
   Optional<ChatMessage> findTopByChatRoomIdOrderByTimestampDesc(String roomId);
