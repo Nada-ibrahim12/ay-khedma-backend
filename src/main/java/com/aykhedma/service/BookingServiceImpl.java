@@ -208,7 +208,7 @@ public class BookingServiceImpl implements BookingService {
         Long bookingId = booking.getId();
         LocalDate date = booking.getRequestedDate();
         LocalTime startTime = booking.getRequestedStartTime();
-        Long estimatedDuration = acceptBookingRequest.getEstimatedDuration();
+        long estimatedDuration = ((acceptBookingRequest.getEstimatedDuration() + 29L) / 30L) * 30L;
         Integer bookingBuffer = provider.getBookingBufferMinutes();
         LocalTime endTime = booking.getRequestedStartTime().plusMinutes(estimatedDuration);
 
