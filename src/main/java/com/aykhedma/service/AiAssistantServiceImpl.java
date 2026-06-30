@@ -43,6 +43,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import jakarta.annotation.PostConstruct;
 
 @Service
 @Slf4j
@@ -51,7 +52,7 @@ import java.util.stream.Collectors;
 public class AiAssistantServiceImpl implements AiAssistantService {
 
     // ===== CONSTANTS =====
-    public static final int MAX_HISTORY_TURNS = 6;
+    public static final int MAX_HISTORY_TURNS = 10;
     public static final int DEFAULT_SEARCH_RADIUS_KM = 10;
     public static final int MAX_SERVICES_FOR_INLINE_CATALOG = 80;
     public static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -98,6 +99,13 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     @Autowired
     public void setOldService(@Lazy AiAssistantOldService oldService) {
         this.oldService = oldService;
+    }
+
+    @PostConstruct
+    public void init() {
+        if (this.oldService == null) {
+            log.warn("oldService not initialized yet");
+        }
     }
 
     // ===== CACHES =====
@@ -637,25 +645,35 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         return reply.toString();
     }
 
-
     // public String buildSolutionSuggestionReply(String normalizedMessage) {
-    //     if (containsAny(normalizedMessage, "كهرب", "electric", "power", "نور", "لمبة", "فيشة", "breaker", "قاطع")) {
-    //         return "جرب أولاً: 1) تأكد إن القاطع الرئيسي شغال، 2) راجع الفيشة والريموت، 3) افصل الجهاز 5 دقائق ورجعه تاني، 4) لو في شرر أو سخونة، افصل الكهرباء فوراً. لو المشكلة مستمرة أقدر أدورلك على كهربائي.";
-    //     }
+    // if (containsAny(normalizedMessage, "كهرب", "electric", "power", "نور",
+    // "لمبة", "فيشة", "breaker", "قاطع")) {
+    // return "جرب أولاً: 1) تأكد إن القاطع الرئيسي شغال، 2) راجع الفيشة والريموت،
+    // 3) افصل الجهاز 5 دقائق ورجعه تاني، 4) لو في شرر أو سخونة، افصل الكهرباء
+    // فوراً. لو المشكلة مستمرة أقدر أدورلك على كهربائي.";
+    // }
 
-    //     if (containsAny(normalizedMessage, "تكييف", "ac", "air", "cool", "برد")) {
-    //         return "جرب أولاً: 1) تأكد من وضع التبريد والحرارة، 2) نظف الفلتر، 3) راجع البطاريات والريموت، 4) افصل التكييف 5 دقائق ثم شغله. لو ما اتحلّش أقدر أدورلك على فني تكييف.";
-    //     }
+    // if (containsAny(normalizedMessage, "تكييف", "ac", "air", "cool", "برد")) {
+    // return "جرب أولاً: 1) تأكد من وضع التبريد والحرارة، 2) نظف الفلتر، 3) راجع
+    // البطاريات والريموت، 4) افصل التكييف 5 دقائق ثم شغله. لو ما اتحلّش أقدر أدورلك
+    // على فني تكييف.";
+    // }
 
-    //     if (containsAny(normalizedMessage, "مياه", "water", "تسريب", "بيسرب", "حنفية", "ماسورة", "صرف")) {
-    //         return "جرب أولاً: 1) اقفل مصدر المياه، 2) راقب مكان التسريب، 3) تأكد إن الوصلات مش مفكوكة، 4) لو في كسر واضح أو التسريب كبير أقدر أدورلك على سباك.";
-    //     }
+    // if (containsAny(normalizedMessage, "مياه", "water", "تسريب", "بيسرب",
+    // "حنفية", "ماسورة", "صرف")) {
+    // return "جرب أولاً: 1) اقفل مصدر المياه، 2) راقب مكان التسريب، 3) تأكد إن
+    // الوصلات مش مفكوكة، 4) لو في كسر واضح أو التسريب كبير أقدر أدورلك على سباك.";
+    // }
 
-    //     if (containsAny(normalizedMessage, "باب", "قفل", "lock", "مفتاح", "handle")) {
-    //         return "جرب أولاً: 1) تأكد إن الباب مش عالق، 2) استخدم زيت خفيف للمفصلة لو بتحتك، 3) راجع المفتاح/القفل، 4) لو القفل مكسور أقدر أدورلك على فني.";
-    //     }
+    // if (containsAny(normalizedMessage, "باب", "قفل", "lock", "مفتاح", "handle"))
+    // {
+    // return "جرب أولاً: 1) تأكد إن الباب مش عالق، 2) استخدم زيت خفيف للمفصلة لو
+    // بتحتك، 3) راجع المفتاح/القفل، 4) لو القفل مكسور أقدر أدورلك على فني.";
+    // }
 
-    //     return "ممكن نبدأ بخطوات بسيطة: 1) تأكد من مصدر المشكلة، 2) افصل/شغّل الجهاز لو ده آمن، 3) راقب إذا كان في جزء مفكوك أو توقف مفاجئ. لو المشكلة مستمرة أقدر أدورلك على مختص مناسب.";
+    // return "ممكن نبدأ بخطوات بسيطة: 1) تأكد من مصدر المشكلة، 2) افصل/شغّل الجهاز
+    // لو ده آمن، 3) راقب إذا كان في جزء مفكوك أو توقف مفاجئ. لو المشكلة مستمرة أقدر
+    // أدورلك على مختص مناسب.";
     // }
 
     public String formatAvailabilityMessage(Long providerId, LocalDate date,
@@ -792,7 +810,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         StringBuilder context = new StringBuilder();
         context.append("## PREVIOUS CONVERSATION CONTEXT:\n");
 
-        int start = Math.max(0, history.size() - 5);
+        int start = Math.max(0, history.size() - MAX_HISTORY_TURNS);
         for (int i = start; i < history.size(); i++) {
             ChatMessage msg = history.get(i);
             String role = msg.getSenderRole() == MessageRole.USER ? "User" : "Assistant";

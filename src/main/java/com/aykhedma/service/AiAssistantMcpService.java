@@ -30,6 +30,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.context.annotation.Lazy;
+import java.time.DayOfWeek;
+import java.time.temporal.TemporalAdjusters;
 
 @Service
 @Slf4j
@@ -38,6 +41,7 @@ import java.util.stream.Collectors;
 public class AiAssistantMcpService {
 
     private final AiAssistantServiceImpl baseService;
+    @Lazy private final AiAssistantOldService oldService;
     private final GeminiClient geminiClient;
     private final SpeechToTextService speechToTextService;
     private final McpServer mcpServer;
@@ -109,7 +113,7 @@ public class AiAssistantMcpService {
 
             if (toolResponse == null) {
                 log.warn("No tool response from Gemini, falling back to existing implementation");
-                return baseService.oldService.chatWithExisting(request, currentUser);
+                return oldService.chatWithExisting(request, currentUser);
             }
 
             log.info("Gemini selected tool: {} with args: {}", toolResponse.tool, toolResponse.arguments);
@@ -134,7 +138,7 @@ public class AiAssistantMcpService {
             String toolName = toolResponse.tool;
             if (!StringUtils.hasText(toolName)) {
                 log.warn("No tool name in response");
-                return baseService.oldService.chatWithExisting(request, currentUser);
+                return oldService.chatWithExisting(request, currentUser);
             }
 
             Map<String, Object> arguments = toolResponse.arguments != null ? toolResponse.arguments : new HashMap<>();
@@ -196,7 +200,7 @@ public class AiAssistantMcpService {
             return chatResponse;
         } catch (Exception e) {
             log.error("MCP chat failed: {}", e.getMessage(), e);
-            return baseService.oldService.chatWithExisting(request, currentUser);
+            return oldService.chatWithExisting(request, currentUser);
         }
     }
 
@@ -288,10 +292,17 @@ public class AiAssistantMcpService {
                         + st.getDescription() + ")")
                 .collect(Collectors.joining("\n"));
 
-        return """
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate tomorrow = today.plusDays(1);
+        int currentYear = today.getYear();
+
+        log.info("TODAY'S DATE: {}", today);
+
+        return ("""
                 You are Ay Khedma AI Assistant - a comprehensive service marketplace assistant.
 
-                 ## USER LOCATION INFORMATION:
+                ## USER LOCATION INFORMATION:
                 %s
                 - Latitude: %.4f
                 - Longitude: %.4f
@@ -309,10 +320,17 @@ public class AiAssistantMcpService {
 
                         ## DATE AND TIME HANDLING
 
+                        ### Colloquial & Relative Expressions — Resolve THESE FIRST before any other parsing
+                        The following words map to fixed dates. Use EXACTLY the date shown — do not calculate, do not offset:
+                        - "انهاردة" / "النهارده" / "اليوم" / "today"    → %s
+                        - "امبارح"  / "البارح"   / "أمس"  / "yesterday" → %s
+                        - "بكره"    / "بكرا"     / "غداً" / "tomorrow"  → %s
+                        - "بعد X يوم/ايام"                              → %s + X days
+                        - "بعد اسبوع" / "الاسبوع الجاي"                → %s + 7 days
+
                         ### Input Formats
                         - Dates: "30/6" or "30/6/2026" → June 30, 2026 | "15-6" → June 15 | "يوم 30" → 30th of current month
-                        - Days: "الجمعة", "السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس" → Next [day]
-                        - Relative: "بعد اسبوع" → +7 days | "بعد 3 ايام" → +3 days
+                        - Days: "الجمعة", "السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس" → Next occurrence of that day
                         - Times: "7" or "7 صباحاً" → 07:00 | "7 مساءً" → 19:00 | "الظهر" → 12:00 | "العصر" → 16:00 | "المغرب" → 18:00 | "العشاء" → 20:00
 
                         ### Day Rules (CRITICAL)
@@ -324,24 +342,28 @@ public class AiAssistantMcpService {
                         - الأحد → Sunday | الاثنين → Monday | الثلاثاء → Tuesday | الأربعاء → Wednesday | الخميس → Thursday | الجمعة → Friday | السبت → Saturday
 
                         ### Date Parsing Rules
-                        1. Day+Month only (e.g., "30/6"): Use current year (2026); if date passed → ADD 1 YEAR
-                        2. Day only (e.g., "يوم 30"): Use current month; if day passed → ADD 1 MONTH
-                        3. Relative: "بعد X يوم/اسبوع" → Today + X days
-                        4. Output: Always `"yyyy-MM-dd"` (e.g., "2026-06-30")
+                        1. Colloquial today/yesterday/tomorrow → use the EXACT pre-resolved dates from the table above
+                        2. Day+Month only (e.g., "30/6"): Use current year (%d); if date has already passed → ADD 1 YEAR
+                        3. Day only (e.g., "يوم 30"): Use current month; if day has passed → ADD 1 MONTH
+                        4. Relative: "بعد X يوم/اسبوع" → Today (%s) + X days
+                        5. Output: Always "yyyy-MM-dd" (e.g., "2026-06-30")
 
                         ### Time Parsing Rules
                         1. Number 1-12 → AM (morning) | 13-24 → 24-hour format
                         2. Arabic references: "صباحاً/صبح" → AM | "مساءً/مغرب" → PM (+12) | "ظهراً" → 12:00 | "العصر" → 16:00 | "المغرب" → 18:00 | "العشاء" → 20:00
-                        3. Output: Always `"HH:mm"` (e.g., "07:00", "19:00")
+                        3. Output: Always "HH:mm" (e.g., "07:00", "19:00")
 
                         ### Examples
-                        1. User: "الجمعة الساعة 10" (Today Monday) → date="2026-07-03", time="10:00"
-                        2. User: "السبت الجاي الساعة 4 العصر" (Today Monday) → date="2026-07-04", time="16:00"
-                        3. User: "يوم 30/6 الساعة 7" (Today June 28) → date="2026-06-30", time="07:00"
-                        4. User: "يوم 15/6 الساعة 8" (Today June 28, past) → date="2027-06-15", time="08:00"
+                        1. User: "انهاردة"                   → date="%s"
+                        2. User: "بكره الساعة 7 صبح"         → date="%s", time="07:00"
+                        3. User: "امبارح"                    → date="%s"  ← (for reference only, past dates should not be booked)
+                        4. User: "الجمعة الساعة 10"           → date="%s", time="10:00"
+                        5. User: "السبت الجاي الساعة 4 العصر" → date="%s", time="16:00"
+                        6. User: "يوم 30/6 الساعة 7"          → date="2026-06-30", time="07:00"
+                        7. User: "يوم 15/6 الساعة 8" (past)   → date="2027-06-15", time="08:00"
 
-                                you need to analyze service categories and service types from the database
-                                """
+                        you need to analyze service categories and service types from the database
+                        """
                 + categoriesStr
                 + "\n\n"
                 + servicesStr
@@ -403,7 +425,7 @@ public class AiAssistantMcpService {
                 + userRole
                 + """
 
-                        - If role = "anonymous" or role = "null" or role = "ANONYMOUS" , user is NOT logged in
+                        - If role = "anonymous" or role = "null" or role = "ANONYMOUS", user is NOT logged in
                         - The user must be authenticated to access any tool
 
                         ## REMEMBER:
@@ -417,8 +439,23 @@ public class AiAssistantMcpService {
                         - Always use double quotes for JSON properties
                         - For Arabic user messages, respond in Arabic in the reply field
                         - For English user messages, respond in English
-                        """.formatted(userLocationInfo, userLatitude, userLongitude,
-                        LocalDate.now().toString(), userLatitude, userLongitude);
+                        """).formatted(
+                        userLocationInfo, userLatitude, userLongitude,
+                        today,
+                        today, yesterday, tomorrow,
+                        today, today, 
+                        currentYear, today,
+                        today, 
+                        tomorrow, 
+                        yesterday, 
+                        nextWeekday(today, DayOfWeek.FRIDAY), 
+                        nextWeekday(today, DayOfWeek.SATURDAY),
+                        userLatitude, userLongitude);
+    }
+
+    private static LocalDate nextWeekday(LocalDate today, DayOfWeek day) {
+        LocalDate next = today.with(TemporalAdjusters.next(day));
+        return next;
     }
 
     // ===== PARSING =====
