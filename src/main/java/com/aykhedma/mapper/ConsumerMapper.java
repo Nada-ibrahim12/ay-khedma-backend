@@ -32,7 +32,7 @@ public interface ConsumerMapper {
     @Mapping(source = "cancellationRate", target = "cancellationRate")
     @Mapping(target = "cancellationHistory", expression = "java(mapCancellationHistory(consumer.getBookings()))")
     @Mapping(target = "savedProviders", expression = "java(mapSavedProviders(consumer.getSavedProviders()))")
-    @Mapping(source = "location", target = "location", qualifiedByName = "mapLocationToDTO")
+    @Mapping(source = "location", target = "location")
     ConsumerResponse toConsumerResponse(Consumer consumer);
 
     // DTO to Entity mappings (for updates)
@@ -60,9 +60,6 @@ public interface ConsumerMapper {
         return LocationDTO.builder()
                 .latitude(location.getLatitude())
                 .longitude(location.getLongitude())
-                .address(location.getAddress())
-                .area(location.getArea())
-                .city(location.getCity())
                 .build();
     }
 
@@ -75,9 +72,6 @@ public interface ConsumerMapper {
         return Location.builder()
                 .latitude(locationDTO.getLatitude())
                 .longitude(locationDTO.getLongitude())
-                .address(locationDTO.getAddress())
-                .area(locationDTO.getArea())
-                .city(locationDTO.getCity())
                 .build();
     }
 

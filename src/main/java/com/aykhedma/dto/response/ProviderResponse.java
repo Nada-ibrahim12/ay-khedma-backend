@@ -37,7 +37,7 @@ public class ProviderResponse {
     private Long serviceTypeId;
     private String worksAt;
     private String workLocation;
-    private LocationDTO location;
+    private LocationResponse location;
     private Boolean emergencyEnabled;
     private Double averagePunctualityRating;
     private Double averageCommitmentRating;

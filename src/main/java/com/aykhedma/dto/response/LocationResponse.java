@@ -16,7 +16,11 @@ public class LocationResponse {
     private String address;
     private String area;
     private String city;
-    private String formattedAddress;
+    private String country;
+    private String addressAr;
+    private String areaAr;
+    private String cityAr;
+    private String countryAr;
     private boolean success;
     private String message;
 }

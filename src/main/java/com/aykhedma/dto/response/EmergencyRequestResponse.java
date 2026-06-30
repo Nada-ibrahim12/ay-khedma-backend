@@ -19,7 +19,7 @@ public class EmergencyRequestResponse {
     private ConsumerSummaryResponse consumer;
     private String serviceType;
     private String serviceTypeAr;
-    private LocationDTO location;
+    private LocationResponse location;
     private Double price;
     private String description;
     private EmergencyRequestStatus status;

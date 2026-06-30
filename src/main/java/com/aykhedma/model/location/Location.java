@@ -41,9 +41,24 @@ public class Location {
     @Size(max = 100, message = "City cannot exceed 100 characters")
     private String city;
 
+    @Size(max = 100, message = "Country cannot exceed 100 characters")
+    private String country;
+
     @NotNull(message = "Coordinates are required")
     @Column(columnDefinition = "geometry(Point,4326)")
     private Point coordinates;
+
+    @Size(max = 255, message = "Arabic address cannot exceed 255 characters")
+    private String addressAr;
+
+    @Size(max = 100, message = "Arabic area cannot exceed 100 characters")
+    private String areaAr;
+
+    @Size(max = 100, message = "Arabic City cannot exceed 100 characters")
+    private String cityAr;
+
+    @Size(max = 100, message = "Arabic country cannot exceed 100 characters")
+    private String countryAr;
 
     public double calculateDistance(Location other) {
         // Haversine formula for distance calculation

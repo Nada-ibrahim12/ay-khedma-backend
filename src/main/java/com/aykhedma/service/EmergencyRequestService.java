@@ -1,11 +1,8 @@
 package com.aykhedma.service;
 
-import com.aykhedma.dto.request.EmergencyRatingRequest;
-import com.aykhedma.dto.request.ProviderEmergencyRatingRequest;
-import com.aykhedma.dto.request.EmergencyRequestRequest;
-import com.aykhedma.dto.request.ProviderResponseRequest;
-import com.aykhedma.dto.request.UpdateEmergencyRequestPriceRequest;
+import com.aykhedma.dto.request.*;
 import com.aykhedma.dto.response.EmergencyRequestResponse;
+import com.aykhedma.dto.response.PriceRecommendationResponse;
 import com.aykhedma.dto.response.ProviderResponseResponse;
 
 import java.util.List;
@@ -13,6 +10,8 @@ import java.util.List;
 public interface EmergencyRequestService
 {
     EmergencyRequestResponse getCurrentEmergencyRequest (Long consumerId);
+
+    PriceRecommendationResponse getEmergencyRequestPriceRecommendation (Long consumerId, PriceRecommendationRequest request);
 
     EmergencyRequestResponse requestEmergencyRequest (Long consumerId, EmergencyRequestRequest request);
 
@@ -30,7 +29,11 @@ public interface EmergencyRequestService
 
     EmergencyRequestResponse updateEmergencyRequestPrice (Long consumerId, UpdateEmergencyRequestPriceRequest request);
 
+    EmergencyRequestResponse completeEmergencyRequest (Long consumerId, Long emergencyRequestId);
+
     EmergencyRequestResponse cancelEmergencyRequest (Long consumerId, Long emergencyRequestId);
+
+    List<EmergencyRequestResponse> getAcceptedEmergencyRequests (Long userId);
 
     List<EmergencyRequestResponse> getEmergencyRequestsHistory (Long userId);
 

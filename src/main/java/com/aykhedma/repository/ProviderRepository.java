@@ -154,18 +154,26 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
 
         // for AI
         List<Provider> findByServiceTypeIdAndVerificationStatus(Long serviceTypeId, VerificationStatus status);
-  
+
+      @Query("SELECT AVG(p.price) FROM Provider p " +
+               "WHERE p.serviceType = :serviceType " +
+               "AND p.enabled = true " +
+               "AND p.location.area = :area")
+      Double getAveragePrice(@Param("serviceType") ServiceType serviceType,
+                             @Param("area") String area);
+
       @Query(value = "SELECT p.*, u.* FROM providers p " +
             "JOIN users u ON p.id = u.id " +
             "JOIN locations l ON p.location_id = l.id " +
             "WHERE p.service_type_id = :serviceTypeId " +
+            "AND u.enabled = true " +
             "AND p.emergency_enabled = true " +
             "AND p.verification_status = 'VERIFIED' " +
             "AND ST_DWithin(l.coordinates, :requestCoordinates, :radiusMeters)",
             nativeQuery = true)
-    List<Provider> findProvidersWithinRadius(@Param("serviceTypeId") Long serviceTypeId,
-                                             @Param("requestCoordinates") Point requestCoordinates,
-                                             @Param("radiusMeters") double radiusMeters);
+      List<Provider> findProvidersWithinRadius(@Param("serviceTypeId") Long serviceTypeId,
+                                               @Param("requestCoordinates") Point requestCoordinates,
+                                               @Param("radiusMeters") double radiusMeters);
 
     @Query(value = """
 WITH consumer_location AS (

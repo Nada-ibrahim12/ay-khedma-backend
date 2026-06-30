@@ -21,7 +21,7 @@ public class ProviderSummaryResponse {
     private Double price;
     private PriceType priceType;
     private String priceTypeAr;
-    private LocationDTO location;
+    private LocationResponse location;
     private Double distance; // In KM
     private Integer estimatedArrivalTime; // In minutes
     private String area;

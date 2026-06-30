@@ -74,15 +74,6 @@ public class RegisterRequest {
     @DecimalMax(value = "180.0", message = "Longitude must be between -180 and 180")
     private Double longitude;
 
-    @Size(max = 255, message = "Address cannot exceed 255 characters")
-    private String address;
-
-    @Size(max = 100, message = "Area cannot exceed 100 characters")
-    private String area;
-
-    @Size(max = 100, message = "City cannot exceed 100 characters")
-    private String city;
-
     @AssertTrue(message = "Service type is required for providers")
     public boolean isProviderServiceTypeValid() {
         return userType != UserType.PROVIDER || serviceTypeId != null;

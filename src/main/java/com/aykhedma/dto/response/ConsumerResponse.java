@@ -22,7 +22,7 @@ public class ConsumerResponse {
     private String profileImage;
     private String preferredLanguage;
     private UserType role;
-    private LocationDTO location;
+    private LocationResponse location;
     private Double averageRating;
     private Integer totalBookings;
     private Integer cancelledBookings;

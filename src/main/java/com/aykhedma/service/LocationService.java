@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.aykhedma.mapper.ProviderMapper;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -39,6 +40,8 @@ public class LocationService {
     private final LocationMapper locationMapper;
     private final ProviderMapper providerMapper;
     private final NotificationFactory notificationFactory;
+    private final GoogleMapsService googleMapsService;
+    private final RestTemplate restTemplate;
 
     // ====== CONSUMER LOCATION METHODS ======
 
@@ -53,14 +56,29 @@ public class LocationService {
             throw new ResourceNotFoundException("Consumer not found with id: " + consumerId);
         }
 
-        // Check if consumer already has a location
+        // Check if the consumer already has a location
         if (consumer.getLocation() != null) {
             throw new IllegalStateException("Consumer already has a location. Use update instead.");
         }
-        // Create new location
-        Location location = locationMapper.toEntity(locationDTO);
-        location = locationRepository.save(location);
 
+        // Create a new location
+        Location location = new Location();
+
+        GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
+
+        location.setLatitude(locationDTO.getLatitude());
+        location.setLongitude(locationDTO.getLongitude());
+        location.setAddress(locationDetails.getAddress());
+        location.setArea(locationDetails.getArea());
+        location.setCity(locationDetails.getCity());
+        location.setCountry(locationDetails.getCountry());
+        location.setAddressAr(locationDetails.getAddressAr());
+        location.setAreaAr(locationDetails.getAreaAr());
+        location.setCityAr(locationDetails.getCityAr());
+        location.setCountryAr(locationDetails.getCountryAr());
+
+        location = locationRepository.save(location);
         consumerRepository.updateConsumerLocation(consumerId, location.getId());
 
         log.info("Location saved successfully for consumer ID: {}", consumerId);
@@ -83,14 +101,20 @@ public class LocationService {
 
         Location existingLocation = consumer.getLocation();
 
-        if (isLocationSame(existingLocation, locationDTO)) {
-            log.info("Location data identical for consumer {}; no update performed.", consumerId);
-            return locationMapper.toResponseWithMessage(existingLocation,
-                    "Location data unchanged; no update performed", false);
-        }
+        GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
 
-        locationMapper.updateEntity(locationDTO, existingLocation);
-        Location updatedLocation = locationRepository.save(existingLocation);
+        location.setLatitude(locationDTO.getLatitude());
+        location.setLongitude(locationDTO.getLongitude());
+        location.setAddress(locationDetails.getAddress());
+        location.setArea(locationDetails.getArea());
+        location.setCity(locationDetails.getCity());
+        location.setCountry(locationDetails.getCountry());
+        location.setAddressAr(locationDetails.getAddressAr());
+        location.setAreaAr(locationDetails.getAreaAr());
+        location.setCityAr(locationDetails.getCityAr());
+        location.setCountryAr(locationDetails.getCountryAr());
+        location = locationRepository.save(location);
 
         log.info("Location updated successfully for consumer ID: {}", consumerId);
 
@@ -121,14 +145,20 @@ public class LocationService {
         if (locationDTO.getLongitude() != null) {
             location.setLongitude(locationDTO.getLongitude());
         }
-        if (locationDTO.getAddress() != null) {
-            location.setAddress(locationDTO.getAddress());
-        }
-        if (locationDTO.getArea() != null) {
-            location.setArea(locationDTO.getArea());
-        }
-        if (locationDTO.getCity() != null) {
-            location.setCity(locationDTO.getCity());
+
+        if (location.getLatitude() != null && location.getLongitude() != null)
+        {
+            GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(location.getLatitude(), location.getLongitude());
+
+            location.setAddress(locationDetails.getAddress());
+            location.setArea(locationDetails.getArea());
+            location.setCity(locationDetails.getCity());
+            location.setCountry(locationDetails.getCountry());
+            location.setAddressAr(locationDetails.getAddressAr());
+            location.setAreaAr(locationDetails.getAreaAr());
+            location.setCityAr(locationDetails.getCityAr());
+            location.setCountryAr(locationDetails.getCountryAr());
         }
 
         location = locationRepository.save(location);
@@ -196,9 +226,23 @@ public class LocationService {
         }
 
         // Create new location using mapper
-        Location location = locationMapper.toEntity(locationDTO);
-        location = locationRepository.save(location);
+        Location location = new Location();
 
+        GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
+
+        location.setLatitude(locationDTO.getLatitude());
+        location.setLongitude(locationDTO.getLongitude());
+        location.setAddress(locationDetails.getAddress());
+        location.setArea(locationDetails.getArea());
+        location.setCity(locationDetails.getCity());
+        location.setCountry(locationDetails.getCountry());
+        location.setAddressAr(locationDetails.getAddressAr());
+        location.setAreaAr(locationDetails.getAreaAr());
+        location.setCityAr(locationDetails.getCityAr());
+        location.setCountryAr(locationDetails.getCountryAr());
+
+        location = locationRepository.save(location);
         provider.setLocation(location);
         providerRepository.save(provider);
 
@@ -222,14 +266,20 @@ public class LocationService {
 
         Location existingLocation = provider.getLocation();
 
-        if (isLocationSame(existingLocation, locationDTO)) {
-            log.info("Location data identical for provider {}; no update performed.", providerId);
-            return locationMapper.toResponseWithMessage(existingLocation,
-                    "Location data unchanged; no update performed", false);
-        }
+        GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
 
-        locationMapper.updateEntity(locationDTO, existingLocation);
-        Location updatedLocation = locationRepository.save(existingLocation);
+        location.setLatitude(locationDTO.getLatitude());
+        location.setLongitude(locationDTO.getLongitude());
+        location.setAddress(locationDetails.getAddress());
+        location.setArea(locationDetails.getArea());
+        location.setCity(locationDetails.getCity());
+        location.setCountry(locationDetails.getCountry());
+        location.setAddressAr(locationDetails.getAddressAr());
+        location.setAreaAr(locationDetails.getAreaAr());
+        location.setCityAr(locationDetails.getCityAr());
+        location.setCountryAr(locationDetails.getCountryAr());
+        location = locationRepository.save(location);
 
         log.info("Location updated successfully for provider ID: {}", providerId);
 
@@ -258,14 +308,20 @@ public class LocationService {
         if (locationDTO.getLongitude() != null) {
             location.setLongitude(locationDTO.getLongitude());
         }
-        if (locationDTO.getAddress() != null) {
-            location.setAddress(locationDTO.getAddress());
-        }
-        if (locationDTO.getArea() != null) {
-            location.setArea(locationDTO.getArea());
-        }
-        if (locationDTO.getCity() != null) {
-            location.setCity(locationDTO.getCity());
+
+        if (location.getLatitude() != null && location.getLongitude() != null)
+        {
+            GoogleMapsService.LocationDetails locationDetails =
+                googleMapsService.getLocationDetails(location.getLatitude(), location.getLongitude());
+
+            location.setAddress(locationDetails.getAddress());
+            location.setArea(locationDetails.getArea());
+            location.setCity(locationDetails.getCity());
+            location.setCountry(locationDetails.getCountry());
+            location.setAddressAr(locationDetails.getAddressAr());
+            location.setAreaAr(locationDetails.getAreaAr());
+            location.setCityAr(locationDetails.getCityAr());
+            location.setCountryAr(locationDetails.getCountryAr());
         }
 
         location = locationRepository.save(location);
