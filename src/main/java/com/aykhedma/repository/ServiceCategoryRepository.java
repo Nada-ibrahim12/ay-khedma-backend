@@ -13,6 +13,8 @@ public interface ServiceCategoryRepository extends JpaRepository<ServiceCategory
 
     Optional<ServiceCategory> findByName(String name);
 
+    Optional<ServiceCategory> findByNameAr(String nameAr);
+
     @Query("SELECT sc FROM ServiceCategory sc LEFT JOIN FETCH sc.serviceTypes ")
     List<ServiceCategory> findAllWithServiceTypes();
 

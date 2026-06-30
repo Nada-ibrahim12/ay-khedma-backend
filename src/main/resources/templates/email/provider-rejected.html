@@ -208,8 +208,9 @@
           <strong>What happens next</strong>You can update your profile details
           and reapply after addressing the reason above.
         </div>
-        <div class="button-container">
-          <a href="#" class="btn-primary">Update your profile</a>
+        <a th:href="${deepLink != null ? deepLink : '#'}" 
+              th:unless="${deepLink == null}" 
+              class="btn-primary"> Update your profile</a>
         </div>
         <div class="signature">
           <p>Best regards,</p>

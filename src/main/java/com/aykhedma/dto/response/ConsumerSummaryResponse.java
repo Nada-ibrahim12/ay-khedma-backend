@@ -16,5 +16,6 @@ public class ConsumerSummaryResponse {
     private String name;
     private String profileImage;
     private String phoneNumber;
+    private String email;
     private LocationResponse location;
 }

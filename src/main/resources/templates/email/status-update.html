@@ -235,8 +235,9 @@
             >Detailed description of the status update.</span
           >
         </div>
-        <div class="button-container">
-          <a href="#" class="btn-primary">View your account</a>
+        <a th:href="${deepLink != null ? deepLink : '#'}" 
+              th:unless="${deepLink == null}" 
+              class="btn-primary"> View your account</a>
         </div>
         <div class="signature">
           <p>Best regards,</p>

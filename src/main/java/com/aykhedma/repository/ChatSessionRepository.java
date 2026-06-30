@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 @Repository
 public interface ChatSessionRepository extends JpaRepository<ChatSession, String> {
@@ -24,4 +25,10 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, String
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("DELETE FROM ChatSession cs WHERE cs.userId = :userId")
     void deleteByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
+
+    // for scheduled cleanup of empty sessions
+    List<ChatSession> findByStartTimeBefore(LocalDateTime time);
+
+    void delete(ChatSession session);
+    
 }

@@ -56,6 +56,10 @@ public class EmailService {
             Context context = new Context();
             context.setVariables(variables);
 
+            if (!variables.containsKey("deepLink")) {
+                context.setVariable("deepLink", null);
+            }
+
             String htmlContent = templateEngine.process(templateName, context);
 
             helper.setFrom(fromEmail);

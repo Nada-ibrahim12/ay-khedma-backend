@@ -20,12 +20,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import org.springframework.http.HttpStatus;
+
+
 @Slf4j
 @RestController
 @RequestMapping("/api/chatbot")
@@ -95,5 +101,23 @@ public class AiChatController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         User currentUser = userDetails != null ? userDetails.getUser() : null;
         return ResponseEntity.ok(aiAssistantService.getUserChats(currentUser));
+    }
+
+    @DeleteMapping("/{sessionId}")
+    public ResponseEntity<?> deleteChat(@PathVariable String sessionId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User currentUser = userDetails != null ? userDetails.getUser() : null;
+                
+        boolean deleted = aiAssistantService.deleteChatbotChatSession(sessionId, currentUser);
+        
+        if (deleted) {
+            return ResponseEntity.ok(Map.of(
+                "message", "Chat session deleted successfully",
+                "sessionId", sessionId
+            ));
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Chat session not found or could not be deleted"));
+        }
     }
 }

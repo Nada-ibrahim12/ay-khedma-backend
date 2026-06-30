@@ -1,10 +1,12 @@
 package com.aykhedma.service;
 
+import com.aykhedma.service.GeminiClient.ConversationTurn;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.vertexai.gemini.VertexAiGeminiChatModel.GeminiRequest;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
@@ -86,6 +88,14 @@ public class GeminiClient {
     public String generateJson(String prompt) {
         return generateJson(List.of(new ConversationTurn("user", prompt)), null);
     }
+
+    public String generateText(String prompt) {
+    if (!isEnabled()) {
+        log.debug("Gemini is disabled");
+        return null;
+    }
+    return generateJson(List.of(new ConversationTurn("user", prompt)), null);
+}
 
     public String generateJson(List<ConversationTurn> history, String systemPrompt) {
         if (!isEnabled()) {

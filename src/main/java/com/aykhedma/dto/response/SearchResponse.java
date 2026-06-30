@@ -28,6 +28,8 @@ public class SearchResponse {
     private Integer completedJobs;
     private Double price;
     private PriceType priceType;
+    private String priceTypeAr;
+
     @JsonIgnore
     private Double distance;
     private Integer estimatedArrivalTime;

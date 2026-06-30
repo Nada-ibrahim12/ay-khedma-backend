@@ -279,7 +279,9 @@
           </ul>
         </div>
         <div class="button-container">
-          <a href="#" class="btn-primary">Rate and review service</a>
+          <a th:href="${deepLink != null ? deepLink : '#'}" 
+              th:unless="${deepLink == null}" 
+              class="btn-primary">Rate and review service</a>
         </div>
         <div class="support-line">
           Need assistance? Contact support@aykhedma.com

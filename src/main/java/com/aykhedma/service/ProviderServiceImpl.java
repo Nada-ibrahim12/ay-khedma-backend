@@ -141,6 +141,10 @@ public class ProviderServiceImpl implements ProviderService {
             provider.setEmergencyEnabled(request.getEmergencyEnabled());
         }
 
+        if (request.getPreferredLanguage() != null) {
+            provider.setPreferredLanguage(request.getPreferredLanguage());
+        }
+
         // update location info
         if (request.getLocation() != null) {
             locationService.updateProviderLocation(providerId, request.getLocation());
@@ -405,56 +409,80 @@ public class ProviderServiceImpl implements ProviderService {
     //
     // return toPage(ranked, pageable);
     // }
-    @Transactional(readOnly = true)
-    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
+//    @Transactional(readOnly = true)
+//    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
+//
+//        double radiusMeters = radius * 1000;
+//
+//        Page<ProviderDistanceProjection> result = providerRepository.findTopRatedNearConsumer(
+//                consumerId,
+//                radiusMeters,
+//                pageable);
+//
+//        List<SearchResponse> mapped = result.getContent()
+//                .stream()
+//                .map(this::map)
+//                .toList();
+//
+//        return new PageImpl<>(mapped, pageable, result.getTotalElements());
+//    }
 
-        double radiusMeters = radius * 1000;
 
-        Page<ProviderDistanceProjection> result = providerRepository.findTopRatedNearConsumer(
-                consumerId,
-                radiusMeters,
-                pageable);
+//    private SearchResponse map(ProviderDistanceProjection p) {
+//
+//        SearchResponse res = new SearchResponse();
+//
+//        res.setId(p.getId());
+//        res.setName(p.getName());
+//        res.setProfileImage(p.getProfileImage());
+//
+//        res.setServiceType(p.getServiceType());
+//        res.setServiceTypeAr(p.getServiceTypeAr());
+//        res.setCategoryName(p.getCategoryName());
+//
+//        res.setAverageRating(p.getAverageRating());
+//
+//        res.setPrice(p.getPrice());
+//        PriceType priceType = p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null;
+//        res.setPriceType(priceType);
+//        res.setPriceTypeAr(priceType != null ? priceType.getArabicLabel() : null);
+//
+//        res.setServiceAreaRadius(p.getServiceAreaRadius());
+//
+//        res.setAveragePunctualityRating(p.getAveragePunctualityRating());
+//        res.setAverageCommitmentRating(p.getAverageCommitmentRating());
+//        res.setAverageQualityOfWorkRating(p.getAverageQualityOfWorkRating());
+//
+//        res.setArea(p.getArea());
+//
+//        res.setDistance(p.getDistanceKm());
+//        res.setEstimatedArrivalTime(p.getEstimatedArrivalTime());
+//
+//        return res;
+//    }
+@Transactional(readOnly = true)
+public Page<SearchResponse> topRatedNearMe(
+        Long consumerId,
+        Double radius,
+        Pageable pageable) {
 
-        List<SearchResponse> mapped = result.getContent()
-                .stream()
-                .map(this::map)
-                .toList();
+    List<SearchResponse> list =
+            searchCacheService.topRatedNearMe(consumerId, radius);
 
-        return new PageImpl<>(mapped, pageable, result.getTotalElements());
-    }
+    int start = (int) pageable.getOffset();
+    int end = Math.min(start + pageable.getPageSize(), list.size());
 
-    private SearchResponse map(ProviderDistanceProjection p) {
+    List<SearchResponse> pageContent =
+            start >= list.size()
+                    ? Collections.emptyList()
+                    : list.subList(start, end);
 
-        SearchResponse res = new SearchResponse();
-
-        res.setId(p.getId());
-        res.setName(p.getName());
-        res.setProfileImage(p.getProfileImage());
-
-        res.setServiceType(p.getServiceType());
-        res.setServiceTypeAr(p.getServiceTypeAr());
-        res.setCategoryName(p.getCategoryName());
-
-        res.setAverageRating(p.getAverageRating());
-
-        res.setPrice(p.getPrice());
-        res.setPriceType(
-                p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null);
-
-        res.setServiceAreaRadius(p.getServiceAreaRadius());
-
-        res.setAveragePunctualityRating(p.getAveragePunctualityRating());
-        res.setAverageCommitmentRating(p.getAverageCommitmentRating());
-        res.setAverageQualityOfWorkRating(p.getAverageQualityOfWorkRating());
-
-        res.setArea(p.getArea());
-
-        res.setDistance(p.getDistanceKm());
-        res.setEstimatedArrivalTime(p.getEstimatedArrivalTime());
-
-        return res;
-    }
-
+    return new PageImpl<>(
+            pageContent,
+            pageable,
+            list.size()
+    );
+}
     @Override
     @Transactional
     public ScheduleResponse addWorkingDay(Long providerId, WorkingDayRequest request) {
@@ -1082,44 +1110,7 @@ public class ProviderServiceImpl implements ProviderService {
                         .thenComparing(ScheduleResponse.TimeSlotResponse::getStartTime))
                 .collect(Collectors.toList());
     }
-    // /**
-    // * Helper method to generate time slots for a working day
-    // */
-    // private void generateTimeSlotsForWorkingDay(Schedule schedule, WorkingDay
-    // workingDay) {
-    // LocalDate startDate = LocalDate.now();
-    // LocalDate endDate = startDate.plusDays(30); // Generate slots for next 30
-    // days
-    //
-    // List<TimeSlot> newSlots = new ArrayList<>();
-    //
-    // for (LocalDate date = startDate; !date.isAfter(endDate); date =
-    // date.plusDays(1)) {
-    // if (date == workingDay.getDate()) {
-    // // Check if slot already exists for this date
-    // LocalDate finalDate = date;
-    // boolean exists = schedule.getTimeSlots().stream()
-    // .anyMatch(slot -> slot.getDate().equals(finalDate));
-    //
-    // if (!exists) {
-    // TimeSlot timeSlot = TimeSlot.builder()
-    // .date(date)
-    // .startTime(workingDay.getStartTime())
-    // .endTime(workingDay.getEndTime())
-    // .status(TimeSlotStatus.AVAILABLE)
-    // .schedule(schedule)
-    // .build();
-    // newSlots.add(timeSlot);
-    // }
-    // }
-    // }
-    //
-    // if (!newSlots.isEmpty()) {
-    // timeSlotRepository.saveAll(newSlots);
-    // schedule.getTimeSlots().addAll(newSlots);
-    // }
-    // }
-
+    
     private List<ScheduleResponse.TimeSlotResponse> toDiscreteStartTimeResponses(List<TimeSlot> availableSlots,
             LocalDate fallbackDate) {
         if (availableSlots == null || availableSlots.isEmpty()) {
@@ -1193,6 +1184,50 @@ public class ProviderServiceImpl implements ProviderService {
     @Override
     public LocalTime minTime(LocalTime a, LocalTime b) {
         return a.isBefore(b) ? a : b;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ScheduleResponse.TimeSlotResponse> getRealAvailableSlotsOnly(Long providerId,
+            LocalDate startDate, LocalDate endDate) {
+
+        if (providerId == null) {
+            log.warn("Provider ID is null in getRealAvailableSlotsOnly");
+            return new ArrayList<>();
+        }
+        
+        Provider provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+
+        if (provider.getSchedule() == null) {
+            return new ArrayList<>();
+        }
+
+        List<TimeSlot> availableSlots = timeSlotRepository.findByScheduleIdAndDateBetweenAndStatus(
+                provider.getSchedule().getId(),
+                startDate,
+                endDate,
+                TimeSlotStatus.AVAILABLE);
+
+        if (availableSlots.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return availableSlots.stream()
+                .map(this::toTimeSlotResponse)
+                .sorted(Comparator
+                        .comparing(ScheduleResponse.TimeSlotResponse::getDate)
+                        .thenComparing(ScheduleResponse.TimeSlotResponse::getStartTime))
+                .collect(Collectors.toList());
+    }
+
+
+    private ScheduleResponse.TimeSlotResponse toTimeSlotResponse(TimeSlot timeSlot) {
+        ScheduleResponse.TimeSlotResponse response = new ScheduleResponse.TimeSlotResponse();
+        response.setDate(timeSlot.getDate().toString());
+        response.setStartTime(timeSlot.getStartTime());
+        response.setEndTime(timeSlot.getEndTime());
+        response.setStatus(timeSlot.getStatus().name());
+        return response;
     }
 
     /**
@@ -1280,18 +1315,6 @@ public class ProviderServiceImpl implements ProviderService {
                 .message("Document deleted successfully")
                 .build();
     }
-
-    // @Override
-    // public ProviderResponse updateEmergencyStatus(Long providerId, boolean
-    // enabled) {
-    // Provider provider = providerRepository.findById(providerId)
-    // .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
-    //
-    // provider.setEmergencyEnabled(enabled);
-    // Provider updatedProvider = providerRepository.save(provider);
-    //
-    // return providerMapper.toProviderResponse(updatedProvider);
-    // }
 
     @Override
     public VerificationStatus getVerificationStatus(Long providerId) {

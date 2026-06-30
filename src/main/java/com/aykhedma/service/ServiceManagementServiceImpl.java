@@ -7,6 +7,7 @@ import com.aykhedma.dto.service.ServicesResponse;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
+import com.aykhedma.model.service.PriceType;
 import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Provider;
@@ -32,8 +33,6 @@ public class ServiceManagementServiceImpl {
     private final LocationService locationService;
     private final ProviderRepository providerRepository;
     private final ProviderMapper providerMapper;
-
-
 
     public List<ServiceTypeDTO> getAllTypes() {
         return typeRepository.findAll()
@@ -117,8 +116,7 @@ public class ServiceManagementServiceImpl {
         }
         if (providerRepository.existsByServiceTypeId(id)) {
             throw new BadRequestException(
-                    "Cannot delete service type because it is used by providers"
-            );
+                    "Cannot delete service type because it is used by providers");
         }
 
         typeRepository.deleteById(id);
@@ -128,45 +126,40 @@ public class ServiceManagementServiceImpl {
         return typeRepository.countServices();
     }
 
-
     @Transactional(readOnly = true)
     public Page<SearchResponse> search(String keyword,
-                                       Long categoryId,
-                                       String categoryName,
-                                       Long consumerId,
-                                       Double radius,
-                                       String sortBy,
-                                       Pageable pageable) {
+            Long categoryId,
+            String categoryName,
+            Long consumerId,
+            Double radius,
+            String sortBy,
+            Pageable pageable) {
 
-        List<SearchResponse> fullList =
-                searchList(keyword, categoryId, categoryName, consumerId, radius, sortBy);
+        List<SearchResponse> fullList = searchList(keyword, categoryId, categoryName, consumerId, radius, sortBy);
 
         int start = (int) pageable.getOffset();
         int end = Math.min(start + pageable.getPageSize(), fullList.size());
 
-        List<SearchResponse> pageContent =
-                start >= fullList.size()
-                        ? Collections.emptyList()
-                        : fullList.subList(start, end);
+        List<SearchResponse> pageContent = start >= fullList.size()
+                ? Collections.emptyList()
+                : fullList.subList(start, end);
 
         return new PageImpl<>(pageContent, pageable, fullList.size());
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "searchProvidersCache",
-            key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy}")
+    @Cacheable(value = "searchProvidersCache", key = "{#keyword,#categoryId,#categoryName,#consumerId,#radius,#sortBy}")
     public List<SearchResponse> searchList(String keyword,
-                                           Long categoryId,
-                                           String categoryName,
-                                           Long consumerId,
-                                           Double radius,
-                                           String sortBy) {
+            Long categoryId,
+            String categoryName,
+            Long consumerId,
+            Double radius,
+            String sortBy) {
 
-        Page<Provider> providersPage =
-                providerRepository.searchProviders(keyword, categoryId, categoryName, Pageable.unpaged());
+        Page<Provider> providersPage = providerRepository.searchProviders(keyword, categoryId, categoryName,
+                Pageable.unpaged());
 
         List<Provider> providers = providersPage.getContent();
-
 
         if (consumerId == null || radius == null) {
             return providers.stream()
@@ -183,14 +176,16 @@ public class ServiceManagementServiceImpl {
 
         for (Provider provider : providers) {
 
-            if (provider.getLocation() == null) continue;
+            if (provider.getLocation() == null)
+                continue;
 
             try {
                 double distance = locationService
                         .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
                         .getDistanceKm();
 
-                if (distance > radius) continue;
+                if (distance > radius)
+                    continue;
 
                 SearchResponse response = providerMapper.toSearchResponse(provider);
                 response.setDistance(Math.round(distance * 100.0) / 100.0);
@@ -208,38 +203,36 @@ public class ServiceManagementServiceImpl {
         return applySorting(result, sortBy);
     }
 
-
-
     private List<SearchResponse> applySorting(List<SearchResponse> list, String sortBy) {
 
-        if (list == null || list.isEmpty()) return new ArrayList<>();
+        if (list == null || list.isEmpty())
+            return new ArrayList<>();
 
         String sort = sortBy == null ? "rating" : sortBy.toLowerCase();
 
         return switch (sort) {
 
             case "price_low" ->
-                    list.stream().sorted(Comparator.comparing(SearchResponse::getPrice)).toList();
+                list.stream().sorted(Comparator.comparing(SearchResponse::getPrice)).toList();
 
             case "price_high" ->
-                    list.stream().sorted(Comparator.comparing(SearchResponse::getPrice).reversed()).toList();
+                list.stream().sorted(Comparator.comparing(SearchResponse::getPrice).reversed()).toList();
 
             case "experience" ->
-                    list.stream().sorted(Comparator.comparing(SearchResponse::getCompletedJobs).reversed()).toList();
+                list.stream().sorted(Comparator.comparing(SearchResponse::getCompletedJobs).reversed()).toList();
 
             case "distance" ->
-                    list.stream()
-                            .filter(r -> r.getDistance() != null)
-                            .sorted(Comparator.comparing(SearchResponse::getDistance))
-                            .toList();
+                list.stream()
+                        .filter(r -> r.getDistance() != null)
+                        .sorted(Comparator.comparing(SearchResponse::getDistance))
+                        .toList();
 
             default ->
-                    list.stream().sorted(
-                            Comparator.comparing(
-                                    SearchResponse::getAverageRating,
-                                    Comparator.nullsLast(Comparator.reverseOrder())
-                            )
-                    ).toList();
+                list.stream().sorted(
+                        Comparator.comparing(
+                                SearchResponse::getAverageRating,
+                                Comparator.nullsLast(Comparator.reverseOrder())))
+                        .toList();
         };
     }
 
@@ -263,7 +256,6 @@ public class ServiceManagementServiceImpl {
         }
     }
 
-
     private ServiceTypeDTO mapToDTO(ServiceType st) {
 
         if (st.getCategory() == null) {
@@ -282,5 +274,9 @@ public class ServiceManagementServiceImpl {
                 .defaultPriceType(st.getDefaultPriceType())
                 .estimatedDuration(st.getEstimatedDuration())
                 .build();
+    }
+
+    public List<PriceType> getAllPriceTypes() {
+        return Arrays.asList(PriceType.values());
     }
 }

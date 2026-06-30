@@ -70,12 +70,18 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/services/categories",
                                                                 "/api/services/types")
                                                 .permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/services/price-types")
+                                                .permitAll()
                                                 .requestMatchers(
                                                                 RegexRequestMatcher.regexMatcher(HttpMethod.GET,
                                                                                 "^/api/services/categories/[0-9]+$"),
                                                                 RegexRequestMatcher.regexMatcher(HttpMethod.GET,
                                                                                 "^/api/services/types/[0-9]+$"))
                                                 .permitAll()
+                                                .requestMatchers("/mcp/**").permitAll()
+                                                .requestMatchers("/mcp/health").permitAll()
+                                                .requestMatchers("/mcp/tools").permitAll()
+                                                .requestMatchers("/mcp").permitAll()
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                                 .requestMatchers("/provider/**").hasRole("PROVIDER")
                                                 .requestMatchers("/consumer/**").hasRole("CONSUMER")

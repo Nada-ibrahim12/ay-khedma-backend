@@ -27,6 +27,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -98,7 +99,7 @@ public class LocationService {
             throw new ResourceNotFoundException("Consumer has no location to update. Please save location first.");
         }
 
-        Location location = consumer.getLocation();
+        Location existingLocation = consumer.getLocation();
 
         GoogleMapsService.LocationDetails locationDetails =
                 googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
@@ -117,10 +118,11 @@ public class LocationService {
 
         log.info("Location updated successfully for consumer ID: {}", consumerId);
 
-        sendLocationUpdateNotification(consumerId, "updated", location);
+        sendLocationUpdateNotification(consumerId, "updated", updatedLocation);
 
-        return locationMapper.toResponseWithMessage(location, "Location updated successfully", true);
+        return locationMapper.toResponseWithMessage(updatedLocation, "Location updated successfully", true);
     }
+
 
     @Transactional
     public LocationResponse patchConsumerLocation(Long consumerId, LocationDTO locationDTO) {
@@ -262,7 +264,7 @@ public class LocationService {
             throw new ResourceNotFoundException("Provider has no location to update. Please save location first.");
         }
 
-        Location location = provider.getLocation();
+        Location existingLocation = provider.getLocation();
 
         GoogleMapsService.LocationDetails locationDetails =
                 googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
@@ -281,9 +283,9 @@ public class LocationService {
 
         log.info("Location updated successfully for provider ID: {}", providerId);
 
-        sendLocationUpdateNotification(providerId, "updated", location);
+        sendLocationUpdateNotification(providerId, "updated", updatedLocation);
 
-        return locationMapper.toResponseWithMessage(location, "Location updated successfully", true);
+        return locationMapper.toResponseWithMessage(updatedLocation, "Location updated successfully", true);
     }
 
     @Transactional
@@ -544,4 +546,13 @@ public class LocationService {
                 .sorted(Comparator.comparing(ProviderSummaryResponse::getDistance))
                 .collect(Collectors.toList());
     }
+
+    private boolean isLocationSame(Location existing, LocationDTO dto) {
+        return Objects.equals(existing.getLatitude(), dto.getLatitude()) &&
+                Objects.equals(existing.getLongitude(), dto.getLongitude()) &&
+                Objects.equals(existing.getAddress(), dto.getAddress()) &&
+                Objects.equals(existing.getArea(), dto.getArea()) &&
+                Objects.equals(existing.getCity(), dto.getCity());
+    }
+
 }
