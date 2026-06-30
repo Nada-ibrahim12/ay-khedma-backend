@@ -99,7 +99,7 @@ public class LocationService {
             throw new ResourceNotFoundException("Consumer has no location to update. Please save location first.");
         }
 
-        Location existingLocation = consumer.getLocation();
+        Location location = consumer.getLocation();
 
         GoogleMapsService.LocationDetails locationDetails =
                 googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
@@ -118,9 +118,9 @@ public class LocationService {
 
         log.info("Location updated successfully for consumer ID: {}", consumerId);
 
-        sendLocationUpdateNotification(consumerId, "updated", updatedLocation);
+        sendLocationUpdateNotification(consumerId, "updated", location);
 
-        return locationMapper.toResponseWithMessage(updatedLocation, "Location updated successfully", true);
+        return locationMapper.toResponseWithMessage(location, "Location updated successfully", true);
     }
 
 
@@ -264,7 +264,7 @@ public class LocationService {
             throw new ResourceNotFoundException("Provider has no location to update. Please save location first.");
         }
 
-        Location existingLocation = provider.getLocation();
+        Location location = provider.getLocation();
 
         GoogleMapsService.LocationDetails locationDetails =
                 googleMapsService.getLocationDetails(locationDTO.getLatitude(), locationDTO.getLongitude());
@@ -283,9 +283,9 @@ public class LocationService {
 
         log.info("Location updated successfully for provider ID: {}", providerId);
 
-        sendLocationUpdateNotification(providerId, "updated", updatedLocation);
+        sendLocationUpdateNotification(providerId, "updated", location);
 
-        return locationMapper.toResponseWithMessage(updatedLocation, "Location updated successfully", true);
+        return locationMapper.toResponseWithMessage(location, "Location updated successfully", true);
     }
 
     @Transactional
@@ -403,7 +403,7 @@ public class LocationService {
 
     /**
      * Calculate distance between a consumer and a provider
-     * 
+     *
      * @param consumerId ID of the consumer
      * @param providerId ID of the provider
      * @return DistanceResponse with distance in kilometers
@@ -455,7 +455,7 @@ public class LocationService {
 
     /**
      * Check if a provider serves a specific location
-     * 
+     *
      * @param providerId ID of the provider
      * @param latitude   Latitude of the location
      * @param longitude  Longitude of the location
@@ -488,7 +488,7 @@ public class LocationService {
 
     /**
      * Haversine formula implementation for distance calculation
-     * 
+     *
      * @param lat1 Latitude of first point
      * @param lon1 Longitude of first point
      * @param lat2 Latitude of second point
@@ -549,10 +549,6 @@ public class LocationService {
 
     private boolean isLocationSame(Location existing, LocationDTO dto) {
         return Objects.equals(existing.getLatitude(), dto.getLatitude()) &&
-                Objects.equals(existing.getLongitude(), dto.getLongitude()) &&
-                Objects.equals(existing.getAddress(), dto.getAddress()) &&
-                Objects.equals(existing.getArea(), dto.getArea()) &&
-                Objects.equals(existing.getCity(), dto.getCity());
+                Objects.equals(existing.getLongitude(), dto.getLongitude());
     }
-
 }
