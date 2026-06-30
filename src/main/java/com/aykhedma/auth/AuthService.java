@@ -222,7 +222,7 @@ public class AuthService {
                         .role(UserType.PROVIDER)
                         .enabled(false) // until OTP verified
                         .credentialsNonExpired(true)
-                        .verificationStatus(VerificationStatus.PENDING)
+                        .verificationStatus(serviceType.getRiskLevel() == RiskLevel.LOW ? VerificationStatus.VERIFIED : VerificationStatus.PENDING)
                         .bio(request.getBio())
                         .yearsOfExperience(request.getYearsOfExperience())
                         .serviceType(serviceType)
