@@ -30,6 +30,15 @@ public class ChatMessage {
     @JoinColumn(name = "session_id", nullable = true)
     private ChatSession chatSession;
 
+    @Column(columnDefinition = "TEXT")
+    private String transcribedText;
+
+    @Builder.Default
+    private Boolean transcriptionSuccess = false;
+
+    @Column(length = 255)
+    private String transcriptionError;
+
     @NotNull(message = "Sender ID is required")
     private Long senderId;
 

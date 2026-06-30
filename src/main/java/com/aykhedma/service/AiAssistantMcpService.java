@@ -5,6 +5,8 @@ import com.aykhedma.dto.response.*;
 import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.model.chat.ChatMessage;
 import com.aykhedma.model.chat.ChatSession;
+import com.aykhedma.model.chat.MessageRole;
+import com.aykhedma.model.chat.MessageType;
 import com.aykhedma.model.service.PriceType;
 import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
@@ -41,7 +43,8 @@ import java.time.temporal.TemporalAdjusters;
 public class AiAssistantMcpService {
 
     private final AiAssistantServiceImpl baseService;
-    @Lazy private final AiAssistantOldService oldService;
+    @Lazy
+    private final AiAssistantOldService oldService;
     private final GeminiClient geminiClient;
     private final SpeechToTextService speechToTextService;
     private final McpServer mcpServer;
@@ -54,6 +57,7 @@ public class AiAssistantMcpService {
     public ChatResponse chatWithMcp(AiChatRequest request, User currentUser) {
         String userMessage = request.getMessage();
         boolean isVoiceNote = request.getVoiceNote() != null && !request.getVoiceNote().isEmpty();
+        boolean isVoiceHandled = false;
 
         if (isVoiceNote) {
             try {
@@ -62,11 +66,38 @@ public class AiAssistantMcpService {
                     userMessage = transcribedText;
                     request.setMessage(userMessage);
                     log.info("Voice transcribed for MCP: {}", userMessage);
+
+                    Long userId = currentUser != null ? currentUser.getId() : null;
+                    ChatSession session = baseService.resolveSession(request, userId);
+
+                    ChatMessage userMessageEntity = ChatMessage.builder()
+                            .chatSession(session)
+                            .senderId(userId != null ? userId : 0L)
+                            .senderRole(MessageRole.USER)
+                            .content("🎤 [Voice] " + transcribedText)
+                            .type(MessageType.VOICE)
+                            .transcriptionSuccess(true)
+                            .transcribedText(transcribedText)
+                            .isRead(true)
+                            .build();
+                    chatMessageRepository.save(userMessageEntity);
+
+                    isVoiceHandled = true; 
                 } else {
                     Long userId = currentUser != null ? currentUser.getId() : null;
                     ChatSession session = baseService.resolveSession(request, userId);
-                    baseService.saveUserMessage(session, userId != null ? userId : 0L, "[Voice note - transcription failed]");
-                    
+                    ChatMessage userMessageEntity = ChatMessage.builder()
+                            .chatSession(session)
+                            .senderId(userId != null ? userId : 0L)
+                            .senderRole(MessageRole.USER)
+                            .content("[Voice note - transcription failed]")
+                            .type(MessageType.VOICE)
+                            .transcriptionSuccess(false)
+                            .transcribedText(null)
+                            .isRead(true)
+                            .build();
+                    chatMessageRepository.save(userMessageEntity);
+
                     ChatResponse response = ChatResponse.builder()
                             .sessionId(session.getSessionId())
                             .timestamp(LocalDateTime.now())
@@ -80,7 +111,8 @@ public class AiAssistantMcpService {
             } catch (IOException e) {
                 log.error("Voice transcription error in MCP", e);
                 if (!StringUtils.hasText(userMessage)) {
-                    ChatSession session = baseService.resolveSession(request, currentUser != null ? currentUser.getId() : null);
+                    ChatSession session = baseService.resolveSession(request,
+                            currentUser != null ? currentUser.getId() : null);
                     return ChatResponse.builder()
                             .sessionId(session.getSessionId())
                             .timestamp(LocalDateTime.now())
@@ -122,7 +154,9 @@ public class AiAssistantMcpService {
                 String reply = toolResponse.reply != null ? toolResponse.reply
                         : "محتاج هذه المعلومات لإتمام طلبك: " + String.join(", ", toolResponse.missingFields);
 
-                baseService.saveUserMessage(session, userId != null ? userId : 0L, request.getMessage());
+                if (!isVoiceHandled) {
+                    baseService.saveUserMessage(session, userId != null ? userId : 0L, request.getMessage());
+                }
 
                 ChatResponse clarificationResponse = ChatResponse.builder()
                         .sessionId(request.getSessionId())
@@ -180,12 +214,15 @@ public class AiAssistantMcpService {
                             .detectedLanguage("ar")
                             .responseType(ChatResponseType.ERROR)
                             .build();
-                    baseService.saveUserMessage(session, userId != null ? userId : 0L, request.getMessage());
+
+                    if (!isVoiceHandled) {
+                        baseService.saveUserMessage(session, userId != null ? userId : 0L, request.getMessage());
+                    }
                     baseService.saveAssistantMessage(session, errorResponse);
                     return errorResponse;
                 }
             }
-            
+ 
             Map<String, Object> mcpRequest = buildMcpRequest(toolName, arguments);
             log.info("MCP Request: {}", mcpRequest);
 
@@ -194,7 +231,9 @@ public class AiAssistantMcpService {
 
             ChatResponse chatResponse = buildResponseFromMcpResult(toolName, mcpResponse, request, toolResponse.reply);
 
-            baseService.saveUserMessage(session, userId != null ? userId : 0L, request.getMessage());
+            if (!isVoiceHandled) {
+                baseService.saveUserMessage(session, userId != null ? userId : 0L, request.getMessage());
+            }
             baseService.saveAssistantMessage(session, chatResponse);
 
             return chatResponse;
@@ -203,9 +242,8 @@ public class AiAssistantMcpService {
             return oldService.chatWithExisting(request, currentUser);
         }
     }
-
     // ===== TOOL CALLING =====
-    
+
     private McpToolCallResponse getMcpToolCallResponse(AiChatRequest request, User currentUser,
             List<ChatMessage> history, List<Map<String, Object>> toolSchemas) {
         if (!geminiClient.isEnabled()) {
@@ -443,12 +481,12 @@ public class AiAssistantMcpService {
                         userLocationInfo, userLatitude, userLongitude,
                         today,
                         today, yesterday, tomorrow,
-                        today, today, 
+                        today, today,
                         currentYear, today,
-                        today, 
-                        tomorrow, 
-                        yesterday, 
-                        nextWeekday(today, DayOfWeek.FRIDAY), 
+                        today,
+                        tomorrow,
+                        yesterday,
+                        nextWeekday(today, DayOfWeek.FRIDAY),
                         nextWeekday(today, DayOfWeek.SATURDAY),
                         userLatitude, userLongitude);
     }
@@ -459,7 +497,7 @@ public class AiAssistantMcpService {
     }
 
     // ===== PARSING =====
-    
+
     private McpToolCallResponse parseMcpToolCallResponse(String modelResponse) {
         if (!StringUtils.hasText(modelResponse)) {
             return null;
@@ -562,7 +600,7 @@ public class AiAssistantMcpService {
     }
 
     // ===== RESPONSE BUILDING =====
-    
+
     private ChatResponse buildResponseFromMcpResult(String toolName, Map<String, Object> mcpResponse,
             AiChatRequest request, String defaultReply) {
 
@@ -710,7 +748,6 @@ public class AiAssistantMcpService {
             @SuppressWarnings("unchecked")
             Map<String, Object> bookingMap = (Map<String, Object>) bookingObj;
 
-
             ConsumerSummaryResponse consumer = null;
             if (bookingMap.get("consumer") instanceof Map) {
                 @SuppressWarnings("unchecked")
@@ -739,8 +776,9 @@ public class AiAssistantMcpService {
                                 : null)
                         .price(providerMap.get("price") != null ? ((Number) providerMap.get("price")).doubleValue()
                                 : null)
-                        .priceType(providerMap.get("priceType") != null ? 
-                                PriceType.valueOf((String) providerMap.get("priceType")) : null)
+                        .priceType(providerMap.get("priceType") != null
+                                ? PriceType.valueOf((String) providerMap.get("priceType"))
+                                : null)
                         .priceTypeAr((String) providerMap.get("priceTypeAr"))
                         .area((String) providerMap.get("area"))
                         .cancellationRate(providerMap.get("cancellationRate") != null
@@ -776,8 +814,7 @@ public class AiAssistantMcpService {
                 }
             }
 
-
-                bookingResponse = BookingResponse.builder()
+            bookingResponse = BookingResponse.builder()
                     .id(bookingMap.get("id") != null ? ((Number) bookingMap.get("id")).longValue() : null)
                     .consumer(consumer)
                     .provider(provider)
@@ -1058,7 +1095,7 @@ public class AiAssistantMcpService {
     }
 
     // ===== PARSING HELPERS =====
-    
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseMcpContent(Map<String, Object> mcpResponse) {
         try {
@@ -1257,7 +1294,7 @@ public class AiAssistantMcpService {
         return String.format("%s %d %s %d", dayOfWeek, date.getDayOfMonth(), month, date.getYear());
     }
     // ===== INNER CLASS =====
-    
+
     @Data
     private static class McpToolCallResponse {
         private String tool;

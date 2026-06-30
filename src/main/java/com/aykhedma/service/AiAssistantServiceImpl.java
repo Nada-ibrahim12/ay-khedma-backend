@@ -140,7 +140,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                             .findByChatSessionSessionIdOrderByTimestampAsc(session.getSessionId());
 
                     String firstMessageContent = messages.isEmpty() ? "New Chat"
-                            : messages.get(0).getContent();
+                            : getDisplayTitle(messages.get(0));
 
                     LocalDateTime lastMessageTime = messages.isEmpty() ? session.getStartTime()
                             : messages.get(messages.size() - 1).getTimestamp();
@@ -154,6 +154,19 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 })
                 .sorted((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()))
                 .collect(Collectors.toList());
+    }
+
+    private String getDisplayTitle(ChatMessage message) {
+        if (message.getType() == MessageType.VOICE) {
+            if (Boolean.TRUE.equals(message.getTranscriptionSuccess())
+                    && StringUtils.hasText(message.getTranscribedText())) {
+                return message.getTranscribedText();
+            } else {
+                return "🎤 Voice note";
+            }
+        }
+
+        return message.getContent();
     }
 
     @Override
