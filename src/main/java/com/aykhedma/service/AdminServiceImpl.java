@@ -153,7 +153,7 @@ public class AdminServiceImpl implements AdminService {
         Pageable cappedPageable = Pageable.ofSize(Math.min(pageable.getPageSize(), maxPageSize));
         // preserve page number and sort
         cappedPageable = org.springframework.data.domain.PageRequest.of(
-            pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
+                pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
 
         Page<User> users = userRepository.searchUsers(role, status, startDate, endDate, keyword, cappedPageable);
 
@@ -168,9 +168,10 @@ public class AdminServiceImpl implements AdminService {
         // Cap page size to prevent very large admin queries
         int maxPageSize = 100;
         Pageable cappedPageable = org.springframework.data.domain.PageRequest.of(
-            pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
+                pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
 
-        Page<Provider> providers = providerRepository.findAllProvidersForAdmin(keyword, status, enabled, cappedPageable);
+        Page<Provider> providers = providerRepository.findAllProvidersForAdmin(keyword, status, enabled,
+                cappedPageable);
 
         return providers.map(providerMapper::toProviderResponse);
     }
