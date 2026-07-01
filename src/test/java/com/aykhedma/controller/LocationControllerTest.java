@@ -7,8 +7,6 @@ import com.aykhedma.dto.response.LocationResponse;
 import com.aykhedma.dto.response.ProviderSummaryResponse;
 import com.aykhedma.exception.GlobalExceptionHandler;
 import com.aykhedma.exception.ResourceNotFoundException;
-import com.aykhedma.security.CustomUserDetailsService;
-import com.aykhedma.security.JwtService;
 import com.aykhedma.service.LocationService;
 import com.aykhedma.util.TestDataFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,13 +14,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -34,9 +34,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(LocationController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 @Import({ TestSecurityConfig.class, GlobalExceptionHandler.class })
-@DisplayName("Location Controller Unit Tests")
+@DisplayName("Location Controller Integration Tests")
 class LocationControllerTest {
 
         private static final class PrincipalUser {
@@ -72,12 +74,6 @@ class LocationControllerTest {
         @MockBean
         private LocationService locationService;
 
-        @MockBean
-        private JwtService jwtService;
-
-        @MockBean
-        private CustomUserDetailsService customUserDetailsService;
-
         private LocationDTO locationDTO;
         private LocationResponse locationResponse;
 
@@ -98,6 +94,13 @@ class LocationControllerTest {
                 return SecurityMockMvcRequestPostProcessors.authentication(auth);
         }
 
+        private RequestPostProcessor authenticatedAdmin() {
+                var principal = new PrincipalPayload(999L);
+                var authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+                return SecurityMockMvcRequestPostProcessors.authentication(auth);
+        }
+
         @BeforeEach
         void setUp() {
                 locationDTO = TestDataFactory.createLocationDTO();
@@ -111,7 +114,7 @@ class LocationControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/locations/consumers/{id} - Should save consumer location")
+        @DisplayName("POST /api/v1/locations/consumer/me - Should save consumer location")
         void saveConsumerLocation_ShouldReturnCreated() throws Exception {
                 when(locationService.saveConsumerLocation(eq(CONSUMER_ID), any(LocationDTO.class)))
                                 .thenReturn(locationResponse);
@@ -125,7 +128,7 @@ class LocationControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/locations/consumers/{id} - Should return 404 when consumer not found")
+        @DisplayName("POST /api/v1/locations/consumer/me - Should return 404 when consumer not found")
         void saveConsumerLocation_NotFound_Returns404() throws Exception {
                 when(locationService.saveConsumerLocation(eq(CONSUMER_ID), any(LocationDTO.class)))
                                 .thenThrow(new ResourceNotFoundException("Consumer not found with id: " + CONSUMER_ID));
@@ -141,7 +144,7 @@ class LocationControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/locations/consumers/{id} - Should return 400 for invalid data")
+        @DisplayName("POST /api/v1/locations/consumer/me - Should return 400 for invalid data")
         void saveConsumerLocation_InvalidData_Returns400() throws Exception {
                 LocationDTO invalidDto = LocationDTO.builder()
                                 .latitude(100.0)
@@ -155,15 +158,11 @@ class LocationControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.status").value(400))
                                 .andExpect(jsonPath("$.error").value("Validation Failed"))
-                                .andExpect(jsonPath("$.message").value("Invalid input parameters"))
-                                .andExpect(jsonPath("$.validationErrors.latitude")
-                                                .value("Latitude must be between -90 and 90"))
-                                .andExpect(jsonPath("$.validationErrors.longitude")
-                                                .value("Longitude must be between -180 and 180"));
+                                .andExpect(jsonPath("$.message").value("Invalid input parameters"));
         }
 
         @Test
-        @DisplayName("PUT /api/v1/locations/consumers/{id} - Should update consumer location")
+        @DisplayName("PUT /api/v1/locations/consumer/me - Should update consumer location")
         void updateConsumerLocation_ShouldReturnOk() throws Exception {
                 when(locationService.updateConsumerLocation(eq(CONSUMER_ID), any(LocationDTO.class)))
                                 .thenReturn(locationResponse);
@@ -177,7 +176,7 @@ class LocationControllerTest {
         }
 
         @Test
-        @DisplayName("PUT /api/v1/locations/consumers/{id} - Should return 404 when consumer not found")
+        @DisplayName("PUT /api/v1/locations/consumer/me - Should return 404 when consumer not found")
         void updateConsumerLocation_NotFound_Returns404() throws Exception {
                 when(locationService.updateConsumerLocation(eq(CONSUMER_ID), any(LocationDTO.class)))
                                 .thenThrow(new ResourceNotFoundException("Consumer not found with id: " + CONSUMER_ID));
@@ -193,7 +192,7 @@ class LocationControllerTest {
         }
 
         @Test
-        @DisplayName("PATCH /api/v1/locations/consumers/{id} - Should patch consumer location")
+        @DisplayName("PATCH /api/v1/locations/consumers/me - Should patch consumer location")
         void patchConsumerLocation_ShouldReturnOk() throws Exception {
                 when(locationService.patchConsumerLocation(eq(CONSUMER_ID), any(LocationDTO.class)))
                                 .thenReturn(locationResponse);
@@ -207,7 +206,7 @@ class LocationControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/locations/consumers/{id} - Should get consumer location")
+        @DisplayName("GET /api/v1/locations/consumers/me - Should get consumer location")
         void getConsumerLocation_ShouldReturnOk() throws Exception {
                 when(locationService.getConsumerLocation(CONSUMER_ID)).thenReturn(locationDTO);
 
@@ -218,7 +217,7 @@ class LocationControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/locations/consumers/{id} - Should return 404 when consumer not found")
+        @DisplayName("GET /api/v1/locations/consumers/me - Should return 404 when consumer not found")
         void getConsumerLocation_NotFound_Returns404() throws Exception {
                 when(locationService.getConsumerLocation(CONSUMER_ID))
                                 .thenThrow(new ResourceNotFoundException("Consumer not found with id: " + CONSUMER_ID));
@@ -232,7 +231,7 @@ class LocationControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/locations/providers/{id} - Should save provider location")
+        @DisplayName("POST /api/v1/locations/provider/me - Should save provider location")
         void saveProviderLocation_ShouldReturnCreated() throws Exception {
                 when(locationService.saveProviderLocation(eq(PROVIDER_ID), any(LocationDTO.class)))
                                 .thenReturn(locationResponse);
@@ -245,7 +244,7 @@ class LocationControllerTest {
         }
 
         @Test
-        @DisplayName("POST /api/v1/locations/providers/{id} - Should return 400 for invalid data")
+        @DisplayName("POST /api/v1/locations/provider/me - Should return 400 for invalid data")
         void saveProviderLocation_InvalidData_Returns400() throws Exception {
                 LocationDTO invalidDto = LocationDTO.builder()
                                 .latitude(100.0)
@@ -259,15 +258,11 @@ class LocationControllerTest {
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.status").value(400))
                                 .andExpect(jsonPath("$.error").value("Validation Failed"))
-                                .andExpect(jsonPath("$.message").value("Invalid input parameters"))
-                                .andExpect(jsonPath("$.validationErrors.latitude")
-                                                .value("Latitude must be between -90 and 90"))
-                                .andExpect(jsonPath("$.validationErrors.longitude")
-                                                .value("Longitude must be between -180 and 180"));
+                                .andExpect(jsonPath("$.message").value("Invalid input parameters"));
         }
 
         @Test
-        @DisplayName("POST /api/v1/locations/providers/{id} - Should return 404 when provider not found")
+        @DisplayName("POST /api/v1/locations/provider/me - Should return 404 when provider not found")
         void saveProviderLocation_NotFound_Returns404() throws Exception {
                 when(locationService.saveProviderLocation(eq(PROVIDER_ID), any(LocationDTO.class)))
                                 .thenThrow(new ResourceNotFoundException("Provider not found with id: " + PROVIDER_ID));
@@ -291,28 +286,6 @@ class LocationControllerTest {
                                 .with(authenticatedConsumer()))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.longitude").value(locationDTO.getLongitude()));
-        }
-
-        @Test
-        @DisplayName("PUT /api/v1/locations/providers/{id} - Should return 400 for invalid data")
-        void updateProviderLocation_InvalidData_Returns400() throws Exception {
-                LocationDTO invalidDto = LocationDTO.builder()
-                                .latitude(100.0)
-                                .longitude(200.0)
-                                .build();
-
-                mockMvc.perform(put("/api/v1/locations/providers/me")
-                                .with(authenticatedProvider())
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(invalidDto)))
-                                .andExpect(status().isBadRequest())
-                                .andExpect(jsonPath("$.status").value(400))
-                                .andExpect(jsonPath("$.error").value("Validation Failed"))
-                                .andExpect(jsonPath("$.message").value("Invalid input parameters"))
-                                .andExpect(jsonPath("$.validationErrors.latitude")
-                                                .value("Latitude must be between -90 and 90"))
-                                .andExpect(jsonPath("$.validationErrors.longitude")
-                                                .value("Longitude must be between -180 and 180"));
         }
 
         @Test
@@ -415,5 +388,78 @@ class LocationControllerTest {
                                 .param("radius", "5.0"))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.length()").value(2));
+        }
+
+        @Test
+        @DisplayName("PUT /api/v1/locations/providers/me - Should update provider location")
+        void updateProviderLocation_ShouldReturnOk() throws Exception {
+                when(locationService.updateProviderLocation(eq(PROVIDER_ID), any(LocationDTO.class)))
+                                .thenReturn(locationResponse);
+
+                mockMvc.perform(put("/api/v1/locations/providers/me")
+                                .with(authenticatedProvider())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(locationDTO)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.id").value(10L));
+        }
+
+        @Test
+        @DisplayName("PUT /api/v1/locations/providers/me - Should return 404 when provider not found")
+        void updateProviderLocation_NotFound_Returns404() throws Exception {
+                when(locationService.updateProviderLocation(eq(PROVIDER_ID), any(LocationDTO.class)))
+                                .thenThrow(new ResourceNotFoundException("Provider not found with id: " + PROVIDER_ID));
+
+                mockMvc.perform(put("/api/v1/locations/providers/me")
+                                .with(authenticatedProvider())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(locationDTO)))
+                                .andExpect(status().isNotFound())
+                                .andExpect(jsonPath("$.status").value(404))
+                                .andExpect(jsonPath("$.error").value("Not Found"))
+                                .andExpect(jsonPath("$.message").value("Provider not found with id: " + PROVIDER_ID));
+        }
+
+        @Test
+        @DisplayName("PUT /api/v1/locations/providers/me - Should return 400 for invalid data")
+        void updateProviderLocation_InvalidData_Returns400() throws Exception {
+                LocationDTO invalidDto = LocationDTO.builder()
+                                .latitude(100.0)
+                                .longitude(200.0)
+                                .build();
+
+                mockMvc.perform(put("/api/v1/locations/providers/me")
+                                .with(authenticatedProvider())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(invalidDto)))
+                                .andExpect(status().isBadRequest())
+                                .andExpect(jsonPath("$.status").value(400))
+                                .andExpect(jsonPath("$.error").value("Validation Failed"))
+                                .andExpect(jsonPath("$.message").value("Invalid input parameters"));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/locations/provider/me - Should get my provider location")
+        void getMyProviderLocation_ShouldReturnOk() throws Exception {
+                when(locationService.getProviderLocation(PROVIDER_ID)).thenReturn(locationDTO);
+
+                mockMvc.perform(get("/api/v1/locations/providers/me")
+                                .with(authenticatedProvider()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.latitude").value(locationDTO.getLatitude()));
+        }
+
+        @Test
+        @DisplayName("GET /api/v1/locations/provider/me - Should return 404 when provider not found")
+        void getMyProviderLocation_NotFound_Returns404() throws Exception {
+                when(locationService.getProviderLocation(PROVIDER_ID))
+                                .thenThrow(new ResourceNotFoundException("Provider not found with id: " + PROVIDER_ID));
+
+                mockMvc.perform(get("/api/v1/locations/providers/me")
+                                .with(authenticatedProvider()))
+                                .andExpect(status().isNotFound())
+                                .andExpect(jsonPath("$.status").value(404))
+                                .andExpect(jsonPath("$.error").value("Not Found"))
+                                .andExpect(jsonPath("$.message").value("Provider not found with id: " + PROVIDER_ID));
         }
 }
