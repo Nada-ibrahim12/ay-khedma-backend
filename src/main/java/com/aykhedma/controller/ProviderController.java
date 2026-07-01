@@ -521,7 +521,7 @@ public class ProviderController {
 
                         @Parameter(description = "Consumer ID for location-based search") @RequestParam(required = true) Long consumerId,
 
-                        @Parameter(description = "Search radius in kilometers (requires consumerId)") @RequestParam(required = false, defaultValue = "5.0") Double radius,
+                        @Parameter(description = "Search radius in kilometers (requires consumerId)") @RequestParam(required = false) Double radius,
 
                         @Parameter(description = "Sort by field (distance, rating, price, experience)") @RequestParam(required = false, defaultValue = "rating") String sortBy,
 

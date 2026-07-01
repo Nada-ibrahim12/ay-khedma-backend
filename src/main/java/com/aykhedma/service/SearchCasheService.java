@@ -47,14 +47,22 @@ class SearchCacheService {
                         categoryName,
                         Pageable.unpaged()
                 );
+        if (consumerId == null) {
 
-        if (consumerId == null || radius == null) {
             List<SearchResponse> responses = providersPage.getContent()
                     .stream()
                     .map(provider -> {
                         SearchResponse response = providerMapper.toSearchResponse(provider);
+
+                        PriceType priceType = provider.getPriceType();
+                        response.setPriceType(priceType);
+                        response.setPriceTypeAr(
+                                priceType != null ? priceType.getArabicLabel() : null
+                        );
+
                         response.setDistance(null);
                         response.setEstimatedArrivalTime(null);
+
                         return response;
                     })
                     .collect(Collectors.toList());
@@ -63,11 +71,14 @@ class SearchCacheService {
         }
 
         try {
-            List<SearchResponse> filteredList = providersPage.getContent()
+
+            List<SearchResponse> responses = providersPage.getContent()
                     .stream()
                     .filter(provider -> provider.getLocation() != null)
                     .map(provider -> {
+
                         try {
+
                             double distance = locationService
                                     .calculateDistanceBetweenConsumerAndProvider(
                                             consumerId,
@@ -75,13 +86,26 @@ class SearchCacheService {
                                     )
                                     .getDistanceKm();
 
-                            if (distance > radius) return null;
+                            if (radius != null && distance > radius) {
+                                return null;
+                            }
 
                             SearchResponse response = providerMapper.toSearchResponse(provider);
-                            response.setDistance(Math.round(distance * 100.0) / 100.0);
+
+                            PriceType priceType = provider.getPriceType();
+                            response.setPriceType(priceType);
+                            response.setPriceTypeAr(
+                                    priceType != null ? priceType.getArabicLabel() : null
+                            );
+
+                            response.setDistance(
+                                    Math.round(distance * 100.0) / 100.0
+                            );
+
                             response.setEstimatedArrivalTime(
                                     (int) Math.round((distance / 30.0) * 60)
                             );
+
                             response.setWithinServiceArea(
                                     distance <= provider.getServiceAreaRadius()
                             );
@@ -91,20 +115,32 @@ class SearchCacheService {
                         } catch (Exception e) {
                             return null;
                         }
+
                     })
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
-            return applySorting(filteredList, sortBy);
+            return applySorting(responses, sortBy);
 
         } catch (ResourceNotFoundException e) {
+
             List<SearchResponse> responses = providersPage.getContent()
                     .stream()
                     .map(provider -> {
+
                         SearchResponse response = providerMapper.toSearchResponse(provider);
+
+                        PriceType priceType = provider.getPriceType();
+                        response.setPriceType(priceType);
+                        response.setPriceTypeAr(
+                                priceType != null ? priceType.getArabicLabel() : null
+                        );
+
                         response.setDistance(null);
                         response.setEstimatedArrivalTime(null);
+
                         return response;
+
                     })
                     .collect(Collectors.toList());
 
