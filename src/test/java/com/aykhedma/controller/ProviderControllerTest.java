@@ -426,7 +426,7 @@ class ProviderControllerTest {
                                 eq(10.0),
                                 eq("distance"),
                                 any(Pageable.class))).thenReturn(Page.empty());
-
+                             
                 mockMvc.perform(get("/api/v1/providers/search")
                                 .param("consumerId", CONSUMER_ID.toString())
                                 .param("radius", "10")
@@ -466,7 +466,7 @@ class ProviderControllerTest {
                                 eq(CONSUMER_ID),
                                 eq(10.0),
                                 eq("distance"),
-                                any(Pageable.class))).thenReturn(Page.empty());
+                                any(Pageable.class))).thenReturn(new PageImpl<>(new ArrayList<>()));
 
                 mockMvc.perform(get("/api/v1/providers/search")
                                 .param("consumerId", CONSUMER_ID.toString())
@@ -484,7 +484,7 @@ class ProviderControllerTest {
         @DisplayName("GET /api/v1/providers/top-rated-near-me")
         void topRatedNearMe() throws Exception {
                 when(providerService.topRatedNearMe(eq(CONSUMER_ID), eq(10.0), any(Pageable.class)))
-                                .thenReturn(Page.empty());
+                                .thenReturn(new PageImpl<>(new ArrayList<>()));
 
                 mockMvc.perform(get("/api/v1/providers/top-rated-near-me")
                                 .param("consumerId", CONSUMER_ID.toString())
