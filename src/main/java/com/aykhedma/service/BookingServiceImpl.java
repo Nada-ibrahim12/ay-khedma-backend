@@ -86,7 +86,6 @@ public class BookingServiceImpl implements BookingService {
                 .problemDescription(problemDescription)
                 .status(BookingStatus.PENDING)
                 .build();
-        bookingRepository.save(booking);
 
         try {
             long buffer = (provider.getBookingBufferMinutes() != null) ? provider.getBookingBufferMinutes() : 30L;
@@ -97,9 +96,10 @@ public class BookingServiceImpl implements BookingService {
                     buffer,
                     false);
             booking.setTimeSlot(reservedForRequest);
-            bookingRepository.save(booking);
         } catch (Exception ignored) {
         }
+
+        bookingRepository.save(booking);
 
         // Update provider stats in memory
         provider.setTotalRequests((provider.getTotalRequests() != null ? provider.getTotalRequests() : 0) + 1);

@@ -7,17 +7,22 @@ import com.aykhedma.dto.request.CancelBookingRequest;
 import com.aykhedma.dto.response.AcceptBookingResponse;
 import com.aykhedma.dto.response.BookingResponse;
 import com.aykhedma.dto.response.ConsumerSummaryResponse;
+import com.aykhedma.dto.response.MonthlyBookingStatsResponse;
 import com.aykhedma.dto.response.ProviderSummaryResponse;
+import com.aykhedma.dto.response.WeeklyBookingStatsResponse;
 import com.aykhedma.exception.GlobalExceptionHandler;
 import com.aykhedma.model.booking.BookingStatus;
 import com.aykhedma.security.CustomUserDetailsService;
 import com.aykhedma.security.JwtService;
 import com.aykhedma.service.BookingService;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -78,6 +83,8 @@ class BookingControllerTest
     private AcceptBookingResponse acceptSuccessResponse;
     private AcceptBookingResponse acceptConflictResponse;
     private AcceptBookingResponse acceptWarningResponse;
+    private WeeklyBookingStatsResponse weeklyStatsResponse;
+    private MonthlyBookingStatsResponse monthlyStatsResponse;
     private final Long consumerId = 2L;
     private final Long providerId = 1L;
     private final Long bookingId = 10L;
@@ -136,6 +143,17 @@ class BookingControllerTest
                 .status("WARNING")
                 .warningMessage("The booking end time will exceed the end time of the working day")
                 .build();
+
+        weeklyStatsResponse = WeeklyBookingStatsResponse.builder()
+                .acceptedAndCompletedBookings(8)
+                .cancelledBookings(2)
+                .build();
+
+        monthlyStatsResponse = MonthlyBookingStatsResponse.builder()
+                .months(List.of("January", "February", "March"))
+                .completedBookings(List.of(5, 3, 7))
+                .cancelledBookings(List.of(1, 2, 0))
+                .build();
     }
 
     @Nested
@@ -171,13 +189,43 @@ class BookingControllerTest
         @DisplayName("Request Booking - Invalid Request Data (400)")
         void requestBookingBadRequest() throws Exception
         {
-            BookingRequest invalidRequest = BookingRequest.builder().build(); // missing required fields
+            BookingRequest invalidRequest = BookingRequest.builder().build();
 
             mockMvc.perform(post("/api/bookings/request-booking")
                             .with(authenticatedConsumer())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(invalidRequest)))
                     .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("Delete Booking - Success")
+        void deleteBookingSuccess() throws Exception
+        {
+            when(bookingService.deleteBooking(eq(consumerId), eq(bookingId)))
+                    .thenReturn(bookingResponse);
+
+            mockMvc.perform(put("/api/bookings/delete-booking/{bookingId}", bookingId)
+                            .with(authenticatedConsumer()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(bookingId))
+                    .andExpect(jsonPath("$.status").value("PENDING"));
+        }
+
+        @Test
+        @DisplayName("Complete Booking - Success")
+        void completeBookingSuccess() throws Exception
+        {
+            bookingResponse.setStatus(BookingStatus.COMPLETED);
+
+            when(bookingService.completeBooking(eq(consumerId), eq(bookingId)))
+                    .thenReturn(bookingResponse);
+
+            mockMvc.perform(put("/api/bookings/complete-booking/{bookingId}", bookingId)
+                            .with(authenticatedConsumer()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(bookingId))
+                    .andExpect(jsonPath("$.status").value("COMPLETED"));
         }
     }
 
@@ -198,7 +246,7 @@ class BookingControllerTest
             when(bookingService.acceptBooking(eq(providerId), any(AcceptBookingRequest.class)))
                     .thenReturn(acceptSuccessResponse);
 
-            mockMvc.perform(post("/api/bookings/accept-booking")
+            mockMvc.perform(put("/api/bookings/accept-booking")
                             .with(authenticatedProvider())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -220,7 +268,7 @@ class BookingControllerTest
             when(bookingService.acceptBooking(eq(providerId), any(AcceptBookingRequest.class)))
                     .thenReturn(acceptConflictResponse);
 
-            mockMvc.perform(post("/api/bookings/accept-booking")
+            mockMvc.perform(put("/api/bookings/accept-booking")
                             .with(authenticatedProvider())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -242,7 +290,7 @@ class BookingControllerTest
             when(bookingService.acceptBooking(eq(providerId), any(AcceptBookingRequest.class)))
                     .thenReturn(acceptWarningResponse);
 
-            mockMvc.perform(post("/api/bookings/accept-booking")
+            mockMvc.perform(put("/api/bookings/accept-booking")
                             .with(authenticatedProvider())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -255,14 +303,49 @@ class BookingControllerTest
         @DisplayName("Decline Booking - Success")
         void declineBookingSuccess() throws Exception
         {
-            when(bookingService.declineBooking(providerId, bookingId))
+            when(bookingService.declineBooking(eq(providerId), eq(bookingId)))
                     .thenReturn(bookingResponse);
 
-            mockMvc.perform(post("/api/bookings/decline-booking/{bookingId}", bookingId)
+            mockMvc.perform(put("/api/bookings/decline-booking/{bookingId}", bookingId)
                             .with(authenticatedProvider()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value(bookingId))
                     .andExpect(jsonPath("$.status").value("PENDING"));
+        }
+
+        @Test
+        @DisplayName("Get Weekly Booking Stats - Success")
+        void getWeeklyBookingStatsSuccess() throws Exception
+        {
+            when(bookingService.getWeeklyBookingStats(eq(providerId)))
+                    .thenReturn(weeklyStatsResponse);
+
+            mockMvc.perform(get("/api/bookings/weekly-booking-stats")
+                            .with(authenticatedProvider()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.acceptedAndCompletedBookings").value(8))
+                    .andExpect(jsonPath("$.cancelledBookings").value(2));
+        }
+
+        @Test
+        @DisplayName("Get Monthly Booking Stats - Success")
+        void getMonthlyBookingStatsSuccess() throws Exception
+        {
+            when(bookingService.getMonthlyBookingStats(eq(providerId)))
+                    .thenReturn(monthlyStatsResponse);
+
+            mockMvc.perform(get("/api/bookings/monthly-booking-stats")
+                            .with(authenticatedProvider()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.months[0]").value("January"))
+                    .andExpect(jsonPath("$.months[1]").value("February"))
+                    .andExpect(jsonPath("$.months[2]").value("March"))
+                    .andExpect(jsonPath("$.completedBookings[0]").value(5))
+                    .andExpect(jsonPath("$.completedBookings[1]").value(3))
+                    .andExpect(jsonPath("$.completedBookings[2]").value(7))
+                    .andExpect(jsonPath("$.cancelledBookings[0]").value(1))
+                    .andExpect(jsonPath("$.cancelledBookings[1]").value(2))
+                    .andExpect(jsonPath("$.cancelledBookings[2]").value(0));
         }
     }
 
@@ -282,7 +365,7 @@ class BookingControllerTest
             when(bookingService.cancelBooking(eq(consumerId), any(CancelBookingRequest.class)))
                     .thenReturn(bookingResponse);
 
-            mockMvc.perform(post("/api/bookings/cancel-booking")
+            mockMvc.perform(put("/api/bookings/cancel-booking")
                             .with(authenticatedConsumer())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -302,7 +385,7 @@ class BookingControllerTest
             when(bookingService.cancelBooking(eq(providerId), any(CancelBookingRequest.class)))
                     .thenReturn(bookingResponse);
 
-            mockMvc.perform(post("/api/bookings/cancel-booking")
+            mockMvc.perform(put("/api/bookings/cancel-booking")
                             .with(authenticatedProvider())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
