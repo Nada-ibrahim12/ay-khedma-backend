@@ -26,6 +26,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -37,9 +38,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 @DisplayName("Service Catalog Controller Unit Tests")
-@WebMvcTest(controllers = ServiceCatalogController.class)
-@Import({ TestSecurityConfig.class, GlobalExceptionHandler.class })
+@SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
+@ActiveProfiles("test")
+@Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
 class ServiceCatalogControllerTest {
 
     @Autowired

@@ -20,6 +20,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -416,24 +417,47 @@ class ProviderControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/providers/search - location radius")
+        @DisplayName("GET search - location radius")
         void search_location() throws Exception {
+
+                SearchResponse response = SearchResponse.builder()
+                        .id(1L)
+                        .name("Ibrahim Nasser")
+                        .serviceType("Drain Cleaning")
+                        .serviceTypeAr("تنظيف المصارف")
+                        .categoryName("Plumbing")
+                        .averageRating(4.8)
+                        .completedJobs(50)
+                        .price(150.0)
+                        .estimatedArrivalTime(15)
+                        .area("Nasr City")
+                        .serviceAreaRadius(10.0)
+                        .build();
+
+                response.setDistance(0.39);
+
+                Page<SearchResponse> page =
+                        new PageImpl<>(List.of(response), PageRequest.of(0, 10), 1);
+
                 when(providerService.search(
-                                isNull(),
-                                isNull(),
-                                isNull(),
-                                eq(CONSUMER_ID),
-                                eq(10.0),
-                                eq("distance"),
-                                any(Pageable.class))).thenReturn(Page.empty());
-                             
+                        isNull(),
+                        isNull(),
+                        isNull(),
+                        eq(1L),
+                        eq(10.0),
+                        eq("distance"),
+                        any(Pageable.class)))
+                        .thenReturn(page);
+
                 mockMvc.perform(get("/api/v1/providers/search")
-                                .param("consumerId", CONSUMER_ID.toString())
+                                .param("consumerId", "1")
                                 .param("radius", "10")
                                 .param("sortBy", "distance")
                                 .param("page", "0")
                                 .param("size", "10"))
-                                .andExpect(status().isOk());
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.content[0].formattedDistance").value("390 m"))
+                        .andExpect(jsonPath("$.content[0].estimatedArrivalTime").value(15));
         }
 
         @Test
@@ -457,39 +481,137 @@ class ProviderControllerTest {
         }
 
         @Test
-        @DisplayName("GET /api/v1/providers/search - all filters combined")
+        @DisplayName("GET search - all filters combined")
         void search_all_filters() throws Exception {
+
+                SearchResponse response = SearchResponse.builder()
+
+                        .id(1L)
+
+                        .name("Ibrahim Nasser")
+
+                        .serviceType("Drain Cleaning")
+
+                        .serviceTypeAr("تنظيف المصارف")
+
+                        .categoryName("Plumbing")
+
+                        .averageRating(4.8)
+
+                        .completedJobs(50)
+
+                        .price(150.0)
+
+                        .estimatedArrivalTime(15)
+
+                        .area("Nasr City")
+
+                        .serviceAreaRadius(10.0)
+
+                        .build();
+
+
+
+                response.setDistance(0.39);
+
+
+
+                Page<SearchResponse> page =
+
+                        new PageImpl<>(List.of(response), PageRequest.of(0, 10), 1);
+
+
+
                 when(providerService.search(
-                                eq("drain"),
-                                eq(3L),
-                                eq("Plumbing"),
-                                eq(CONSUMER_ID),
-                                eq(10.0),
-                                eq("distance"),
-                                any(Pageable.class))).thenReturn(new PageImpl<>(new ArrayList<>()));
+
+                        eq("drain"),
+
+                        eq(3L),
+
+                        eq("Plumbing"),
+
+                        eq(1L),
+
+                        eq(10.0),
+
+                        eq("distance"),
+
+                        any(Pageable.class)))
+
+                        .thenReturn(page);
+
+
 
                 mockMvc.perform(get("/api/v1/providers/search")
-                                .param("consumerId", CONSUMER_ID.toString())
+
+                                .param("consumerId", "1")
+
                                 .param("keyword", "drain")
+
                                 .param("categoryId", "3")
+
                                 .param("categoryName", "Plumbing")
+
                                 .param("radius", "10")
+
                                 .param("sortBy", "distance")
+
                                 .param("page", "0")
+
                                 .param("size", "10"))
-                                .andExpect(status().isOk());
+
+                        .andExpect(status().isOk())
+
+                        .andExpect(jsonPath("$.content[0].categoryName").value("Plumbing"))
+
+                        .andExpect(jsonPath("$.content[0].serviceType").value("Drain Cleaning"))
+
+                        .andExpect(jsonPath("$.content[0].formattedDistance").value("390 m"));
+
         }
 
         @Test
         @DisplayName("GET /api/v1/providers/top-rated-near-me")
         void topRatedNearMe() throws Exception {
-                when(providerService.topRatedNearMe(eq(CONSUMER_ID), eq(10.0), any(Pageable.class)))
-                                .thenReturn(new PageImpl<>(new ArrayList<>()));
+
+                SearchResponse response = SearchResponse.builder()
+                        .id(1L)
+                        .name("Ibrahim Nasser")
+                        .serviceType("Drain Cleaning")
+                        .serviceTypeAr("تنظيف المصارف")
+                        .categoryName("Plumbing")
+                        .averageRating(4.8)
+                        .completedJobs(50)
+                        .price(150.0)
+                        .estimatedArrivalTime(15)
+                        .area("Nasr City")
+                        .serviceAreaRadius(10.0)
+                        .build();
+
+                response.setDistance(0.39);
+
+                Page<SearchResponse> page =
+                        new PageImpl<>(List.of(response), PageRequest.of(0, 10), 1);
+
+                when(providerService.topRatedNearMe(
+                        eq(CONSUMER_ID),
+                        eq(10.0),
+                        any(Pageable.class)))
+                        .thenReturn(page);
 
                 mockMvc.perform(get("/api/v1/providers/top-rated-near-me")
+                                .with(authenticatedConsumer())
                                 .param("consumerId", CONSUMER_ID.toString())
                                 .param("radius", "10")
-                                .with(authenticatedConsumer()))
-                                .andExpect(status().isOk());
+                                .param("page", "0")
+                                .param("size", "10"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.content[0].id").value(1))
+                        .andExpect(jsonPath("$.content[0].name").value("Ibrahim Nasser"))
+                        .andExpect(jsonPath("$.content[0].categoryName").value("Plumbing"))
+                        .andExpect(jsonPath("$.content[0].serviceType").value("Drain Cleaning"))
+                        .andExpect(jsonPath("$.content[0].averageRating").value(4.8))
+                        .andExpect(jsonPath("$.content[0].price").value(150.0))
+                        .andExpect(jsonPath("$.content[0].formattedDistance").value("390 m"));
         }
 }

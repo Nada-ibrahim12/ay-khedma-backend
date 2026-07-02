@@ -6,6 +6,7 @@ import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.service.PriceType;
+import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceCategoryRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +33,8 @@ class ServiceManagementServiceImplTest {
 
     @InjectMocks
     private ServiceManagementServiceImpl service;
+    @Mock
+    private ProviderRepository providerRepository;
 
     private ServiceCategory category;
     private ServiceType type;
@@ -125,17 +128,24 @@ class ServiceManagementServiceImplTest {
         verify(typeRepository, times(1)).save(any(ServiceType.class));
     }
 
+
     @Test
     @DisplayName("deleteType should delete successfully when type exists")
     void testDeleteType() {
 
-        when(typeRepository.existsById(1L)).thenReturn(true);
+        when(providerRepository.existsByServiceTypeId(1L))
+                .thenReturn(false);
+
+        when(typeRepository.existsById(1L))
+                .thenReturn(true);
+
         doNothing().when(typeRepository).deleteById(1L);
 
         service.deleteType(1L);
 
-        verify(typeRepository, times(1)).existsById(1L);
-        verify(typeRepository, times(1)).deleteById(1L);
+        verify(providerRepository).existsByServiceTypeId(1L);
+        verify(typeRepository).existsById(1L);
+        verify(typeRepository).deleteById(1L);
     }
     @Test
     @DisplayName("deleteType should throw ResourceNotFoundException when type not found")

@@ -1,7 +1,10 @@
 package com.aykhedma.controller;
 
+import com.aykhedma.config.TestSecurityConfig;
 import com.aykhedma.dto.request.ChatMessageRequest;
 import com.aykhedma.dto.response.ChatMessageResponse;
+import com.aykhedma.exception.GlobalExceptionHandler;
+import com.aykhedma.mapper.ChatMapper;
 import com.aykhedma.model.chat.ChatRoom;
 import com.aykhedma.model.chat.MessageType;
 import com.aykhedma.model.user.User;
@@ -13,11 +16,16 @@ import com.aykhedma.service.ChatService;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -25,7 +33,10 @@ import java.util.List;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ChatController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
 class ChatControllerTest {
 
     @Autowired
@@ -37,6 +48,8 @@ class ChatControllerTest {
     @MockBean
     private JwtService jwtService;
 
+    @MockBean
+    ChatMapper chatMapper;
     @MockBean
     private CustomUserDetailsService customUserDetailsService;
 

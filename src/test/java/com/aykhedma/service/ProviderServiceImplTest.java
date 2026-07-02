@@ -442,28 +442,38 @@ class ProviderServiceImplTest {
                 assertThat(result.getTotalElements()).isEqualTo(3);
         }
         @Test
+        @DisplayName("topRatedNearMe should return mapped results")
         void topRatedNearMe_shouldReturnMappedResults() {
 
                 Pageable pageable = PageRequest.of(0, 10);
 
-                ProviderDistanceProjection projection = mock(ProviderDistanceProjection.class);
+                SearchResponse response = SearchResponse.builder()
+                        .id(1L)
+                        .name("Ibrahim Nasser")
+                        .serviceType("Drain Cleaning")
+                        .categoryName("Plumbing")
+                        .averageRating(4.8)
+                        .estimatedArrivalTime(15)
+                        .build();
 
-                Page<ProviderDistanceProjection> repoResult =
-                        new PageImpl<>(List.of(projection), pageable, 1);
+                response.setDistance(0.39);
 
-                when(providerRepository.findTopRatedNearConsumer(
-                        anyLong(),
-                        anyDouble(),
-                        eq(pageable)
-                )).thenReturn(repoResult);
+                when(searchCacheService.topRatedNearMe(1L, 10.0))
+                        .thenReturn(List.of(response));
 
-                Page<SearchResponse> result = providerService.topRatedNearMe(
-                        1L,
-                        10.0,
-                        pageable
-                );
+                Page<SearchResponse> result =
+                        providerService.topRatedNearMe(
+                                1L,
+                                10.0,
+                                pageable
+                        );
 
                 assertThat(result.getContent()).hasSize(1);
                 assertThat(result.getTotalElements()).isEqualTo(1);
+                assertThat(result.getContent().get(0).getName())
+                        .isEqualTo("Ibrahim Nasser");
+
+                verify(searchCacheService)
+                        .topRatedNearMe(1L, 10.0);
         }
 }

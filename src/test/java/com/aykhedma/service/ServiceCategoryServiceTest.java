@@ -135,15 +135,19 @@ class ServiceCategoryServiceTest {
     @DisplayName("deleteCategory should delete successfully when category exists")
     void testDeleteCategory() {
 
-        when(categoryRepository.existsById(1L)).thenReturn(true);
-        doNothing().when(categoryRepository).deleteById(1L);
+        ServiceCategory category = new ServiceCategory();
+        category.setId(1L);
+
+        when(categoryRepository.findById(1L))
+                .thenReturn(Optional.of(category));
+
+        doNothing().when(categoryRepository).delete(category);
 
         service.deleteCategory(1L);
 
-        verify(categoryRepository, times(1)).existsById(1L);
-        verify(categoryRepository, times(1)).deleteById(1L);
+        verify(categoryRepository).findById(1L);
+        verify(categoryRepository).delete(category);
     }
-
     @Test
     @DisplayName("deleteCategory should throw exception when category not found")
     void testDeleteCategory_NotFound() {

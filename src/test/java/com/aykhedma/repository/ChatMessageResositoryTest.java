@@ -1,5 +1,7 @@
 package com.aykhedma.repository;
 
+import com.aykhedma.config.TestSecurityConfig;
+import com.aykhedma.exception.GlobalExceptionHandler;
 import com.aykhedma.model.chat.ChatMessage;
 import com.aykhedma.model.chat.ChatRoom;
 import com.aykhedma.model.chat.MessageRole;
@@ -10,7 +12,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,6 +26,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
+@ActiveProfiles("test")
 class ChatMessageRepositoryTest {
 
     @Autowired
@@ -25,6 +34,8 @@ class ChatMessageRepositoryTest {
 
     @Autowired
     private TestEntityManager em;
+    @MockBean
+    JavaMailSender javaMailSender;
 
 
     private Consumer user(Long id) {
@@ -45,7 +56,7 @@ class ChatMessageRepositoryTest {
         ChatMessage m = new ChatMessage();
         m.setChatRoom(room);
         m.setSenderId(sender.getId());
-        m.setSenderRole(MessageRole.USER); 
+        m.setSenderRole(MessageRole.USER);
         m.setContent("hello");
         m.setType(MessageType.TEXT);
         m.setIsRead(false);
