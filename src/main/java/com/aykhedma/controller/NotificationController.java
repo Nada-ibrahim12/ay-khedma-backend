@@ -67,6 +67,11 @@ public class NotificationController {
             @AuthenticationPrincipal(expression = "user.id") Long consumerId,
             @RequestBody NotificationRequest request) {
         Long userId = consumerId;
+
+        if (userId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
         log.info("Received request to send in-app notification to userId: {}", userId);
         request.forInAppChannel(userId);
 
