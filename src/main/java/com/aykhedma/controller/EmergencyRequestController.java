@@ -52,7 +52,7 @@ public class EmergencyRequestController
     }
 
     @PreAuthorize("hasRole('CONSUMER')")
-    @GetMapping("/get-emergency-request-price-recommendation")
+    @PostMapping("/get-emergency-request-price-recommendation")
     @Operation(summary = "Returns a price recommendation for an emergency request")
     @ApiResponses(value =
             {

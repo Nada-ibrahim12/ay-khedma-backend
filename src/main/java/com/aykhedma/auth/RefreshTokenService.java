@@ -1,5 +1,6 @@
 package com.aykhedma.auth;
 
+import com.aykhedma.exception.UnauthorizedException;
 import com.aykhedma.model.user.RefreshToken;
 import com.aykhedma.model.user.User;
 import com.aykhedma.repository.RefreshTokenRepository;
@@ -43,16 +44,16 @@ public class RefreshTokenService {
 
     public RefreshToken verify(String token) {
         RefreshToken refreshToken = repository.findByToken(token)
-                .orElseThrow(() -> new RuntimeException("Invalid refresh token"));
+                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
 
         if (refreshToken.getExpiryDate().isBefore(LocalDateTime.now())) {
             // Clean up the expired token
             repository.delete(refreshToken);
-            throw new RuntimeException("Expired refresh token. Please login again.");
+            throw new UnauthorizedException("Expired refresh token. Please login again.");
         }
 
         if (!refreshToken.getUser().isEnabled()) {
-            throw new RuntimeException("Account is suspended. Please contact support.");
+            throw new UnauthorizedException("Account is suspended. Please contact support.");
         }
 
         return refreshToken;

@@ -82,6 +82,7 @@ public class NotificationService {
         notificationRepository.deleteById(notificationId);
     }
 
+    @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void sendNotification(NotificationRequest request) {
         validateRequest(request);

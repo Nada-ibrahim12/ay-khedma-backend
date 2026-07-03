@@ -28,6 +28,8 @@ public class ProviderResponse {
     @NotNull(message = "Emergency request is required")
     @ManyToOne
     @JoinColumn(name = "emergency_request_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private EmergencyRequest emergencyRequest;
 
     @Builder.Default

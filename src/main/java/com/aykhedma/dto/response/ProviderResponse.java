@@ -58,4 +58,5 @@ public class ProviderResponse {
     private Double serviceAreaRadius;
     private String area;
     private String rejectionReason;
+    private Integer bookingBufferMinutes;
 }

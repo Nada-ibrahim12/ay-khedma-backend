@@ -23,10 +23,10 @@ public class DeviceTokenController {
             @RequestHeader("X-User-Id") Long userId,
             @RequestBody RegisterDeviceRequest request) {
 
-        // Validate FCM token format (must be 100+ characters)
-        if (request.getFcmToken() == null || request.getFcmToken().length() < 100) {
+        // Validate token format (Android FCM tokens are 100+ chars, iOS APNs tokens are 64 chars)
+        if (request.getFcmToken() == null || request.getFcmToken().length() < 32) {
             return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Invalid FCM token format. Token must be at least 100 characters."));
+                    "error", "Invalid push token format."));
         }
 
         // Validate device ID

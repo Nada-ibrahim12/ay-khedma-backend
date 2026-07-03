@@ -53,6 +53,8 @@ public class EmergencyRequest {
 
     @OneToMany(mappedBy = "emergencyRequest", cascade = CascadeType.ALL)
     @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<ProviderResponse> providerResponses = new ArrayList<>();
 
     @ManyToOne

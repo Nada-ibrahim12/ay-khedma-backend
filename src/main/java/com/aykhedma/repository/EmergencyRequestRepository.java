@@ -2,6 +2,7 @@ package com.aykhedma.repository;
 
 import com.aykhedma.model.emergency.EmergencyRequest;
 import com.aykhedma.model.emergency.EmergencyRequestStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -28,8 +29,10 @@ public interface EmergencyRequestRepository extends JpaRepository<EmergencyReque
 
     EmergencyRequest findTopByConsumerIdAndStatusInOrderByCreatedAtDesc(Long consumerId, List<EmergencyRequestStatus> statuses);
 
+    @EntityGraph(attributePaths = {"consumer", "location", "selectedProvider", "providerResponses"})
     List<EmergencyRequest> findByConsumerIdAndStatusInAndSelectedProviderNotNullOrderByCreatedAtDesc(Long consumerId, List<EmergencyRequestStatus> statuses);
 
+    @EntityGraph(attributePaths = {"consumer", "location", "selectedProvider", "providerResponses"})
     List<EmergencyRequest> findBySelectedProviderIdAndStatusInOrderByCreatedAtDesc(Long providerId, List<EmergencyRequestStatus> statuses);
 
     long countBySelectedProviderIdAndConsumerRatingIsNotNull(Long providerId);
