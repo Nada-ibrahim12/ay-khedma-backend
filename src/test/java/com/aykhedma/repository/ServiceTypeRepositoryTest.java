@@ -32,9 +32,12 @@ public class ServiceTypeRepositoryTest {
     private ServiceCategoryRepository categoryRepository;
 
     private ServiceCategory category;
+    @Autowired
+    private ProviderRepository providerRepository;
 
     @BeforeEach
     void setUp() {
+        providerRepository.deleteAll();
         typeRepository.deleteAll();
         categoryRepository.deleteAll();
 
@@ -46,7 +49,6 @@ public class ServiceTypeRepositoryTest {
 
         categoryRepository.save(category);
 
-        // إنشاء ServiceType
         ServiceType type1 = ServiceType.builder()
                 .name("Home Cleaning")
                 .nameAr("تنظيف المنازل")

@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
+@ActiveProfiles("mock-security")
 @Import({ TestSecurityConfig.class, GlobalExceptionHandler.class })
 @DisplayName("InteractionRatingController Tests")
 class InteractionRatingControllerTest {
