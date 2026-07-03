@@ -21,8 +21,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -40,8 +40,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = EmergencyRequestController.class,
-        excludeAutoConfiguration = SecurityAutoConfiguration.class)
+@SpringBootTest
+@AutoConfigureMockMvc
 @Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
 @DisplayName("EmergencyRequestController Tests")
 class EmergencyRequestControllerTest
@@ -173,7 +173,7 @@ class EmergencyRequestControllerTest
             when(emergencyRequestService.getEmergencyRequestPriceRecommendation(eq(consumerId), any(PriceRecommendationRequest.class)))
                     .thenReturn(priceRecommendationResponse);
 
-            mockMvc.perform(get("/api/emergency-requests/get-emergency-request-price-recommendation")
+            mockMvc.perform(post("/api/emergency-requests/get-emergency-request-price-recommendation")
                             .with(authenticatedConsumer())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
@@ -194,7 +194,7 @@ class EmergencyRequestControllerTest
             when(emergencyRequestService.getEmergencyRequestPriceRecommendation(eq(consumerId), any(PriceRecommendationRequest.class)))
                     .thenReturn(emptyResponse);
 
-            mockMvc.perform(get("/api/emergency-requests/get-emergency-request-price-recommendation")
+            mockMvc.perform(post("/api/emergency-requests/get-emergency-request-price-recommendation")
                             .with(authenticatedConsumer())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))

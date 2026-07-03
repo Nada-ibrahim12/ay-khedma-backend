@@ -119,15 +119,19 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
     Object findBookingStatsCurrentWeek(@Param("providerId") Long providerId,
                                        @Param("currentDate") LocalDate currentDate);
 
-    @Query(value = "SELECT TO_CHAR(requested_date, 'Mon') AS month, " +
-            "SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed, " +
-            "SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled " +
-            "FROM bookings " +
-            "WHERE provider_id = :providerId " +
-            "AND requested_date >= date_trunc('month', CAST(:currentDate AS DATE) - INTERVAL '6 months') " +
-            "AND requested_date < date_trunc('month', CAST(:currentDate AS DATE)) " +
-            "GROUP BY TO_CHAR(requested_date, 'Mon'), date_trunc('month', requested_date) " +
-            "ORDER BY date_trunc('month', requested_date)",
+    @Query(value = "WITH months AS (SELECT generate_series (" +
+            "date_trunc('month', CAST(:currentDate AS DATE) - INTERVAL '6 months'), " +
+            "date_trunc('month', CAST(:currentDate AS DATE)) - INTERVAL '1 month', " +
+            "INTERVAL '1 month'" +
+            ") AS month) " +
+            "SELECT TO_CHAR(m.month, 'Mon') AS month, " +
+            "COALESCE(SUM(CASE WHEN b.status = 'COMPLETED' THEN 1 END), 0) AS completed, " +
+            "COALESCE(SUM(CASE WHEN b.status = 'CANCELLED' THEN 1 END), 0) AS cancelled " +
+            "FROM months m LEFT JOIN bookings b " +
+            "ON date_trunc('month', b.requested_date) = m.month " +
+            "AND b.provider_id = :providerId " +
+            "GROUP BY m.month " +
+            "ORDER BY m.month",
             nativeQuery = true)
     List<Object[]> findBookingStatsLastSixMonths(@Param("providerId") Long providerId,
                                                  @Param("currentDate") LocalDate currentDate);
