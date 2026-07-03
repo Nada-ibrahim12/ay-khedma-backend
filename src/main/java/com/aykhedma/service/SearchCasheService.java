@@ -26,6 +26,7 @@ class SearchCacheService {
     private final ProviderMapper providerMapper;
     private final LocationService locationService;
 
+
     @Transactional(readOnly = true)
     @Cacheable(
             value = "searchProvidersCache",
@@ -41,112 +42,24 @@ class SearchCacheService {
 
         System.out.println("searchList executed from DB");
 
-        Page<Provider> providersPage =
-                providerRepository.searchProviders(
+        Double radiusMeters = (consumerId != null && radius != null) ? radius * 1000 : null;
+
+        Page<ProviderDistanceProjection> providersPage =
+                providerRepository.searchProvidersWithDistance(
                         keyword,
                         categoryId,
                         categoryName,
+                        consumerId,
+                        radiusMeters,
                         Pageable.unpaged()
                 );
-        if (consumerId == null) {
 
-            List<SearchResponse> responses = providersPage.getContent()
-                    .stream()
-                    .map(provider -> {
-                        SearchResponse response = providerMapper.toSearchResponse(provider);
+        List<SearchResponse> responses = providersPage.getContent()
+                .stream()
+                .map(this::map)
+                .collect(Collectors.toList());
 
-                        PriceType priceType = provider.getPriceType();
-                        response.setPriceType(priceType);
-                        response.setPriceTypeAr(
-                                priceType != null ? priceType.getArabicLabel() : null
-                        );
-
-                        response.setDistance(null);
-                        response.setEstimatedArrivalTime(null);
-
-                        return response;
-                    })
-                    .collect(Collectors.toList());
-
-            return applySorting(responses, sortBy);
-        }
-
-        try {
-
-            List<SearchResponse> responses = providersPage.getContent()
-                    .stream()
-                    .filter(provider -> provider.getLocation() != null)
-                    .map(provider -> {
-
-                        try {
-
-                            double distance = locationService
-                                    .calculateDistanceBetweenConsumerAndProvider(
-                                            consumerId,
-                                            provider.getId()
-                                    )
-                                    .getDistanceKm();
-
-                            if (radius != null && distance > radius) {
-                                return null;
-                            }
-
-                            SearchResponse response = providerMapper.toSearchResponse(provider);
-
-                            PriceType priceType = provider.getPriceType();
-                            response.setPriceType(priceType);
-                            response.setPriceTypeAr(
-                                    priceType != null ? priceType.getArabicLabel() : null
-                            );
-
-                            response.setDistance(
-                                    Math.round(distance * 100.0) / 100.0
-                            );
-
-                            response.setEstimatedArrivalTime(
-                                    (int) Math.round((distance / 30.0) * 60)
-                            );
-
-                            response.setWithinServiceArea(
-                                    distance <= provider.getServiceAreaRadius()
-                            );
-
-                            return response;
-
-                        } catch (Exception e) {
-                            return null;
-                        }
-
-                    })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-
-            return applySorting(responses, sortBy);
-
-        } catch (ResourceNotFoundException e) {
-
-            List<SearchResponse> responses = providersPage.getContent()
-                    .stream()
-                    .map(provider -> {
-
-                        SearchResponse response = providerMapper.toSearchResponse(provider);
-
-                        PriceType priceType = provider.getPriceType();
-                        response.setPriceType(priceType);
-                        response.setPriceTypeAr(
-                                priceType != null ? priceType.getArabicLabel() : null
-                        );
-
-                        response.setDistance(null);
-                        response.setEstimatedArrivalTime(null);
-
-                        return response;
-
-                    })
-                    .collect(Collectors.toList());
-
-            return applySorting(responses, sortBy);
-        }
+        return applySorting(responses, sortBy);
     }
 
     private List<SearchResponse> applySorting(List<SearchResponse> responses,
