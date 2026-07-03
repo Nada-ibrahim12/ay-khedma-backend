@@ -6,12 +6,14 @@ import com.aykhedma.model.user.Consumer;
 import com.aykhedma.model.user.User;
 import com.aykhedma.model.user.UserType;
 import com.aykhedma.repository.RefreshTokenRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -29,6 +31,11 @@ class RefreshTokenServiceTest {
 
     @InjectMocks
     private RefreshTokenService refreshTokenService;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(refreshTokenService, "refreshExpirationMinutes", 10080L);
+    }
 
     private User buildUser() {
         return Consumer.builder()

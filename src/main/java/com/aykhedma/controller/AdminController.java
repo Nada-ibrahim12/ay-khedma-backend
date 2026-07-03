@@ -8,19 +8,15 @@ import com.aykhedma.dto.response.AdminProviderResponse;
 import com.aykhedma.dto.response.DashboardStatsResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
+import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.model.user.UserType;
 import com.aykhedma.model.user.VerificationStatus;
 import com.aykhedma.service.AdminService;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/admin")
@@ -106,10 +103,17 @@ public class AdminController {
     })
     public ResponseEntity<Page<AdminProviderResponse>> searchProviders(
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) VerificationStatus status,
-            @RequestParam(required = false) Boolean enabled,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String verificationStatus,
+            @RequestParam(required = false) String enabled,
             Pageable pageable) {
-        return ResponseEntity.ok(adminService.searchProviders(keyword, status, enabled, pageable));
+        return ResponseEntity.ok(adminService.searchProviders(
+                firstPresent(keyword, search, q),
+                parseVerificationStatus(firstPresent(status, verificationStatus)),
+                parseEnabled(enabled),
+                pageable));
     }
 
     @PutMapping("/providers/{id}/block")
@@ -146,13 +150,22 @@ public class AdminController {
             @ApiResponse(responseCode = "403", description = "Unauthorized - admin access required")
     })
     public ResponseEntity<Page<UserResponse>> searchUsers(
-            @RequestParam(value = "role", required = false) UserType role,
-            @RequestParam(value = "status", required = false) Boolean status,
+            @RequestParam(value = "role", required = false) String role,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "enabled", required = false) String enabled,
             @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "q", required = false) String q,
             Pageable pageable) {
-        return ResponseEntity.ok(adminService.searchUsers(role, status, startDate, endDate, keyword, pageable));
+        return ResponseEntity.ok(adminService.searchUsers(
+                parseUserType(role),
+                parseEnabled(firstPresent(enabled, status)),
+                startDate,
+                endDate,
+                firstPresent(keyword, search, q),
+                pageable));
     }
 
     @PostMapping("/users")
@@ -214,5 +227,48 @@ public class AdminController {
     public ResponseEntity<String> deleteUser(@PathVariable("id") Long id) {
         adminService.deleteUser(id);
         return ResponseEntity.ok("User deleted successfully");
+    }
+
+    private String firstPresent(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private UserType parseUserType(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return UserType.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Invalid role filter: " + value);
+        }
+    }
+
+    private VerificationStatus parseVerificationStatus(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return VerificationStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Invalid provider status filter: " + value);
+        }
+    }
+
+    private Boolean parseEnabled(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "true", "enabled", "active", "1", "yes" -> true;
+            case "false", "disabled", "inactive", "suspended", "blocked", "0", "no" -> false;
+            default -> throw new BadRequestException("Invalid enabled/status filter: " + value);
+        };
     }
 }

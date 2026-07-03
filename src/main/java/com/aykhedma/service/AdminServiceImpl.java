@@ -32,12 +32,16 @@ import com.aykhedma.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -155,21 +159,44 @@ public class AdminServiceImpl implements AdminService {
         Pageable cappedPageable = org.springframework.data.domain.PageRequest.of(
                 pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
 
-        // Pass role as String for native query
-        String roleStr = (role != null) ? role.name() : null;
-        Page<Object[]> rows = userRepository.searchUsersNative(roleStr, status, startDate, endDate, keyword, cappedPageable);
+        Page<User> users = userRepository.findAll(
+                buildUserSearchSpecification(role, status, startDate, endDate, normalizeKeyword(keyword)),
+                cappedPageable);
 
-        return rows.map(row -> UserResponse.builder()
-                .id(((Number) row[0]).longValue())
-                .name((String) row[1])
-                .email((String) row[2])
-                .phoneNumber((String) row[3])
-                .role(row[4] != null ? UserType.valueOf((String) row[4]) : null)
-                .profileImage((String) row[5])
-                .preferredLanguage((String) row[6])
-                .createdAt(row[7] != null ? ((java.sql.Timestamp) row[7]).toLocalDateTime() : null)
-                .enabled(row[8] != null && (Boolean) row[8])
-                .build());
+        return users.map(userMapper::toUserResponse);
+    }
+
+    private Specification<User> buildUserSearchSpecification(
+            UserType role,
+            Boolean status,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            String keyword) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (role != null) {
+                predicates.add(criteriaBuilder.equal(root.get("role"), role));
+            }
+            if (status != null) {
+                predicates.add(criteriaBuilder.equal(root.get("enabled"), status));
+            }
+            if (startDate != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), startDate));
+            }
+            if (endDate != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), endDate));
+            }
+            if (keyword != null) {
+                String pattern = "%" + keyword.toLowerCase(Locale.ROOT) + "%";
+                predicates.add(criteriaBuilder.or(
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), pattern),
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), pattern),
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("phoneNumber")), pattern)));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
     }
 
     @Override
@@ -183,10 +210,17 @@ public class AdminServiceImpl implements AdminService {
         Pageable cappedPageable = org.springframework.data.domain.PageRequest.of(
                 pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
 
-        Page<Provider> providers = providerRepository.findAllProvidersForAdmin(keyword, status, enabled,
+        Page<Provider> providers = providerRepository.findAllProvidersForAdmin(normalizeKeyword(keyword), status, enabled,
                 cappedPageable);
 
         return providers.map(providerMapper::toAdminProviderResponse);
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+        return keyword.trim();
     }
 
     @Override
