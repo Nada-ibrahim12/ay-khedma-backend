@@ -19,4 +19,5 @@ public interface ProviderDistanceProjection {
     Double getDistanceKm();
     Integer getEstimatedArrivalTime();
     Double getScore();
+    Integer getCompletedJobs();
 }

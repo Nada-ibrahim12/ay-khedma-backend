@@ -5,6 +5,7 @@ import com.aykhedma.model.chat.ChatRoom;
 import com.aykhedma.model.user.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -34,10 +35,18 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, String> {
             @Param("u2") User u2);
 
     @Query("""
-                SELECT r FROM ChatRoom r
-                JOIN r.participants p
-                WHERE p.id = :userId
-                ORDER BY COALESCE(r.lastMessageAt, r.createdAt) DESC
-            """)
-    Page<ChatRoom> findUserRooms(@Param("userId") Long userId, Pageable pageable);
+SELECT DISTINCT r
+FROM ChatRoom r
+JOIN FETCH r.participants p
+WHERE EXISTS (
+    SELECT 1
+    FROM r.participants me
+    WHERE me.id = :userId
+)
+ORDER BY r.lastMessageAt DESC
+""")
+    Page<ChatRoom> findUserRooms(
+            @Param("userId") Long userId,
+            Pageable pageable
+    );
 }

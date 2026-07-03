@@ -284,12 +284,12 @@ public class ProviderServiceImpl implements ProviderService {
 
     @Transactional(readOnly = true)
     public Page<SearchResponse> search(String keyword,
-            Long categoryId,
-            String categoryName,
-            Long consumerId,
-            Double radius,
-            String sortBy,
-            Pageable pageable) {
+                                       Long categoryId,
+                                       String categoryName,
+                                       Long consumerId,
+                                       Double radius,
+                                       String sortBy,
+                                       Pageable pageable) {
 
         List<SearchResponse> fullList = searchCacheService.searchList(
                 keyword,
@@ -297,7 +297,8 @@ public class ProviderServiceImpl implements ProviderService {
                 categoryName,
                 consumerId,
                 radius,
-                sortBy);
+                sortBy,
+                pageable);
 
         int start = (int) pageable.getOffset();
         int end = Math.min(start + pageable.getPageSize(), fullList.size());

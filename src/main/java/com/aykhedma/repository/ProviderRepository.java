@@ -81,6 +81,147 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
             @Param("categoryId") Long categoryId,
             @Param("categoryName") String categoryName,
             Pageable pageable);
+
+    @Query(value = """
+    WITH consumer_location AS (
+        SELECT cl.coordinates AS consumer_coords
+        FROM consumers c
+        JOIN locations cl ON c.location_id = cl.id
+        WHERE :consumerId IS NOT NULL AND c.id = :consumerId
+    ),
+    provider_distance AS (
+        SELECT
+            p.id AS id,
+            u.name AS name,
+            u.profile_image AS profileImage,
+
+            st.name AS serviceType,
+            st.name_ar AS serviceTypeAr,
+            sc.name AS categoryName,
+
+            p.average_rating AS averageRating,
+            p.price AS price,
+            p.price_type AS priceType,
+            p.service_area_radius AS serviceAreaRadius,
+            p.completed_jobs AS completedJobs,
+
+            p.average_punctuality_rating AS averagePunctualityRating,
+            p.average_commitment_rating AS averageCommitmentRating,
+            p.average_quality_of_work_rating AS averageQualityOfWorkRating,
+
+            l.area AS area,
+
+            CASE WHEN cl.consumer_coords IS NOT NULL AND l.coordinates IS NOT NULL
+                 THEN ST_Distance(
+                        CAST(l.coordinates AS geography),
+                        CAST(cl.consumer_coords AS geography)
+                      )
+                 ELSE NULL END AS distanceMeters
+
+        FROM providers p
+        JOIN users u ON p.id = u.id
+        LEFT JOIN locations l ON p.location_id = l.id
+        LEFT JOIN service_types st ON p.service_type_id = st.id
+        LEFT JOIN service_categories sc ON st.category_id = sc.id
+        LEFT JOIN consumer_location cl ON true
+
+        WHERE u.enabled = true
+          AND p.verification_status = 'VERIFIED'
+          AND (:keyword IS NULL OR :keyword = '' OR
+               LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(COALESCE(p.bio, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(st.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(COALESCE(st.name_ar, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(sc.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(COALESCE(l.area, '')) LIKE LOWER(CONCAT('%', :keyword, '%')))
+          AND (:categoryId IS NULL OR sc.id = :categoryId)
+          AND (:categoryName IS NULL OR :categoryName = '' OR LOWER(sc.name) = LOWER(:categoryName))
+    )
+    SELECT
+        id,
+        name,
+        profileImage,
+
+        serviceType,
+        serviceTypeAr,
+        categoryName,
+
+        averageRating,
+        price,
+        priceType,
+        serviceAreaRadius,
+        completedJobs,
+
+        averagePunctualityRating,
+        averageCommitmentRating,
+        averageQualityOfWorkRating,
+
+        area,
+
+        distanceMeters,
+
+        CASE WHEN distanceMeters IS NOT NULL THEN distanceMeters / 1000.0 ELSE NULL END AS distanceKm,
+
+        CASE WHEN distanceMeters IS NOT NULL
+             THEN CAST((distanceMeters / 1000.0 / 30.0) * 60 AS INTEGER)
+             ELSE NULL END AS estimatedArrivalTime,
+
+        CASE WHEN distanceMeters IS NOT NULL THEN (
+                (COALESCE(averageRating, 0) * 20 * 0.5)
+                + (GREATEST(0, 100 - ((distanceMeters / 1000.0) * 10)) * 0.5)
+             )
+             ELSE NULL END AS score
+
+    FROM provider_distance
+
+    WHERE (:consumerId IS NULL OR :radiusMeters IS NULL OR distanceMeters IS NULL OR distanceMeters <= :radiusMeters)
+    """,
+            countQuery = """
+    WITH consumer_location AS (
+        SELECT cl.coordinates AS consumer_coords
+        FROM consumers c
+        JOIN locations cl ON c.location_id = cl.id
+        WHERE :consumerId IS NOT NULL AND c.id = :consumerId
+    ),
+    provider_distance AS (
+        SELECT
+            p.id AS id,
+            CASE WHEN cl.consumer_coords IS NOT NULL AND l.coordinates IS NOT NULL
+                 THEN ST_Distance(
+                        CAST(l.coordinates AS geography),
+                        CAST(cl.consumer_coords AS geography)
+                      )
+                 ELSE NULL END AS distanceMeters
+        FROM providers p
+        JOIN users u ON p.id = u.id
+        LEFT JOIN locations l ON p.location_id = l.id
+        LEFT JOIN service_types st ON p.service_type_id = st.id
+        LEFT JOIN service_categories sc ON st.category_id = sc.id
+        LEFT JOIN consumer_location cl ON true
+        WHERE u.enabled = true
+          AND p.verification_status = 'VERIFIED'
+          AND (:keyword IS NULL OR :keyword = '' OR
+               LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(COALESCE(p.bio, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(st.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(COALESCE(st.name_ar, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(sc.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+               LOWER(COALESCE(l.area, '')) LIKE LOWER(CONCAT('%', :keyword, '%')))
+          AND (:categoryId IS NULL OR sc.id = :categoryId)
+          AND (:categoryName IS NULL OR :categoryName = '' OR LOWER(sc.name) = LOWER(:categoryName))
+    )
+    SELECT COUNT(*)
+    FROM provider_distance
+    WHERE (:consumerId IS NULL OR :radiusMeters IS NULL OR distanceMeters IS NULL OR distanceMeters <= :radiusMeters)
+    """,
+            nativeQuery = true)
+    Page<ProviderDistanceProjection> searchProvidersWithDistance(
+            @Param("keyword") String keyword,
+            @Param("categoryId") Long categoryId,
+            @Param("categoryName") String categoryName,
+            @Param("consumerId") Long consumerId,
+            @Param("radiusMeters") Double radiusMeters,
+            Pageable pageable);
     // @Query("SELECT p FROM Provider p " +
     // "LEFT JOIN p.serviceType s " +
     // "LEFT JOIN s.category c " +

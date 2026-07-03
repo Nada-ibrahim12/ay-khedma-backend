@@ -29,14 +29,15 @@ class SearchCacheService {
     @Transactional(readOnly = true)
     @Cacheable(
             value = "searchProvidersCache",
-            key = "#keyword + '-' + #categoryId + '-' + #categoryName + '-' + #consumerId + '-' + #radius + '-' + #sortBy"
+            key = "#keyword + '-' + #categoryId + '-' + #categoryName + '-' + #consumerId + '-' + #radius + '-' + #sortBy + '-' + #pageable.pageNumber + '-' + #pageable.pageSize"
     )
     public List<SearchResponse> searchList(String keyword,
                                            Long categoryId,
                                            String categoryName,
                                            Long consumerId,
                                            Double radius,
-                                           String sortBy) {
+                                           String sortBy,
+                                           Pageable pageable) {
 
         System.out.println("searchList executed from DB");
 

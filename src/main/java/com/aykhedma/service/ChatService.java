@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -65,42 +67,55 @@ public class ChatService {
 
         public Page<ChatRoomResponse> getUserRooms(User user, int page, int size) {
 
-                if (user == null)
+                if (user == null) {
                         throw new UnauthorizedException("User not authenticated");
+                }
 
                 Page<ChatRoom> rooms = chatRoomRepository.findUserRooms(
                         user.getId(),
                         PageRequest.of(page, size));
 
+                List<String> roomIds = rooms.getContent()
+                        .stream()
+                        .map(ChatRoom::getId)
+                        .toList();
+
+                Map<String, Long> unreadMap = chatMessageRepository
+                        .countUnreadMessagesForRooms(roomIds, user.getId())
+                        .stream()
+                        .collect(Collectors.toMap(
+                                row -> (String) row[0],
+                                row -> (Long) row[1]
+                        ));
+
                 return rooms.map(room -> {
 
-                        User otherUser = room.getParticipants().stream()
-                                .filter(u -> !u.getId().equals(user.getId()))
-                                .findFirst()
-                                .orElse(null);
-
+                        User otherUser = null;
+                        for (User participant : room.getParticipants()) {
+                                if (!participant.getId().equals(user.getId())) {
+                                        otherUser = participant;
+                                        break;
+                                }
+                        }
                         return ChatRoomResponse.builder()
                                 .roomId(room.getId())
                                 .otherUserId(otherUser != null ? otherUser.getId() : null)
                                 .otherUserName(otherUser != null ? otherUser.getName() : "Unknown")
-                                .otherUserProfileImage(
-                                        otherUser != null ? otherUser.getProfileImage() : null)
+                                .otherUserProfileImage(otherUser != null
+                                        ? otherUser.getProfileImage()
+                                        : null)
                                 .lastMessage(
-                                        (room.getLastMessage() != null
-                                                && !room.getLastMessage().isBlank())
-                                                ? room.getLastMessage()
-                                                : "No messages yet")
-                                .lastMessageTime(
-                                        room.getLastMessageAt() != null
-                                                ? room.getLastMessageAt()
-                                                : room.getCreatedAt())
+                                        room.getLastMessage() == null ||
+                                                room.getLastMessage().isBlank()
+                                                ? "No messages yet"
+                                                : room.getLastMessage())
+                                .lastMessageTime(room.getLastMessageAt())
                                 .unreadCount(
-                                        chatMessageRepository.countUnreadMessages(room.getId(),
-                                                user.getId()))
+                                        unreadMap.getOrDefault(room.getId(), 0L).intValue())
                                 .build();
                 });
-
         }
+
         @Transactional
         public ChatMessageResponse sendMessage(User sender, ChatMessageRequest request) throws IOException {
 
@@ -180,25 +195,50 @@ public class ChatService {
                 return response;
         }
         @Transactional
-        public List<ChatMessageResponse> getMessages(User currentUser, String roomId, int page, int size) {
+        public List<ChatMessageResponse> getMessages(
+                User currentUser,
+                String roomId,
+                int page,
+                int size
+        ) {
 
-                var room = chatRoomRepository.findById(roomId)
+                ChatRoom room = chatRoomRepository.findById(roomId)
                         .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
 
-                boolean isParticipant = room.getParticipants().stream()
+                boolean isParticipant = room.getParticipants()
+                        .stream()
                         .anyMatch(u -> u.getId().equals(currentUser.getId()));
 
-                if (!isParticipant)
+                if (!isParticipant) {
                         throw new ForbiddenException("You are not allowed in this room");
+                }
 
-                chatMessageRepository.markMessagesAsRead(roomId, currentUser.getId(), LocalDateTime.now());
+                if (chatMessageRepository.existsUnreadMessages(roomId, currentUser.getId())) {
+                        chatMessageRepository.markMessagesAsRead(
+                                roomId,
+                                currentUser.getId(),
+                                LocalDateTime.now()
+                        );
+                }
 
-                var messages = chatMessageRepository.findByChatRoomId(
+                Page<ChatMessage> messages = chatMessageRepository.findByChatRoomId(
                         roomId,
-                        PageRequest.of(page, size, Sort.by("timestamp").descending()));
+                        PageRequest.of(
+                                page,
+                                Math.min(size, 50),
+                                Sort.by(Sort.Direction.DESC, "timestamp")
+                        )
+                );
 
-                return messages.stream()
-                        .map(msg -> ChatMessageResponse.fromEntity(msg, currentUser.getId(), userRepository))
+                return messages.getContent()
+                        .stream()
+                        .map(message ->
+                                ChatMessageResponse.fromEntity(
+                                        message,
+                                        currentUser.getId(),
+                                        userRepository
+                                )
+                        )
                         .toList();
         }
 

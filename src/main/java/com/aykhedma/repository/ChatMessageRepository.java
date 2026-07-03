@@ -43,6 +43,17 @@ ORDER BY m.timestamp DESC
           @Param("userId") Long userId,
           @Param("currentTimestamp") LocalDateTime currentTimestamp
   );
+  @Query("""
+SELECT COUNT(m) > 0
+FROM ChatMessage m
+WHERE m.chatRoom.id = :roomId
+AND m.senderId <> :userId
+AND m.isRead = false
+""")
+  boolean existsUnreadMessages(
+          @Param("roomId") String roomId,
+          @Param("userId") Long userId
+  );
 
   @Query("""
       SELECT COUNT(m) FROM ChatMessage m
@@ -52,5 +63,17 @@ ORDER BY m.timestamp DESC
       """)
   long countUnreadMessages(@Param("roomId") String roomId,
       @Param("userId") Long userId);
+
+  @Query("""
+SELECT cm.chatRoom.id, COUNT(cm)
+FROM ChatMessage cm
+WHERE cm.chatRoom.id IN :roomIds
+AND cm.senderId <> :userId
+AND cm.isRead = false
+GROUP BY cm.chatRoom.id
+""")
+  List<Object[]> countUnreadMessagesForRooms(
+          @Param("roomIds") List<String> roomIds,
+          @Param("userId") Long userId);
 
 }

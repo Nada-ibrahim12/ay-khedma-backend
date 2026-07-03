@@ -425,7 +425,7 @@ class ProviderServiceImplTest {
                 Pageable pageable = PageRequest.of(0, 2);
 
                 when(searchCacheService.searchList(
-                        any(), any(), any(), any(), any(), any()
+                        any(), any(), any(), any(), any(), any(), any()
                 )).thenReturn(fullList);
 
                 Page<SearchResponse> result = providerService.search(
