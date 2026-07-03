@@ -9,7 +9,13 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+        @Index(name = "idx_user_role", columnList = "role"),
+        @Index(name = "idx_user_enabled", columnList = "enabled"),
+        @Index(name = "idx_user_created_at", columnList = "createdAt"),
+        @Index(name = "idx_user_name", columnList = "name"),
+        @Index(name = "idx_user_email", columnList = "email")
+})
 @Inheritance(strategy = InheritanceType.JOINED)
 @DiscriminatorColumn(name = "role", discriminatorType = DiscriminatorType.STRING)
 @DiscriminatorValue("USER")

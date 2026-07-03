@@ -278,9 +278,19 @@ public interface ProviderRepository extends JpaRepository<Provider, Long> {
             @Param("acceptanceRate") Integer acceptanceRate,
             @Param("bookingRate") Integer bookingRate);
 
-    @Query("SELECT p FROM Provider p " +
+    @Query(value = "SELECT p FROM Provider p " +
+            "LEFT JOIN FETCH p.serviceType s " +
+            "LEFT JOIN FETCH s.category c " +
+            "LEFT JOIN FETCH p.location l " +
+            "WHERE (:status IS NULL OR p.verificationStatus = :status) " +
+            "AND (:enabled IS NULL OR p.enabled = :enabled) " +
+            "AND (:keyword IS NULL OR :keyword = '' OR " +
+            "    LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "    LOWER(p.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "    LOWER(p.phoneNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "    LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')))",
+            countQuery = "SELECT COUNT(p) FROM Provider p " +
             "LEFT JOIN p.serviceType s " +
-            "LEFT JOIN s.category c " +
             "WHERE (:status IS NULL OR p.verificationStatus = :status) " +
             "AND (:enabled IS NULL OR p.enabled = :enabled) " +
             "AND (:keyword IS NULL OR :keyword = '' OR " +

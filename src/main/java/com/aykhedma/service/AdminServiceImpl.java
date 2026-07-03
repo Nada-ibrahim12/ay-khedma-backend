@@ -1,6 +1,7 @@
 package com.aykhedma.service;
 
 import com.aykhedma.dto.request.UpdateUserRequest;
+import com.aykhedma.dto.response.AdminProviderResponse;
 import com.aykhedma.dto.response.DashboardStatsResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
@@ -142,6 +143,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<UserResponse> searchUsers(
             UserType role, Boolean status,
             LocalDateTime startDate, LocalDateTime endDate,
@@ -150,18 +152,29 @@ public class AdminServiceImpl implements AdminService {
 
         // Cap page size to prevent expensive unbounded requests from admin UI
         int maxPageSize = 100;
-        Pageable cappedPageable = Pageable.ofSize(Math.min(pageable.getPageSize(), maxPageSize));
-        // preserve page number and sort
-        cappedPageable = org.springframework.data.domain.PageRequest.of(
+        Pageable cappedPageable = org.springframework.data.domain.PageRequest.of(
                 pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
 
-        Page<User> users = userRepository.searchUsers(role, status, startDate, endDate, keyword, cappedPageable);
+        // Pass role as String for native query
+        String roleStr = (role != null) ? role.name() : null;
+        Page<Object[]> rows = userRepository.searchUsersNative(roleStr, status, startDate, endDate, keyword, cappedPageable);
 
-        return users.map(userMapper::toUserResponse);
+        return rows.map(row -> UserResponse.builder()
+                .id(((Number) row[0]).longValue())
+                .name((String) row[1])
+                .email((String) row[2])
+                .phoneNumber((String) row[3])
+                .role(row[4] != null ? UserType.valueOf((String) row[4]) : null)
+                .profileImage((String) row[5])
+                .preferredLanguage((String) row[6])
+                .createdAt(row[7] != null ? ((java.sql.Timestamp) row[7]).toLocalDateTime() : null)
+                .enabled(row[8] != null && (Boolean) row[8])
+                .build());
     }
 
     @Override
-    public Page<ProviderResponse> searchProviders(
+    @Transactional(readOnly = true)
+    public Page<AdminProviderResponse> searchProviders(
             String keyword, VerificationStatus status,
             Boolean enabled, Pageable pageable) {
 
@@ -173,7 +186,7 @@ public class AdminServiceImpl implements AdminService {
         Page<Provider> providers = providerRepository.findAllProvidersForAdmin(keyword, status, enabled,
                 cappedPageable);
 
-        return providers.map(providerMapper::toProviderResponse);
+        return providers.map(providerMapper::toAdminProviderResponse);
     }
 
     @Override

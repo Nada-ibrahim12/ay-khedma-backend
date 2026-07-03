@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Page;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,17 +37,30 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.email = :email AND u.enabled = true")
     Optional<User> findActiveUserByEmail(@Param("email") String email);
 
-    @Query("SELECT u FROM User u WHERE " +
+    @Query(value = "SELECT u.id, u.name, u.email, u.phone_number AS phoneNumber, " +
+            "u.role, u.profile_image AS profileImage, u.preferred_language AS preferredLanguage, " +
+            "u.created_at AS createdAt, u.enabled " +
+            "FROM users u WHERE " +
             "(:role IS NULL OR u.role = :role) AND " +
             "(:status IS NULL OR u.enabled = :status) AND " +
-            "(CAST(:startDate AS timestamp) IS NULL OR u.createdAt >= :startDate) AND " +
-            "(CAST(:endDate AS timestamp) IS NULL OR u.createdAt <= :endDate) AND " +
+            "(CAST(:startDate AS timestamp) IS NULL OR u.created_at >= :startDate) AND " +
+            "(CAST(:endDate AS timestamp) IS NULL OR u.created_at <= :endDate) AND " +
             "(:keyword IS NULL OR :keyword = '' OR " +
             "LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(u.phoneNumber) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    org.springframework.data.domain.Page<User> searchUsers(
-            @Param("role") UserType role,
+            "LOWER(u.phone_number) LIKE LOWER(CONCAT('%', :keyword, '%')))",
+            countQuery = "SELECT COUNT(*) FROM users u WHERE " +
+            "(:role IS NULL OR u.role = :role) AND " +
+            "(:status IS NULL OR u.enabled = :status) AND " +
+            "(CAST(:startDate AS timestamp) IS NULL OR u.created_at >= :startDate) AND " +
+            "(CAST(:endDate AS timestamp) IS NULL OR u.created_at <= :endDate) AND " +
+            "(:keyword IS NULL OR :keyword = '' OR " +
+            "LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.phone_number) LIKE LOWER(CONCAT('%', :keyword, '%')))",
+            nativeQuery = true)
+    Page<Object[]> searchUsersNative(
+            @Param("role") String role,
             @Param("status") Boolean status,
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate,

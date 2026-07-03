@@ -1,5 +1,6 @@
 package com.aykhedma.mapper;
 
+import com.aykhedma.dto.response.AdminProviderResponse;
 import com.aykhedma.dto.response.CancellationResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.ProviderSummaryResponse;
@@ -91,6 +92,29 @@ public interface ProviderMapper {
 
     @IterableMapping(qualifiedByName = "providerSummary")
     List<ProviderSummaryResponse> toProviderSummaryResponseList(List<Provider> providers);
+
+    @Named("adminProviderResponse")
+    @Mapping(source = "id", target = "id")
+    @Mapping(source = "name", target = "name")
+    @Mapping(source = "email", target = "email")
+    @Mapping(source = "phoneNumber", target = "phoneNumber")
+    @Mapping(source = "profileImage", target = "profileImage")
+    @Mapping(source = "enabled", target = "enabled")
+    @Mapping(source = "verificationStatus", target = "verificationStatus")
+    @Mapping(source = "rejectionReason", target = "rejectionReason")
+    @Mapping(source = "serviceType.name", target = "serviceType")
+    @Mapping(source = "serviceType.nameAr", target = "serviceTypeAr")
+    @Mapping(source = "serviceType.category.name", target = "serviceCategory")
+    @Mapping(source = "serviceType.category.nameAr", target = "serviceCategoryAr")
+    @Mapping(source = "serviceType.id", target = "serviceTypeId")
+    @Mapping(source = "completedJobs", target = "completedJobs")
+    @Mapping(source = "totalBookings", target = "totalBookings")
+    @Mapping(source = "averageRating", target = "averageRating")
+    @Mapping(source = "acceptanceRate", target = "acceptanceRate")
+    @Mapping(source = "cancellationRate", target = "cancellationRate")
+    @Mapping(source = "location.area", target = "area")
+    @Mapping(source = "createdAt", target = "createdAt")
+    AdminProviderResponse toAdminProviderResponse(Provider provider);
 
     default List<CancellationResponse> mapCancellationHistory(List<com.aykhedma.model.booking.Booking> bookings) {
         if (bookings == null)

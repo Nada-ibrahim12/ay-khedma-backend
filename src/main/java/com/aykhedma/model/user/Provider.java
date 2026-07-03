@@ -15,7 +15,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "providers")
+@Table(name = "providers", indexes = {
+        @Index(name = "idx_provider_verification_status", columnList = "verification_status"),
+        @Index(name = "idx_provider_service_type", columnList = "service_type_id")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

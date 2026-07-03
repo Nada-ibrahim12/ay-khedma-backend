@@ -1,6 +1,7 @@
 package com.aykhedma.service;
 
 import com.aykhedma.dto.request.UpdateUserRequest;
+import com.aykhedma.dto.response.AdminProviderResponse;
 import com.aykhedma.dto.response.DashboardStatsResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
@@ -28,7 +29,7 @@ public interface AdminService {
             String keyword,
             Pageable pageable);
 
-    Page<ProviderResponse> searchProviders(
+    Page<AdminProviderResponse> searchProviders(
             String keyword,
             VerificationStatus status,
             Boolean enabled,

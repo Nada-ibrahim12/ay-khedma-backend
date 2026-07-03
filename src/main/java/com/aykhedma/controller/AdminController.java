@@ -4,6 +4,7 @@ import com.aykhedma.auth.AuthService;
 import com.aykhedma.dto.request.RegisterRequest;
 import com.aykhedma.dto.request.RejectProviderRequest;
 import com.aykhedma.dto.request.UpdateUserRequest;
+import com.aykhedma.dto.response.AdminProviderResponse;
 import com.aykhedma.dto.response.DashboardStatsResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
@@ -103,7 +104,7 @@ public class AdminController {
             @ApiResponse(responseCode = "400", description = "Invalid filter parameters"),
             @ApiResponse(responseCode = "403", description = "Unauthorized - admin access required")
     })
-    public ResponseEntity<Page<ProviderResponse>> searchProviders(
+    public ResponseEntity<Page<AdminProviderResponse>> searchProviders(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) VerificationStatus status,
             @RequestParam(required = false) Boolean enabled,
