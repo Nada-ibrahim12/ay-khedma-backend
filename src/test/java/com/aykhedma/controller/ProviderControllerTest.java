@@ -341,7 +341,7 @@ class ProviderControllerTest {
                                 TestDataFactory.createProviderSummaryResponse(2L));
                 when(providerService.allProviders()).thenReturn(providers);
 
-                mockMvc.perform(get("/api/v1/providers/all"))
+                mockMvc.perform(get("/api/v1/providers/all").with(authenticatedProvider()))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.length()").value(2));
         }
@@ -351,7 +351,7 @@ class ProviderControllerTest {
         void getVerificationStatus_ShouldReturnStatus() throws Exception {
                 when(providerService.getVerificationStatus(PROVIDER_ID)).thenReturn(VerificationStatus.VERIFIED);
 
-                mockMvc.perform(get("/api/v1/providers/{id}/verification-status", PROVIDER_ID))
+                mockMvc.perform(get("/api/v1/providers/{id}/verification-status", PROVIDER_ID).with(authenticatedProvider()))
                                 .andExpect(status().isOk())
                                 .andExpect(content().string("\"VERIFIED\""));
         }
@@ -369,6 +369,7 @@ class ProviderControllerTest {
                                 any(Pageable.class))).thenReturn(new PageImpl<>(new ArrayList<>()));
 
                 mockMvc.perform(get("/api/v1/providers/search")
+                                .with(authenticatedConsumer())
                                 .param("consumerId", CONSUMER_ID.toString())
                                 .param("keyword", "drain")
                                 .param("page", "0")
@@ -389,6 +390,7 @@ class ProviderControllerTest {
                                 any(Pageable.class))).thenReturn(new PageImpl<>(new ArrayList<>()));
 
                 mockMvc.perform(get("/api/v1/providers/search")
+                                .with(authenticatedConsumer())
                                 .param("consumerId", CONSUMER_ID.toString())
                                 .param("categoryId", "3")
                                 .param("page", "0")
@@ -409,6 +411,7 @@ class ProviderControllerTest {
                                 any(Pageable.class))).thenReturn(new PageImpl<>(new ArrayList<>()));
 
                 mockMvc.perform(get("/api/v1/providers/search")
+                                .with(authenticatedConsumer())
                                 .param("consumerId", CONSUMER_ID.toString())
                                 .param("categoryName", "Plumbing")
                                 .param("page", "0")
@@ -450,6 +453,7 @@ class ProviderControllerTest {
                         .thenReturn(page);
 
                 mockMvc.perform(get("/api/v1/providers/search")
+                                .with(authenticatedConsumer())
                                 .param("consumerId", "1")
                                 .param("radius", "10")
                                 .param("sortBy", "distance")
@@ -473,6 +477,7 @@ class ProviderControllerTest {
                                 any(Pageable.class))).thenReturn(new PageImpl<>(new ArrayList<>()));
 
                 mockMvc.perform(get("/api/v1/providers/search")
+                                .with(authenticatedConsumer())
                                 .param("consumerId", CONSUMER_ID.toString())
                                 .param("sortBy", "price_low")
                                 .param("page", "0")
@@ -485,37 +490,19 @@ class ProviderControllerTest {
         void search_all_filters() throws Exception {
 
                 SearchResponse response = SearchResponse.builder()
-
                         .id(1L)
-
                         .name("Ibrahim Nasser")
-
                         .serviceType("Drain Cleaning")
-
                         .serviceTypeAr("تنظيف المصارف")
-
                         .categoryName("Plumbing")
-
                         .averageRating(4.8)
-
                         .completedJobs(50)
-
                         .price(150.0)
-
                         .estimatedArrivalTime(15)
-
                         .area("Nasr City")
-
                         .serviceAreaRadius(10.0)
-
                         .build();
-
-
-
                 response.setDistance(0.39);
-
-
-
                 Page<SearchResponse> page =
 
                         new PageImpl<>(List.of(response), PageRequest.of(0, 10), 1);
@@ -543,6 +530,7 @@ class ProviderControllerTest {
 
 
                 mockMvc.perform(get("/api/v1/providers/search")
+                                .with(authenticatedConsumer())
 
                                 .param("consumerId", "1")
 
@@ -614,4 +602,5 @@ class ProviderControllerTest {
                         .andExpect(jsonPath("$.content[0].price").value(150.0))
                         .andExpect(jsonPath("$.content[0].formattedDistance").value("390 m"));
         }
+
 }
