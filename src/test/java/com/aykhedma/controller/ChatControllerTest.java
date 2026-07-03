@@ -36,202 +36,188 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
+@Import({ TestSecurityConfig.class, GlobalExceptionHandler.class })
 class ChatControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @MockBean
-    private ChatService chatService;
+        @MockBean
+        private ChatService chatService;
 
-    @MockBean
-    private JwtService jwtService;
+        @MockBean
+        private JwtService jwtService;
 
-    @MockBean
-    ChatMapper chatMapper;
-    @MockBean
-    private CustomUserDetailsService customUserDetailsService;
+        @MockBean
+        ChatMapper chatMapper;
+        @MockBean
+        private CustomUserDetailsService customUserDetailsService;
 
+        private CustomUserDetails getPrincipal() {
+                User user = new User() {
+                };
+                user.setId(1L);
+                user.setEmail("test@test.com");
+                user.setRole(UserType.CONSUMER);
+                user.setEnabled(true);
 
-    private CustomUserDetails getPrincipal() {
-        User user = new User() {};
-        user.setId(1L);
-        user.setEmail("test@test.com");
-        user.setRole(UserType.CONSUMER);
-        user.setEnabled(true);
+                return new CustomUserDetails(user);
+        }
 
-        return new CustomUserDetails(user);
-    }
+        @Test
+        void createRoom_ShouldReturnRoomId() throws Exception {
 
-    @Test
-    void createRoom_ShouldReturnRoomId() throws Exception {
+                ChatRoom room = Mockito.mock(ChatRoom.class);
+                Mockito.when(room.getId()).thenReturn("room123");
 
-        ChatRoom room = Mockito.mock(ChatRoom.class);
-        Mockito.when(room.getId()).thenReturn("room123");
+                Mockito.when(chatService.getOrCreateRoom(Mockito.any(), Mockito.anyLong()))
+                                .thenReturn(room);
 
-        Mockito.when(chatService.getOrCreateRoom(Mockito.any(), Mockito.anyLong()))
-                .thenReturn(room);
+                mockMvc.perform(post("/api/chat/room")
+                                .param("receiverId", "2")
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isOk())
+                                .andExpect(content().string("room123"));
+        }
 
-        mockMvc.perform(post("/api/chat/room")
-                        .param("receiverId", "2")
-                        .with(SecurityMockMvcRequestPostProcessors.csrf())
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isOk())
-                .andExpect(content().string("room123"));
-    }
+        @Test
+        void createRoom_MissingReceiverId_Returns400() throws Exception {
 
-    @Test
-    void createRoom_MissingReceiverId_Returns400() throws Exception {
+                mockMvc.perform(post("/api/chat/room")
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isBadRequest());
+        }
 
-        mockMvc.perform(post("/api/chat/room")
-                        .with(SecurityMockMvcRequestPostProcessors.csrf())
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isBadRequest());
-    }
+        // ===================== SEND MESSAGE =====================
+        @Test
+        void sendMessage_TextOnly_Success() throws Exception {
 
-    // ===================== SEND MESSAGE =====================
-    @Test
-    void sendMessage_TextOnly_Success() throws Exception {
+                Mockito.when(chatService.sendMessage(Mockito.any(), Mockito.any()))
+                                .thenReturn(new ChatMessageResponse());
 
-        Mockito.when(chatService.sendMessage(Mockito.any(), Mockito.any()))
-                .thenReturn(new ChatMessageResponse());
+                mockMvc.perform(multipart("/api/chat/send")
+                                .file(new MockMultipartFile("roomId", "", "text/plain", "room123".getBytes()))
+                                .file(new MockMultipartFile("content", "", "text/plain", "hello".getBytes()))
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isOk());
+        }
 
-        mockMvc.perform(multipart("/api/chat/send")
-                        .file(new MockMultipartFile("roomId", "", "text/plain", "room123".getBytes()))
-                        .file(new MockMultipartFile("content", "", "text/plain", "hello".getBytes()))
-                        .with(SecurityMockMvcRequestPostProcessors.csrf())
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isOk());
-    }
+        @Test
+        void sendMessage_WithMediaFiles_Success() throws Exception {
 
-    @Test
-    void sendMessage_WithMediaFiles_Success() throws Exception {
+                Mockito.when(chatService.sendMessage(Mockito.any(), Mockito.any()))
+                                .thenReturn(new ChatMessageResponse());
 
-        Mockito.when(chatService.sendMessage(Mockito.any(), Mockito.any()))
-                .thenReturn(new ChatMessageResponse());
+                MockMultipartFile file = new MockMultipartFile(
+                                "mediaFiles",
+                                "img.png",
+                                MediaType.IMAGE_PNG_VALUE,
+                                "image".getBytes());
 
-        MockMultipartFile file = new MockMultipartFile(
-                "mediaFiles",
-                "img.png",
-                MediaType.IMAGE_PNG_VALUE,
-                "image".getBytes()
-        );
+                mockMvc.perform(multipart("/api/chat/send")
+                                .file(new MockMultipartFile("roomId", "", "text/plain", "room123".getBytes()))
+                                .file(file)
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isOk());
+        }
 
-        mockMvc.perform(multipart("/api/chat/send")
-                        .file(new MockMultipartFile("roomId", "", "text/plain", "room123".getBytes()))
-                        .file(file)
-                        .with(SecurityMockMvcRequestPostProcessors.csrf())
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isOk());
-    }
+        @Test
+        void sendMessage_WithoutContentButWithMedia_Success() throws Exception {
 
-    @Test
-    void sendMessage_WithoutContentButWithMedia_Success() throws Exception {
+                Mockito.when(chatService.sendMessage(Mockito.any(), Mockito.any()))
+                                .thenReturn(new ChatMessageResponse());
 
-        Mockito.when(chatService.sendMessage(Mockito.any(), Mockito.any()))
-                .thenReturn(new ChatMessageResponse());
+                MockMultipartFile file = new MockMultipartFile(
+                                "mediaFiles",
+                                "img.png",
+                                MediaType.IMAGE_PNG_VALUE,
+                                "image".getBytes());
 
-        MockMultipartFile file = new MockMultipartFile(
-                "mediaFiles",
-                "img.png",
-                MediaType.IMAGE_PNG_VALUE,
-                "image".getBytes()
-        );
+                mockMvc.perform(multipart("/api/chat/send")
+                                .file(new MockMultipartFile("roomId", "", "text/plain", "room123".getBytes()))
+                                .file(file)
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isOk());
+        }
 
-        mockMvc.perform(multipart("/api/chat/send")
-                        .file(new MockMultipartFile("roomId", "", "text/plain", "room123".getBytes()))
-                        .file(file)
-                        .with(SecurityMockMvcRequestPostProcessors.csrf())
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isOk());
-    }
+        @Test
+        void sendMessage_MissingRoomId_Returns400() throws Exception {
 
-    @Test
-    void sendMessage_MissingRoomId_Returns400() throws Exception {
+                mockMvc.perform(multipart("/api/chat/send")
+                                .file(new MockMultipartFile("content", "", "text/plain", "hi".getBytes()))
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isBadRequest());
+        }
 
-        mockMvc.perform(multipart("/api/chat/send")
-                        .file(new MockMultipartFile("content", "", "text/plain", "hi".getBytes()))
-                        .with(SecurityMockMvcRequestPostProcessors.csrf())
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isBadRequest());
-    }
+        @Test
+        void getMessages_ShouldReturnPaginatedMessages() throws Exception {
 
+                Mockito.when(chatService.getMessages(Mockito.any(), Mockito.anyString(), Mockito.anyInt(),
+                                Mockito.anyInt()))
+                                .thenReturn(List.of(new ChatMessageResponse()));
 
-    @Test
-    void getMessages_ShouldReturnPaginatedMessages() throws Exception {
+                mockMvc.perform(get("/api/chat/messages")
+                                .param("roomId", "room123")
+                                .param("page", "0")
+                                .param("size", "10")
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isOk());
+        }
 
-        Mockito.when(chatService.getMessages(Mockito.any(), Mockito.anyString(), Mockito.anyInt(), Mockito.anyInt()))
-                .thenReturn(List.of(new ChatMessageResponse()));
+        @Test
+        void getUnreadCount_ShouldReturnCount() throws Exception {
 
-        mockMvc.perform(get("/api/chat/messages")
-                        .param("roomId", "room123")
-                        .param("page", "0")
-                        .param("size", "10")
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isOk());
-    }
+                Mockito.when(chatService.getUnreadCount(Mockito.anyString(), Mockito.anyLong()))
+                                .thenReturn(5L);
 
+                mockMvc.perform(get("/api/chat/unread")
+                                .param("roomId", "room123")
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isOk())
+                                .andExpect(content().string("5"));
+        }
 
-    @Test
-    void getUnreadCount_ShouldReturnCount() throws Exception {
+        @Test
+        void getUnreadCount_ZeroUnread_Returns0() throws Exception {
 
-        Mockito.when(chatService.getUnreadCount(Mockito.anyString(), Mockito.anyLong()))
-                .thenReturn(5L);
+                Mockito.when(chatService.getUnreadCount(Mockito.anyString(), Mockito.anyLong()))
+                                .thenReturn(0L);
 
-        mockMvc.perform(get("/api/chat/unread")
-                        .param("roomId", "room123")
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isOk())
-                .andExpect(content().string("5"));
-    }
+                mockMvc.perform(get("/api/chat/unread")
+                                .param("roomId", "room123")
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isOk())
+                                .andExpect(content().string("0"));
+        }
 
-    @Test
-    void getUnreadCount_ZeroUnread_Returns0() throws Exception {
+        @Test
+        void deleteMessage_Success_Returns204() throws Exception {
 
-        Mockito.when(chatService.getUnreadCount(Mockito.anyString(), Mockito.anyLong()))
-                .thenReturn(0L);
+                Mockito.doNothing().when(chatService)
+                                .deleteMessage(Mockito.anyString(), Mockito.any());
 
-        mockMvc.perform(get("/api/chat/unread")
-                        .param("roomId", "room123")
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isOk())
-                .andExpect(content().string("0"));
-    }
+                mockMvc.perform(delete("/api/chat/message/123")
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isNoContent());
+        }
 
-    @Test
-    void deleteMessage_Success_Returns204() throws Exception {
+        @Test
+        void deleteMessage_NotFound_Returns404() throws Exception {
 
-        Mockito.doNothing().when(chatService)
-                .deleteMessage(Mockito.anyString(), Mockito.any());
+                Mockito.doThrow(new RuntimeException("Not found"))
+                                .when(chatService).deleteMessage(Mockito.anyString(), Mockito.any());
 
-        mockMvc.perform(delete("/api/chat/message/123")
-                        .with(SecurityMockMvcRequestPostProcessors.csrf())
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isNoContent());
-    }
-
-    @Test
-    void deleteMessage_NotFound_Returns404() throws Exception {
-
-        Mockito.doThrow(new RuntimeException("Not found"))
-                .when(chatService).deleteMessage(Mockito.anyString(), Mockito.any());
-
-        mockMvc.perform(delete("/api/chat/message/999")
-                        .with(SecurityMockMvcRequestPostProcessors.csrf())
-                        .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal()))
-                )
-                .andExpect(status().isInternalServerError());
-    }
+                mockMvc.perform(delete("/api/chat/message/999")
+                                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                                .with(SecurityMockMvcRequestPostProcessors.user(getPrincipal())))
+                                .andExpect(status().isInternalServerError());
+        }
 
 }

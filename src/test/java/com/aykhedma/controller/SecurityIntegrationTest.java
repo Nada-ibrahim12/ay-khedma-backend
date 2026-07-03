@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
@@ -20,6 +21,9 @@ import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@TestPropertySource(properties = {
+    "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration,org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration"
+})
 @DisplayName("Security Integration Tests")
 class SecurityIntegrationTest extends BaseIntegrationTest {
 
@@ -61,6 +65,8 @@ class SecurityIntegrationTest extends BaseIntegrationTest {
                 .password("Password123")
                 .phoneNumber("010" + String.format("%08d", (int) (Math.random() * 100_000_000)))
                 .userType(UserType.CONSUMER)
+                .latitude(30.0444)
+                .longitude(31.2357)
                 .build();
 
         mockMvc.perform(post("/auth/register")
@@ -70,22 +76,23 @@ class SecurityIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /auth/login should be accessible without token (throws RuntimeException, not 401/403)")
-    void publicLoginEndpoint_noAuth_notBlocked() {
-        assertThatThrownBy(() -> mockMvc.perform(post("/auth/login")
+    @DisplayName("POST /auth/login should be accessible without token (returns 404 User not found, not 401/403)")
+    void publicLoginEndpoint_noAuth_notBlocked() throws Exception {
+        mockMvc.perform(post("/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"emailOrPhone\":\"x@x.com\",\"password\":\"12345678\"}")))
-                .hasRootCauseMessage("User not found");
+                .content("{\"emailOrPhone\":\"x@x.com\",\"password\":\"12345678\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("User not found"));
     }
 
     // ═══════════════════════════════════════════════════════
     // PROTECTED ENDPOINTS — NO TOKEN
     // ═══════════════════════════════════════════════════════
     @Test
-    @DisplayName("GET /api/users should return 403 without token")
-    void protectedEndpoint_noToken_returns403() throws Exception {
+    @DisplayName("GET /api/users should return 401 without token")
+    void protectedEndpoint_noToken_returns401() throws Exception {
         mockMvc.perform(get("/api/users"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     // ═══════════════════════════════════════════════════════
