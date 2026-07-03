@@ -35,6 +35,9 @@ public class ServiceTypeRepositoryTest {
 
     @BeforeEach
     void setUp() {
+        typeRepository.deleteAll();
+        categoryRepository.deleteAll();
+
         category = ServiceCategory.builder()
                 .name("Cleaning")
                 .nameAr("تنظيف")
@@ -66,6 +69,8 @@ public class ServiceTypeRepositoryTest {
 
         typeRepository.save(type1);
         typeRepository.save(type2);
+        
+        typeRepository.flush();
     }
 
     @Test
@@ -77,15 +82,16 @@ public class ServiceTypeRepositoryTest {
     @Test
     void testFindByRiskLevel() {
         List<ServiceType> lowRisk = typeRepository.findByRiskLevel(RiskLevel.LOW);
-        assertThat(lowRisk).hasSize(2);
-        assertThat(lowRisk.get(0).getName()).isEqualTo("Home Cleaning");
+        assertThat(lowRisk.stream().map(ServiceType::getName))
+                .containsExactlyInAnyOrder("Home Cleaning", "Office Cleaning");
     }
 
     @Test
     void testFindByCategoryAndRiskLevel() {
-        List<ServiceType> mediumTypes = typeRepository.findByCategoryAndRiskLevel(category.getId(), RiskLevel.LOW);
-        assertThat(mediumTypes).hasSize(2);
-        assertThat(mediumTypes.get(0).getName()).isEqualTo("Home Cleaning");
+        List<ServiceType> lowRiskTypes = typeRepository.findByCategoryAndRiskLevel(category.getId(), RiskLevel.LOW);
+        assertThat(lowRiskTypes).hasSize(2);
+        assertThat(lowRiskTypes.stream().map(ServiceType::getName))
+                .contains("Home Cleaning");
     }
 
     @Test
