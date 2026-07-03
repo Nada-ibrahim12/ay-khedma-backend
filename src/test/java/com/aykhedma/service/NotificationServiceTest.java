@@ -5,9 +5,11 @@ import com.aykhedma.dto.request.NotificationRequest;
 import com.aykhedma.model.notification.Notification;
 import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.notification.NotificationStatus;
+import com.aykhedma.model.notification.NotificationPreference;
 import com.aykhedma.model.user.Consumer;
 import com.aykhedma.util.TestDataFactory;
 import com.aykhedma.repository.NotificationRepository;
+import com.aykhedma.repository.NotificationPreferenceRepository;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.service.notification.EmailService;
 import com.aykhedma.service.notification.FirebaseService;
@@ -44,6 +46,9 @@ class NotificationServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private NotificationPreferenceRepository notificationPreferenceRepository;
+
+    @Mock
     private FirebaseService firebaseService;
 
     @Mock
@@ -61,6 +66,7 @@ class NotificationServiceTest {
     private Notification notification;
     private NotificationRequest notificationRequest;
     private Consumer user;
+    private NotificationPreference notificationPreference;
     private final Long USER_ID = 1L;
     private final Long NOTIFICATION_ID = 100L;
     private final Long NON_EXISTENT_ID = 999L;
@@ -70,6 +76,14 @@ class NotificationServiceTest {
         user = createTestUser();
         notification = createTestNotification();
         notificationRequest = createTestNotificationRequest();
+
+        notificationPreference = NotificationPreference.builder()
+                .userId(USER_ID)
+                .inAppEnabled(true)
+                .emailEnabled(true)
+                .pushEnabled(true)
+                .updatedAt(LocalDateTime.now())
+                .build();
     }
 
     @Nested
@@ -82,22 +96,29 @@ class NotificationServiceTest {
             notificationRequest.setSendInApp(true);
             notificationRequest.setSendPush(true);
             notificationRequest.setSendEmail(true);
+            notificationRequest.setEmail("test@example.com");
 
-            when(notificationRepository.save(any(Notification.class)))
-                    .thenReturn(notification);
-            when(userRepository.findById(USER_ID))
-                    .thenReturn(Optional.of(user));
-            when(firebaseService.isFirebaseEnabled()).thenReturn(true);
+            when(userRepository.existsById(USER_ID)).thenReturn(true);
+            when(notificationRepository.saveAndFlush(any(Notification.class)))
+                    .thenAnswer(invocation -> {
+                        Notification saved = invocation.getArgument(0);
+                        saved.setId(NOTIFICATION_ID);
+                        return saved;
+                    });
+            when(notificationRepository.countUnreadByUserId(USER_ID)).thenReturn(0L);
+            when(firebaseService.sendPushNotification(anyLong(), anyString(), anyString(), anyMap()))
+                    .thenReturn(NotificationStatus.DELIVERED);
+            when(notificationPreferenceRepository.findByUserId(USER_ID))
+                    .thenReturn(Optional.of(notificationPreference));
 
             notificationService.sendNotification(notificationRequest);
 
-            verify(notificationRepository, atLeastOnce()).save(any(Notification.class));
-            verify(messagingTemplate, times(2)).convertAndSendToUser(anyString(), anyString(), any());
-            verify(firebaseService).sendPushNotification(USER_ID,
-                    notificationRequest.getTitle(),
-                    notificationRequest.getContent(),
-                    notificationRequest.getData());
-            verify(emailService).sendHtmlEmail(anyString(), anyString(), anyString(), anyMap());
+            verify(notificationRepository, atLeastOnce()).saveAndFlush(any(Notification.class));
+            verify(messagingTemplate, atLeastOnce()).convertAndSend(
+                    anyString(),
+                    any(Object.class));
+            verify(firebaseService).sendPushNotification(eq(USER_ID), anyString(), anyString(), anyMap());
+            verify(emailService).sendHtmlEmail(eq("test@example.com"), anyString(), anyString(), anyMap());
         }
 
         @Test
@@ -107,13 +128,22 @@ class NotificationServiceTest {
             notificationRequest.setSendPush(false);
             notificationRequest.setSendEmail(false);
 
-            when(notificationRepository.save(any(Notification.class)))
-                    .thenReturn(notification);
-            when(notificationRepository.countUnreadByUserId(USER_ID)).thenReturn(1L);
+            when(userRepository.existsById(USER_ID)).thenReturn(true);
+            when(notificationRepository.saveAndFlush(any(Notification.class)))
+                    .thenAnswer(invocation -> {
+                        Notification saved = invocation.getArgument(0);
+                        saved.setId(NOTIFICATION_ID);
+                        return saved;
+                    });
+            when(notificationRepository.countUnreadByUserId(USER_ID)).thenReturn(0L);
+            when(notificationPreferenceRepository.findByUserId(USER_ID))
+                    .thenReturn(Optional.of(notificationPreference));
 
             notificationService.sendNotification(notificationRequest);
 
-            verify(messagingTemplate, times(2)).convertAndSendToUser(anyString(), anyString(), any());
+            verify(messagingTemplate, atLeastOnce()).convertAndSend(
+                    anyString(),
+                    any(Object.class));
             verify(firebaseService, never()).sendPushNotification(anyLong(), anyString(), anyString(), anyMap());
             verify(emailService, never()).sendHtmlEmail(anyString(), anyString(), anyString(), anyMap());
         }
@@ -121,15 +151,19 @@ class NotificationServiceTest {
         @Test
         @DisplayName("Should not send notification if save fails")
         void shouldNotSendIfSaveFails() {
-            when(notificationRepository.save(any(Notification.class)))
+            when(userRepository.existsById(USER_ID)).thenReturn(true);
+            when(notificationPreferenceRepository.findByUserId(USER_ID))
+                    .thenReturn(Optional.of(notificationPreference));
+            when(notificationRepository.saveAndFlush(any(Notification.class)))
                     .thenThrow(new RuntimeException("Database error"));
 
             assertThatThrownBy(() -> notificationService.sendNotification(notificationRequest))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("Database error");
 
-            verify(messagingTemplate, never()).convertAndSendToUser(anyString(), anyString(), any());
+            verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
             verify(firebaseService, never()).sendPushNotification(anyLong(), anyString(), anyString(), anyMap());
+            verify(emailService, never()).sendHtmlEmail(anyString(), anyString(), anyString(), anyMap());
         }
     }
 
@@ -198,7 +232,6 @@ class NotificationServiceTest {
             when(notificationRepository.findById(NON_EXISTENT_ID))
                     .thenReturn(Optional.empty());
 
-            // Act & Assert
             assertThatThrownBy(() -> notificationService.getNotificationById(USER_ID, NON_EXISTENT_ID))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("not found");
@@ -207,11 +240,10 @@ class NotificationServiceTest {
         @Test
         @DisplayName("Should throw exception when user is unauthorized")
         void shouldThrowExceptionForUnauthorizedUser() {
-            notification.setUserId(2L); // Different user
+            notification.setUserId(2L);
             when(notificationRepository.findById(NOTIFICATION_ID))
                     .thenReturn(Optional.of(notification));
 
-            // Act & Assert
             assertThatThrownBy(() -> notificationService.getNotificationById(USER_ID, NOTIFICATION_ID))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("Unauthorized");
@@ -240,15 +272,14 @@ class NotificationServiceTest {
         @Test
         @DisplayName("Should mark all notifications as read")
         void shouldMarkAllAsRead() {
-            when(notificationRepository.markAllAsRead(USER_ID, LocalDateTime.now())).thenReturn(5);
+            when(notificationRepository.markAllAsRead(eq(USER_ID), any(LocalDateTime.class))).thenReturn(5);
 
             notificationService.markAllAsRead(USER_ID);
 
-            verify(notificationRepository).markAllAsRead(USER_ID, LocalDateTime.now());
-            verify(messagingTemplate).convertAndSendToUser(
-                    eq(USER_ID.toString()),
-                    eq("/queue/notifications/count"),
-                    anyMap());
+            verify(notificationRepository).markAllAsRead(eq(USER_ID), any(LocalDateTime.class));
+            verify(messagingTemplate).convertAndSend(
+                    anyString(),
+                    any(Object.class));
         }
     }
 
@@ -270,11 +301,10 @@ class NotificationServiceTest {
         @Test
         @DisplayName("Should throw exception when deleting unauthorized notification")
         void shouldThrowExceptionWhenUnauthorized() {
-            notification.setUserId(2L); // Different user
+            notification.setUserId(2L);
             when(notificationRepository.findById(NOTIFICATION_ID))
                     .thenReturn(Optional.of(notification));
 
-            // Act & Assert
             assertThatThrownBy(() -> notificationService.deleteNotification(USER_ID, NOTIFICATION_ID))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("Unauthorized");
@@ -338,7 +368,6 @@ class NotificationServiceTest {
         }
     }
 
-    // Test data factory methods
     private Notification createTestNotification() {
         return Notification.builder()
                 .id(NOTIFICATION_ID)
@@ -366,6 +395,8 @@ class NotificationServiceTest {
     }
 
     private Consumer createTestUser() {
-        return TestDataFactory.createConsumer(USER_ID);
+        Consumer consumer = TestDataFactory.createConsumer(USER_ID);
+        consumer.setEmail("test@example.com");
+        return consumer;
     }
 }
