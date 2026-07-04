@@ -7,7 +7,6 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.HashMap;
 
 @Entity
 @Table(name = "notifications")
@@ -39,7 +38,8 @@ public class Notification {
     @Column(nullable = false, length = 30)
     private NotificationType type;
 
-    @ElementCollection
+
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "notification_methods", joinColumns = @JoinColumn(name = "notification_id"))
     @Column(name = "method")
     @Enumerated(EnumType.STRING)
