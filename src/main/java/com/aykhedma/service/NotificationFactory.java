@@ -270,7 +270,7 @@ public class NotificationFactory {
                 .userId(userId)
                 .type(NotificationType.REVIEW_RECEIVED)
                 .title((String) params.getOrDefault("title", "New Review Received"))
-                .content((String) params.getOrDefault("content", "A customer has left a review for you"))
+                .content((String) params.getOrDefault("content", "A user has left a review for you"))
                 .imageUrl((String) params.get("imageUrl"))
                 .deepLink(generateDeepLink(NotificationType.REVIEW_RECEIVED, params))
                 .data(extractDataMap(params))
