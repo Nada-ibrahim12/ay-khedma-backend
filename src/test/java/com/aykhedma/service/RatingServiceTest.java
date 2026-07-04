@@ -253,20 +253,6 @@ class RatingServiceTest
         }
 
         @Test
-        @DisplayName("Throw BadRequestException When Rating Before 30 Minutes After Service Start")
-        void submitRatingTooEarlyTest()
-        {
-            booking.setRequestedDate(LocalDate.now());
-            booking.setRequestedStartTime(LocalTime.now().plusMinutes(10));
-
-            when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
-
-            assertThatThrownBy(() -> bookingService.submitRating(consumer.getId(), ratingRequest))
-                    .isInstanceOf(BadRequestException.class)
-                    .hasMessageContaining("Rating is allowed only 30 minutes after service start");
-        }
-
-        @Test
         @DisplayName("Throw BadRequestException For Pending Booking")
         void submitRatingPendingBookingTest()
         {
@@ -500,20 +486,6 @@ class RatingServiceTest
             assertThatThrownBy(() -> bookingService.submitConsumerRating(99L, providerRatingRequest))
                     .isInstanceOf(ForbiddenException.class)
                     .hasMessageContaining("Booking does not belong to this provider");
-        }
-
-        @Test
-        @DisplayName("Throw BadRequestException When Rating Before 30 Minutes After Service Start")
-        void submitConsumerRatingTooEarlyTest()
-        {
-            booking.setRequestedDate(LocalDate.now());
-            booking.setRequestedStartTime(LocalTime.now().plusMinutes(10));
-
-            when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
-
-            assertThatThrownBy(() -> bookingService.submitConsumerRating(provider.getId(), providerRatingRequest))
-                    .isInstanceOf(BadRequestException.class)
-                    .hasMessageContaining("Rating is allowed only 30 minutes after service start");
         }
 
         @Test

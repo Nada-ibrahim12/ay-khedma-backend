@@ -577,10 +577,6 @@ public class BookingServiceImpl implements BookingService {
         if (!consumerId.equals(booking.getConsumer().getId()))
             throw new ForbiddenException("Booking does not belong to this consumer");
 
-        LocalDateTime serviceStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
-        if (serviceStartTime.plusMinutes(30).isAfter(LocalDateTime.now()))
-            throw new BadRequestException("Rating is allowed only 30 minutes after service start");
-
         BookingStatus status = booking.getStatus();
         boolean isCompleted = status == BookingStatus.COMPLETED;
         boolean isExpiredAndAccepted = status == BookingStatus.EXPIRED && booking.getAcceptedAt() != null;
@@ -664,10 +660,6 @@ public class BookingServiceImpl implements BookingService {
 
         if (!providerId.equals(booking.getProvider().getId()))
             throw new ForbiddenException("Booking does not belong to this provider");
-
-        LocalDateTime serviceStartTime = LocalDateTime.of(booking.getRequestedDate(), booking.getRequestedStartTime());
-        if (serviceStartTime.plusMinutes(30).isAfter(LocalDateTime.now()))
-            throw new BadRequestException("Rating is allowed only 30 minutes after service start");
 
         BookingStatus status = booking.getStatus();
         boolean isCompleted = status == BookingStatus.COMPLETED;
