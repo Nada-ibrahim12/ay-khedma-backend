@@ -9,6 +9,7 @@ import com.aykhedma.exception.ForbiddenException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.BookingMapper;
 import com.aykhedma.model.booking.*;
+import com.aykhedma.model.emergency.EmergencyRequest;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.*;
 import com.aykhedma.repository.*;
@@ -38,6 +39,8 @@ class RatingServiceTest
 {
     @Mock
     private BookingRepository bookingRepository;
+    @Mock
+    private EmergencyRequestRepository emergencyRequestRepository;
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -583,6 +586,8 @@ class RatingServiceTest
             when(consumerRepository.existsById(consumer.getId())).thenReturn(true);
             when(bookingRepository.findByConsumerIdAndProviderRatingIsNotNull(consumer.getId()))
                     .thenReturn(List.of(ratedBooking));
+            when(emergencyRequestRepository.findByConsumerIdAndProviderRatingIsNotNull(consumer.getId()))
+                    .thenReturn(List.of());
 
             List<ConsumerReviewResponse> reviews = bookingService.getConsumerReviews(consumer.getId());
 
@@ -601,6 +606,8 @@ class RatingServiceTest
         {
             when(consumerRepository.existsById(consumer.getId())).thenReturn(true);
             when(bookingRepository.findByConsumerIdAndProviderRatingIsNotNull(consumer.getId()))
+                    .thenReturn(List.of());
+            when(emergencyRequestRepository.findByConsumerIdAndProviderRatingIsNotNull(consumer.getId()))
                     .thenReturn(List.of());
 
             List<ConsumerReviewResponse> reviews = bookingService.getConsumerReviews(consumer.getId());
@@ -625,12 +632,48 @@ class RatingServiceTest
             when(consumerRepository.existsById(consumer.getId())).thenReturn(true);
             when(bookingRepository.findByConsumerIdAndProviderRatingIsNotNull(consumer.getId()))
                     .thenReturn(List.of(booking1, booking2));
+            when(emergencyRequestRepository.findByConsumerIdAndProviderRatingIsNotNull(consumer.getId()))
+                    .thenReturn(List.of());
 
             List<ConsumerReviewResponse> reviews = bookingService.getConsumerReviews(consumer.getId());
 
             assertThat(reviews).hasSize(2);
+            assertThat(reviews.get(0).getId()).isEqualTo(21L);
+            assertThat(reviews.get(0).getRating()).isEqualTo(3.0);
+            assertThat(reviews.get(1).getId()).isEqualTo(20L);
+            assertThat(reviews.get(1).getRating()).isEqualTo(5.0);
+        }
+
+        @Test
+        @DisplayName("Successfully Get and Sort Reviews from Both Bookings and Emergency Requests")
+        void getConsumerReviewsCombinedAndSortedTest()
+        {
+            Booking booking = Booking.builder()
+                    .id(20L).consumer(consumer).provider(provider)
+                    .providerRating(4.0).providerReview("Good booking client").completedAt(LocalDateTime.now().minusDays(2))
+                    .build();
+
+            EmergencyRequest emergencyRequest = EmergencyRequest.builder()
+                    .id(50L).consumer(consumer).selectedProvider(provider)
+                    .providerRating(5.0).providerReview("Amazing emergency client").completedAt(LocalDateTime.now().minusDays(1))
+                    .build();
+
+            when(consumerRepository.existsById(consumer.getId())).thenReturn(true);
+            when(bookingRepository.findByConsumerIdAndProviderRatingIsNotNull(consumer.getId()))
+                    .thenReturn(List.of(booking));
+            when(emergencyRequestRepository.findByConsumerIdAndProviderRatingIsNotNull(consumer.getId()))
+                    .thenReturn(List.of(emergencyRequest));
+
+            List<ConsumerReviewResponse> reviews = bookingService.getConsumerReviews(consumer.getId());
+
+            assertThat(reviews).hasSize(2);
+            assertThat(reviews.get(0).getId()).isEqualTo(50L);
             assertThat(reviews.get(0).getRating()).isEqualTo(5.0);
-            assertThat(reviews.get(1).getRating()).isEqualTo(3.0);
+            assertThat(reviews.get(0).getReview()).isEqualTo("Amazing emergency client");
+
+            assertThat(reviews.get(1).getId()).isEqualTo(20L);
+            assertThat(reviews.get(1).getRating()).isEqualTo(4.0);
+            assertThat(reviews.get(1).getReview()).isEqualTo("Good booking client");
         }
 
         @Test

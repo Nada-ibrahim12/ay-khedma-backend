@@ -39,6 +39,8 @@ public interface EmergencyRequestRepository extends JpaRepository<EmergencyReque
 
     long countByConsumerIdAndProviderRatingIsNotNull(Long consumerId);
 
+    List<EmergencyRequest> findByConsumerIdAndProviderRatingIsNotNull(Long consumerId);
+
     @Modifying
     @Query("DELETE FROM EmergencyRequest er WHERE er.consumer.id = :consumerId")
     void deleteByConsumerId(@Param("consumerId") Long consumerId);

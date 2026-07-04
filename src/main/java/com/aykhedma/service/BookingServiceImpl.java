@@ -12,6 +12,7 @@ import com.aykhedma.exception.ForbiddenException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.BookingMapper;
 import com.aykhedma.model.booking.*;
+import com.aykhedma.model.emergency.EmergencyRequest;
 import com.aykhedma.model.notification.NotificationType;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Consumer;
@@ -47,6 +48,7 @@ public class BookingServiceImpl implements BookingService {
     private final BookingMapper bookingMapper;
     private final ProviderService providerService;
     private final NotificationFactory notificationFactory;
+    private final EmergencyRequestRepository emergencyRequestRepository;
 
     @Override
     @Transactional
@@ -750,7 +752,9 @@ public class BookingServiceImpl implements BookingService {
             throw new ResourceNotFoundException("Consumer not found");
         }
         List<Booking> bookings = bookingRepository.findByConsumerIdAndProviderRatingIsNotNull(consumerId);
-        return bookings.stream()
+        List<EmergencyRequest> emergencyRequests = emergencyRequestRepository.findByConsumerIdAndProviderRatingIsNotNull(consumerId);
+
+        List<com.aykhedma.dto.response.ConsumerReviewResponse> bookingReviews = bookings.stream()
                 .map(booking -> com.aykhedma.dto.response.ConsumerReviewResponse.builder()
                         .id(booking.getId())
                         .providerId(booking.getProvider().getId())
@@ -760,5 +764,29 @@ public class BookingServiceImpl implements BookingService {
                         .completedAt(booking.getCompletedAt())
                         .build())
                 .toList();
+
+        List<com.aykhedma.dto.response.ConsumerReviewResponse> emergencyReviews = emergencyRequests.stream()
+                .map(er -> com.aykhedma.dto.response.ConsumerReviewResponse.builder()
+                        .id(er.getId())
+                        .providerId(er.getSelectedProvider() != null ? er.getSelectedProvider().getId() : null)
+                        .providerName(er.getSelectedProvider() != null ? er.getSelectedProvider().getName() : null)
+                        .rating(er.getProviderRating())
+                        .review(er.getProviderReview())
+                        .completedAt(er.getCompletedAt())
+                        .build())
+                .toList();
+
+        List<com.aykhedma.dto.response.ConsumerReviewResponse> allReviews = new java.util.ArrayList<>();
+        allReviews.addAll(bookingReviews);
+        allReviews.addAll(emergencyReviews);
+
+        allReviews.sort((r1, r2) -> {
+            if (r1.getCompletedAt() == null && r2.getCompletedAt() == null) return 0;
+            if (r1.getCompletedAt() == null) return 1;
+            if (r2.getCompletedAt() == null) return -1;
+            return r2.getCompletedAt().compareTo(r1.getCompletedAt());
+        });
+
+        return allReviews;
     }
 }

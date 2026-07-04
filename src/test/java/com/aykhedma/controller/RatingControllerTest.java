@@ -229,4 +229,32 @@ class RatingControllerTest {
                 .andExpect(jsonPath("$.id").value(20L))
                 .andExpect(jsonPath("$.providerRating").value(4.0));
     }
+
+    @Test
+    @DisplayName("GET /api/ratings/consumer/my-ratings - Should return consumer reviews for authenticated consumer")
+    void getMyRatings_ShouldReturnOk() throws Exception {
+        ConsumerReviewResponse response = ConsumerReviewResponse.builder()
+                .id(10L)
+                .providerId(PROVIDER_ID)
+                .providerName("Provider One")
+                .rating(4.0)
+                .review("Great consumer")
+                .build();
+
+        when(bookingService.getConsumerReviews(CONSUMER_ID)).thenReturn(List.of(response));
+
+        mockMvc.perform(get("/api/ratings/consumer/my-ratings")
+                        .with(authenticatedUser(CONSUMER_ID, UserType.CONSUMER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(10L))
+                .andExpect(jsonPath("$[0].review").value("Great consumer"));
+    }
+
+    @Test
+    @DisplayName("GET /api/ratings/consumer/my-ratings - Should return forbidden for provider")
+    void getMyRatings_ShouldReturnForbiddenForProvider() throws Exception {
+        mockMvc.perform(get("/api/ratings/consumer/my-ratings")
+                        .with(authenticatedUser(PROVIDER_ID, UserType.PROVIDER)))
+                .andExpect(status().isForbidden());
+    }
 }

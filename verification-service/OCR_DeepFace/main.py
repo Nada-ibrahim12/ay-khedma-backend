@@ -65,15 +65,38 @@ def detect_digits(crop):
     for r in results:
         for box in r.boxes:
             cls = int(box.cls[0])
+            conf = float(box.conf[0])
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             cx = (x1 + x2) / 2
-            digits.append((cx, str(cls)))
+            w_box = x2 - x1
+            # Use the model's class name mapping instead of the raw index
+            digit_label = r.names[cls]
+            digits.append((cx, digit_label, conf, w_box))
 
     if not digits:
         return ""
 
+    # Sort by x-coordinate (left to right)
     digits.sort(key=lambda x: x[0])
-    return "".join(d for _, d in digits)
+
+    # Deduplicate overlapping detections at similar x-positions:
+    # keep only the highest-confidence detection within half a digit width
+    deduped = [digits[0]]
+    for i in range(1, len(digits)):
+        cx_prev = deduped[-1][0]
+        w_prev = deduped[-1][3]
+        cx_curr, _, conf_curr, _ = digits[i]
+        # If two detections are closer than half the digit width, they're duplicates
+        if abs(cx_curr - cx_prev) < w_prev * 0.5:
+            # Keep the one with higher confidence
+            if conf_curr > deduped[-1][2]:
+                deduped[-1] = digits[i]
+        else:
+            deduped.append(digits[i])
+
+    result = "".join(d for _, d, _, _ in deduped)
+    print(f"[OCR] Extracted digits: {result} ({len(deduped)} digits)")
+    return result
 
 
 # ---------------------------
@@ -213,7 +236,7 @@ async def extract_nid(file: UploadFile = File(...)):
     return {
         "nid": nid,
         "valid": validate_nid(nid),
-        "photo_url": f"http://127.0.0.1:8000/static/{filename}",
+        "photoUrl": f"http://127.0.0.1:8000/static/{filename}",
     }
 
 

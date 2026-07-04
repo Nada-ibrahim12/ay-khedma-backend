@@ -83,6 +83,13 @@ public class RatingController {
         return ResponseEntity.ok(bookingService.getConsumerReviews(consumerId));
     }
 
+    @GetMapping("/consumer/my-ratings")
+    @PreAuthorize("hasRole('CONSUMER')")
+    public ResponseEntity<List<com.aykhedma.dto.response.ConsumerReviewResponse>> getMyRatings(
+            @AuthenticationPrincipal(expression = "user.id") Long consumerId) {
+        return ResponseEntity.ok(bookingService.getConsumerReviews(consumerId));
+    }
+
     @PostMapping("/emergency")
     @PreAuthorize("hasRole('CONSUMER')")
     public ResponseEntity<EmergencyRequestResponse> submitEmergencyRating(
