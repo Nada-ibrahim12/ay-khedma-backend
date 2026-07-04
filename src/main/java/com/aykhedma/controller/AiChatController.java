@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.HashMap;
 import org.springframework.http.HttpStatus;
 
-
 @Slf4j
 @RestController
 @RequestMapping("/api/chatbot")
@@ -52,22 +51,32 @@ public class AiChatController {
             @RequestPart(value = "location", required = false) LocationDTO location,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
-        log.info("Chat request - sessionId: {}, voiceNote: {}",
-                sessionId, voiceNote != null ? "present (" + voiceNote.getSize() + " bytes)" : "null");
+        try {
+            log.info("Chat request - sessionId: {}, voiceNote: {}",
+                    sessionId, voiceNote != null ? "present (" + voiceNote.getSize() + " bytes)" : "null");
 
-        AiChatRequest request = AiChatRequest.builder()
-                .sessionId(sessionId)
-                .message(message)
-                .voiceNote(voiceNote)
-                .providerId(providerId)
-                .serviceTypeId(serviceTypeId)
-                .requestedDate(requestedDate)
-                .requestedTime(requestedTime)
-                .location(location)
-                .build();
+            AiChatRequest request = AiChatRequest.builder()
+                    .sessionId(sessionId)
+                    .message(message)
+                    .voiceNote(voiceNote)
+                    .providerId(providerId)
+                    .serviceTypeId(serviceTypeId)
+                    .requestedDate(requestedDate)
+                    .requestedTime(requestedTime)
+                    .location(location)
+                    .build();
 
-        User currentUser = userDetails != null ? userDetails.getUser() : null;
-        return ResponseEntity.ok(aiAssistantService.chat(request, currentUser));
+            User currentUser = userDetails != null ? userDetails.getUser() : null;
+            ChatResponse response = aiAssistantService.chat(request, currentUser);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid argument in chatWithVoice: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Error processing chat with voice: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -75,16 +84,36 @@ public class AiChatController {
             @Valid @RequestBody AiChatRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
-        User currentUser = userDetails != null ? userDetails.getUser() : null;
-        return ResponseEntity.ok(aiAssistantService.chat(request, currentUser));
+        try {
+            User currentUser = userDetails != null ? userDetails.getUser() : null;
+            ChatResponse response = aiAssistantService.chat(request, currentUser);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid argument in chat: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Error processing chat: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @PostMapping("/new-chat")
     public ResponseEntity<ChatResponse> startNewChat(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
-        User currentUser = userDetails != null ? userDetails.getUser() : null;
-        return ResponseEntity.ok(aiAssistantService.startNewChat(currentUser));
+        try {
+            User currentUser = userDetails != null ? userDetails.getUser() : null;
+            ChatResponse response = aiAssistantService.startNewChat(currentUser);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid argument in startNewChat: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Error starting new chat: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/chat/{sessionId}")
@@ -92,32 +121,64 @@ public class AiChatController {
             @PathVariable String sessionId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
-        User currentUser = userDetails != null ? userDetails.getUser() : null;
-        return ResponseEntity.ok(aiAssistantService.getChat(sessionId, currentUser));
+        try {
+            User currentUser = userDetails != null ? userDetails.getUser() : null;
+            ChatResponse response = aiAssistantService.getChat(sessionId, currentUser);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid argument in getChat: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Error getting chat: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/chats")
     public ResponseEntity<List<ChatResponse>> getUserChats(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        User currentUser = userDetails != null ? userDetails.getUser() : null;
-        return ResponseEntity.ok(aiAssistantService.getUserChats(currentUser));
+
+        try {
+            User currentUser = userDetails != null ? userDetails.getUser() : null;
+            List<ChatResponse> responses = aiAssistantService.getUserChats(currentUser);
+            return ResponseEntity.ok(responses);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid argument in getUserChats: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Error getting user chats: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @DeleteMapping("/{sessionId}")
     public ResponseEntity<?> deleteChat(@PathVariable String sessionId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        User currentUser = userDetails != null ? userDetails.getUser() : null;
-                
-        boolean deleted = aiAssistantService.deleteChatbotChatSession(sessionId, currentUser);
-        
-        if (deleted) {
-            return ResponseEntity.ok(Map.of(
-                "message", "Chat session deleted successfully",
-                "sessionId", sessionId
-            ));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", "Chat session not found or could not be deleted"));
+
+        try {
+            User currentUser = userDetails != null ? userDetails.getUser() : null;
+
+            boolean deleted = aiAssistantService.deleteChatbotChatSession(sessionId, currentUser);
+
+            if (deleted) {
+                return ResponseEntity.ok(Map.of(
+                        "message", "Chat session deleted successfully",
+                        "sessionId", sessionId));
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Chat session not found or could not be deleted"));
+            }
+
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid argument in deleteChat: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid session ID provided"));
+        } catch (Exception e) {
+            log.error("Error deleting chat session: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "An error occurred while deleting the chat session"));
         }
     }
 }
