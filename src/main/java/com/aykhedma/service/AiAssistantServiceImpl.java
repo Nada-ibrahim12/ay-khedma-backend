@@ -566,7 +566,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
         if (providers.isEmpty()) {
             return "عذراً، لم أجد أي " + serviceName
-                    + " متاحين في منطقتك حالياً. جرب توسيع نطاق البحث أو حاول مرة أخرى لاحقاً.";
+                    + " متاحين في منطقتك حالياً. حاول مرة أخرى لاحقاً.";
         }
 
         if (providers.size() == 1) {
@@ -621,42 +621,47 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     private String buildMultipleProvidersReply(List<ProviderSummaryResponse> providers, String serviceName) {
-        StringBuilder reply = new StringBuilder();
-        reply.append("🔍 وجدت ").append(providers.size()).append(" ").append(serviceName).append(" مناسبين:\n\n");
+    StringBuilder reply = new StringBuilder();
+    reply.append("🔍 وجدت ").append(providers.size()).append(" ").append(serviceName).append(" مناسبين:\n\n");
 
-        for (int i = 0; i < Math.min(5, providers.size()); i++) {
-            ProviderSummaryResponse p = providers.get(i);
-            reply.append(i + 1).append(". ").append(p.getName());
-
-            if (p.getAverageRating() != null && p.getAverageRating() > 0) {
-                reply.append(" ⭐").append(String.format("%.1f", p.getAverageRating()));
+    int maxDisplay = Math.min(5, providers.size());
+    for (int i = 0; i < maxDisplay; i++) {
+        ProviderSummaryResponse p = providers.get(i);
+        
+        reply.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        reply.append("【").append(i + 1).append("】 ").append(p.getName()).append("\n");
+        reply.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        
+        if (p.getAverageRating() != null && p.getAverageRating() > 0) {
+            reply.append("⭐ التقييم: ").append(String.format("%.1f", p.getAverageRating())).append("\n");
+        }
+        
+        if (p.getDistance() != null) {
+            reply.append("📍 المسافة: ").append(String.format("%.1f", p.getDistance())).append(" كم\n");
+        }
+        
+        if (p.getPrice() != null) {
+            reply.append("💰 السعر: ").append(p.getPrice());
+            if (p.getPriceTypeAr() != null) {
+                reply.append("/").append(p.getPriceTypeAr());
             }
-
-            if (p.getDistance() != null) {
-                reply.append(" 📍").append(String.format("%.1f", p.getDistance())).append("كم");
-            }
-
-            if (p.getPrice() != null) {
-                reply.append(" 💰").append(p.getPrice());
-                if (p.getPriceTypeAr() != null) {
-                    reply.append("/").append(p.getPriceTypeAr());
-                }
-            }
-
-            if (p.getArea() != null) {
-                reply.append(" 🏙️").append(p.getArea());
-            }
-
             reply.append("\n");
         }
-
-        if (providers.size() > 5) {
-            reply.append("\nو ").append(providers.size() - 5).append(" آخرين...");
+        
+        if (p.getArea() != null) {
+            reply.append("🏙️ المنطقة: ").append(p.getArea()).append("\n");
         }
-
-        reply.append("\n\n💡 اختر رقم المزود المناسب أو اسألني عن تفاصيل أكثر.");
-        return reply.toString();
+        
+        reply.append("\n");
     }
+
+    if (providers.size() > 5) {
+        reply.append("...و ").append(providers.size() - 5).append(" آخرين\n\n");
+    }
+
+    reply.append("💡 اختر رقم المزود المناسب أو اسألني عن تفاصيل أكثر.");
+    return reply.toString();
+}
 
     // public String buildSolutionSuggestionReply(String normalizedMessage) {
     // if (containsAny(normalizedMessage, "كهرب", "electric", "power", "نور",

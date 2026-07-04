@@ -627,7 +627,7 @@ public class AiAssistantMcpService {
         String reply = defaultReply;
 
         if (providers.isEmpty()) {
-            reply = "عذراً، لم أجد أي مقدمي خدمة متاحين في منطقتك حالياً. جرب توسيع نطاق البحث أو حاول مرة أخرى لاحقاً.";
+            reply = "عذراً، لم أجد أي مقدمي خدمة متاحين في منطقتك حالياً. حاول مرة أخرى لاحقاً.";
         } else {
             ServiceType serviceType = null;
             if (providers.get(0).getServiceType() != null) {
