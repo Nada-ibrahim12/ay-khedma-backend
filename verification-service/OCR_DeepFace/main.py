@@ -1,10 +1,12 @@
-import shutil
-
-from fastapi import FastAPI, UploadFile, File
-import numpy as np
-import cv2
 import os
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+import cv2
+import numpy as np
+from fastapi import FastAPI, UploadFile, File
 from ultralytics import YOLO
+
 from face_match import face_match
 
 app = FastAPI()
@@ -12,104 +14,148 @@ app = FastAPI()
 object_model = YOLO("weights/detect_odjects.pt")
 digit_model = YOLO("weights/detect_id.pt")
 
+# Toggle verbose debug artifacts (disable in production — disk I/O on every request is expensive)
+DEBUG = os.environ.get("NID_DEBUG", "0") == "1"
 
-def safe_filename(name):
+# One worker pool for the whole app; inference is CPU/GPU-bound and blocking,
+# so it must never run directly inside an `async def` endpoint.
+_executor = ThreadPoolExecutor(max_workers=int(os.environ.get("NID_WORKERS", "2")))
+
+
+# ---------------------------
+# UTIL
+# ---------------------------
+def safe_filename(name: str) -> str:
     return os.path.basename(name).replace(" ", "_")
-
-
-def preprocess_for_yolo(img):
-    h, w = img.shape[:2]
-    if w < 1000:
-        img = cv2.resize(img, (1280, 819), interpolation=cv2.INTER_CUBIC)
-    return img
-
 
 
 def validate_nid(nid):
     return nid is not None and len(nid) == 14 and nid.isdigit()
 
 
+def preprocess_for_yolo(img):
+    """Upscale small images for better detection, preserving aspect ratio
+    (the original fixed 1280x819 target silently distorted non-matching ratios)."""
+    h, w = img.shape[:2]
+    if w < 1000:
+        scale = 1280 / w
+        new_w, new_h = 1280, int(round(h * scale))
+        img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+    return img
+
+
+def read_image(file_bytes):
+    np_arr = np.frombuffer(file_bytes, np.uint8)
+    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Could not decode image")
+    return img
+
+
+# ---------------------------
+# DIGIT EXTRACTION
+# ---------------------------
 def detect_digits(crop):
+    if crop is None or crop.size == 0:
+        return ""
+
     results = digit_model(crop, conf=0.10, iou=0.3, verbose=False)
 
     digits = []
-
     for r in results:
         for box in r.boxes:
             cls = int(box.cls[0])
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             cx = (x1 + x2) / 2
-
             digits.append((cx, str(cls)))
 
     if not digits:
         return ""
 
     digits.sort(key=lambda x: x[0])
+    return "".join(d for _, d in digits)
 
-    return "".join([d for _, d in digits])
 
+# ---------------------------
+# OBJECT DETECTION (run ONCE per image, reused across pad factors)
+# ---------------------------
+def detect_fields(img):
+    """Run the object model a single time and return the best box per field
+    class (highest confidence), instead of re-running detection per padding
+    attempt and instead of letting later lower-confidence boxes silently
+    clobber earlier good ones."""
+    results = object_model(img, verbose=False)
 
-def try_extract(img, pad_factor, filename):
-
-    h, w = img.shape[:2]
-
-    results = object_model(img)
-
-    best = ""
+    best_boxes = {}  # cls_name -> (conf, x1, y1, x2, y2)
 
     for r in results:
         for box in r.boxes:
-
             cls_name = r.names[int(box.cls[0])]
-
+            conf = float(box.conf[0])
             x1, y1, x2, y2 = map(int, box.xyxy[0])
 
-            w_box = x2 - x1
-            h_box = y2 - y1
+            if cls_name not in best_boxes or conf > best_boxes[cls_name][0]:
+                best_boxes[cls_name] = (conf, x1, y1, x2, y2)
 
-            pad_x = int(w_box * pad_factor)
-            pad_y = int(h_box * pad_factor)
-
-            x1 = max(0, x1 - pad_x)
-            y1 = max(0, y1 - pad_y)
-            x2 = min(w, x2 + pad_x)
-            y2 = min(h, y2 + pad_y)
-
-            crop = img[y1:y2, x1:x2]
+    return best_boxes
 
 
-            if cls_name == "photo":
-                if crop is not None and crop.size != 0:
-                    os.makedirs("static", exist_ok=True)
-                    cv2.imwrite(f"static/{filename}", crop)
+def crop_with_padding(img, box, pad_factor):
+    h, w = img.shape[:2]
+    _, x1, y1, x2, y2 = box
+
+    w_box, h_box = x2 - x1, y2 - y1
+    pad_x, pad_y = int(w_box * pad_factor), int(h_box * pad_factor)
+
+    x1 = max(0, x1 - pad_x)
+    y1 = max(0, y1 - pad_y)
+    x2 = min(w, x2 + pad_x)
+    y2 = min(h, y2 + pad_y)
+
+    return img[y1:y2, x1:x2]
 
 
-            if cls_name == "nid":
-                nid = detect_digits(crop)
+def try_extract(img, best_boxes, pad_factor, filename):
+    """Uses cached detection boxes — only the crop bounds change per pad_factor,
+    so no re-run of the (expensive) object model here."""
+    best = ""
 
-                if validate_nid(nid):
-                    return nid
+    if "photo" in best_boxes:
+        crop = crop_with_padding(img, best_boxes["photo"], pad_factor)
+        if crop is not None and crop.size != 0:
+            os.makedirs("static", exist_ok=True)
+            cv2.imwrite(f"static/{filename}", crop)
 
-                best = nid
+    if "nid" in best_boxes:
+        crop = crop_with_padding(img, best_boxes["nid"], pad_factor)
+        nid = detect_digits(crop)
+
+        if validate_nid(nid):
+            return nid
+
+        # Bug fix: only keep `nid` as "best" if it's actually a better (longer)
+        # candidate than what we already have.
+        if len(nid) > len(best):
+            best = nid
 
     return best
 
 
 def process_image(img, filename):
-
     img = preprocess_for_yolo(img)
 
-    cv2.imwrite("debug_full.jpg", img)
+    if DEBUG:
+        cv2.imwrite("debug_full.jpg", img)
 
-    attempts = [0.20, 0.30, 0.40]
+    # Object detection runs exactly once per image now.
+    best_boxes = detect_fields(img)
 
     best = ""
+    for pad_factor in (0.20, 0.30, 0.40):
+        nid = try_extract(img, best_boxes, pad_factor, filename)
 
-    for p in attempts:
-        nid = try_extract(img, p, filename)
-
-        print(f"try pad {p}: {nid}")
+        if DEBUG:
+            print(f"try pad {pad_factor}: {nid}")
 
         if validate_nid(nid):
             return {"nid": nid}
@@ -121,22 +167,20 @@ def process_image(img, filename):
 
 
 def detect_and_process(img, filename):
-
     rotations = [
         img,
         cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE),
         cv2.rotate(img, cv2.ROTATE_180),
-        cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE),
     ]
 
     best = ""
-
     for r in rotations:
-
         result = process_image(r, filename)
         nid = result["nid"]
 
-        print("result:", nid)
+        if DEBUG:
+            print("result:", nid)
 
         if validate_nid(nid):
             return nid
@@ -145,46 +189,47 @@ def detect_and_process(img, filename):
             best = nid
 
     return best
-def read_image(file_bytes):
-    np_arr = np.frombuffer(file_bytes, np.uint8)
-    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-    if img is None:
-        raise ValueError("Could not decode image")
 
-    return img
-
+# ---------------------------
+# ROUTES
+# ---------------------------
 @app.post("/extract-nid")
 async def extract_nid(file: UploadFile = File(...)):
-
     image_bytes = await file.read()
 
-    np_arr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-    if img is None:
+    try:
+        img = read_image(image_bytes)
+    except ValueError:
         return {"error": "invalid image"}
 
     filename = safe_filename(file.filename)
 
-    nid = detect_and_process(img, filename)
+    # Offload the blocking YOLO/OpenCV work to the thread pool so the event
+    # loop stays free to serve other requests concurrently.
+    loop = asyncio.get_event_loop()
+    nid = await loop.run_in_executor(_executor, detect_and_process, img, filename)
 
     return {
         "nid": nid,
         "valid": validate_nid(nid),
-        "photo_url": f"http://127.0.0.1:8000/static/{filename}"
+        "photo_url": f"http://127.0.0.1:8000/static/{filename}",
     }
+
 
 @app.post("/face-match")
 async def face_match_endpoint(
     id_image: UploadFile = File(...),
-    selfie: UploadFile = File(...)
+    selfie: UploadFile = File(...),
 ):
-
     id_bytes = await id_image.read()
     selfie_bytes = await selfie.read()
 
     img1 = read_image(id_bytes)
     img2 = read_image(selfie_bytes)
 
-    return face_match(img1, img2, object_model=object_model)
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        _executor, face_match, img1, img2, object_model
+    )
+    return result

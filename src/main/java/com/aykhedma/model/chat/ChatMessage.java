@@ -73,7 +73,7 @@ public class ChatMessage {
 
     @Builder.Default
     @Size(max = 500, message = "Media URL cannot exceed 500 characters")
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.LAZY)
     private List<String> mediaUrls = new ArrayList<>();
 
     @Size(max = 64, message = "Audio hash must be 64 characters or less")
