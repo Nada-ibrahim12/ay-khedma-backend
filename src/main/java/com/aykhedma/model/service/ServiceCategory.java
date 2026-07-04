@@ -33,6 +33,9 @@ public class ServiceCategory {
     @Column(length = 200)
     private String description;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<ServiceType> serviceTypes = new ArrayList<>();

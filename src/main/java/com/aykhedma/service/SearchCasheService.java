@@ -42,9 +42,9 @@ class SearchCacheService {
 
         System.out.println("searchList executed from DB");
 
-        Double radiusMeters = (consumerId != null && radius != null) ? radius * 1000 : null;
+        Double radiusMeters = (consumerId != null && radius != null) ? radius * 1000 : null; // Convert the search radius from kilometers to meters.
 
-        Page<ProviderDistanceProjection> providersPage =
+        Page<ProviderDistanceProjection> providersPage = // Retrieve all matching providers from the database.
                 providerRepository.searchProvidersWithDistance(
                         keyword,
                         categoryId,
@@ -53,7 +53,7 @@ class SearchCacheService {
                         radiusMeters,
                         Pageable.unpaged()
                 );
-
+        // Map database projections to API response objects.
         List<SearchResponse> responses = providersPage.getContent()
                 .stream()
                 .map(this::map)
@@ -68,7 +68,7 @@ class SearchCacheService {
         if (responses == null || responses.isEmpty()) {
             return new ArrayList<>();
         }
-
+        // Default sorting is by rating.
         String sortField = sortBy != null ? sortBy.toLowerCase() : "rating";
 
         switch (sortField) {
@@ -111,69 +111,7 @@ class SearchCacheService {
                         .collect(Collectors.toList());
         }
     }
-    //    @Transactional(readOnly = true)
-//    @Cacheable(
-//            value = "topRatedNearMeCache",
-//            key = "#consumerId + '_' + #radius + '_' + #pageable.pageNumber + '_' + #pageable.pageSize"
-//    )
-//    public List<SearchResponse> topRatedNearMe(Long consumerId, Double radius) {
-//
-//        if (consumerId == null) {
-//            throw new BadRequestException("consumerId is required");
-//        }
-//        if (radius == null || radius <= 0) {
-//            throw new BadRequestException("radius must be greater than 0");
-//        }
-//
-//        Page<Provider> providersPage =
-//                providerRepository.searchProviders(null, null, null, Pageable.unpaged());
-//
-//        return providersPage.getContent().stream()
-//                .filter(p -> p.getLocation() != null)
-//                .map(provider -> {
-//
-//                    try {
-//                        double distance = locationService
-//                                .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
-//                                .getDistanceKm();
-//
-//                        if (distance > radius) return null;
-//
-//                        SearchResponse res = providerMapper.toSearchResponse(provider);
-//
-//                        res.setDistance(distance);
-//                        res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
-//
-//                        double score = calculateScore(provider, distance);
-//                        res.setScore(score);
-//
-//                        return res;
-//
-//                    } catch (Exception e) {
-//                        throw new BadRequestException("Distance calculation failed");
-//                    }
-//                })
-//                .filter(Objects::nonNull)
-//                .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
-//                .toList();
-//    }
-//
-//    private double calculateScore(Provider p, double distance) {
-//
-//        double ratingWeight = 0.5;
-//        double distanceWeight = 0.3;
-//        double experienceWeight = 0.2;
-//
-//        double ratingScore = (p.getAverageRating() != null ? p.getAverageRating() : 0) * 20;
-//
-//        double distanceScore = Math.max(0, 100 - (distance * 10));
-//
-//        double experienceScore = (p.getCompletedJobs() != null ? p.getCompletedJobs() : 0) / 10.0;
-//
-//        return (ratingScore * ratingWeight)
-//                + (distanceScore * distanceWeight)
-//                + (experienceScore * experienceWeight);
-//    }
+
     @Transactional(readOnly = true)
     @Cacheable(
             value = "topRatedNearMeCache",
@@ -190,7 +128,7 @@ class SearchCacheService {
         }
 
         double radiusMeters = radius * 1000;
-
+        // Retrieve nearby providers ordered by rating.
         Page<ProviderDistanceProjection> result =
                 providerRepository.findTopRatedNearConsumer(
                         consumerId,
@@ -199,7 +137,7 @@ class SearchCacheService {
                 );
 
         return result.getContent()
-                .stream()
+                .stream()//stream to do map or filter and so on
                 .map(this::map)
                 .toList();
     }

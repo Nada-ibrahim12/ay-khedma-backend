@@ -51,8 +51,9 @@ public class FileStorageServiceImpl implements FileStorageService {
             throw new BadRequestException("File is empty or null");
         }
 
-        // FIXED: Correct directory validation
-        if (directory.equals("profile-images") || directory.equals("national-id-images")) {
+        if (directory.equals("profile-images")
+                || directory.equals("national-id-images")
+                || directory.equals("category-images")) {
             validateImageFile(file);
         } else if (directory.equals("documents")) {
             validateDocumentFile(file);
@@ -207,6 +208,7 @@ public class FileStorageServiceImpl implements FileStorageService {
                 if (!directory.equals("profile-images")
                         && !directory.equals("national-id-images")
                         && !directory.equals("documents")
+                        && !directory.equals("category-images")
                         && !directory.matches("\\d+")) {
                     return;
                 }

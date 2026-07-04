@@ -20,8 +20,10 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -46,14 +48,21 @@ public class ServiceCatalogController {
         return categoryService.getCategoryById(id);
     }
 
-    @PostMapping("/categories")
-    public ServiceCategoryDTO createCategory(@RequestBody ServiceCategoryDTO dto) {
-        return categoryService.createCategory(dto);
+    @PostMapping(value = "/categories", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ServiceCategoryDTO createCategory(
+            @RequestPart("category") ServiceCategoryDTO dto,
+            @RequestPart("image") MultipartFile image) {
+
+        return categoryService.createCategory(dto, image);
     }
 
-    @PutMapping("/categories/{id}")
-    public ServiceCategoryDTO updateCategory(@PathVariable Long id, @RequestBody ServiceCategoryDTO dto) {
-        return categoryService.updateCategory(id, dto);
+    @PutMapping(value = "/categories/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ServiceCategoryDTO updateCategory(
+            @PathVariable Long id,
+            @RequestPart("category") ServiceCategoryDTO dto,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+
+        return categoryService.updateCategory(id, dto, image);
     }
 
     @DeleteMapping("/categories/{id}")

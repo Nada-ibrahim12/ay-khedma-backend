@@ -26,16 +26,16 @@ public class RedisConfig {
     public RedisCacheConfiguration cacheConfiguration() {
 
         ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
-        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        objectMapper.registerModule(new JavaTimeModule());// Support Java 8 Date/Time types (LocalDateTime, LocalDate, etc.).
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // Serialize dates as ISO-8601 strings instead of timestamps.
 
         GenericJackson2JsonRedisSerializer serializer =
                 new GenericJackson2JsonRedisSerializer(objectMapper);
 
         return RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMinutes(30))
-                .disableCachingNullValues()
-                .serializeValuesWith(
+                .disableCachingNullValues() // Prevent caching null values.
+                .serializeValuesWith( // Serialize cached values as JSON using the configured serializer.
                         RedisSerializationContext.SerializationPair.fromSerializer(serializer)
                 );
     }

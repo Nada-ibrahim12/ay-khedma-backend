@@ -7,8 +7,10 @@ import com.aykhedma.model.service.ServiceCategory;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.service.PriceType;
+import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceCategoryRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
+import com.cloudinary.Cloudinary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,11 +30,20 @@ class ServiceCategoryServiceTest {
     @Mock
     private ServiceCategoryRepository categoryRepository;
 
-    @InjectMocks
-    private ServiceCategoryService service;
-
     @Mock
     private ServiceTypeRepository serviceTypeRepository;
+
+    @Mock
+    private ProviderRepository providerRepository;
+
+    @Mock
+    private Cloudinary cloudinary;
+
+    @Mock
+    private FileStorageService fileStorageService;
+
+    @InjectMocks
+    private ServiceCategoryService service;
 
     private ServiceCategory category;
     private ServiceType type;
@@ -105,7 +116,8 @@ class ServiceCategoryServiceTest {
 
         when(categoryRepository.save(any(ServiceCategory.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ServiceCategoryDTO created = service.createCategory(dto);
+        // No image provided for this test — service.createCategory handles a null image gracefully
+        ServiceCategoryDTO created = service.createCategory(dto, null);
 
         assertThat(created.getName()).isEqualTo("Technical Services");
         assertThat(created.getServiceTypes()).hasSize(1);
@@ -124,7 +136,8 @@ class ServiceCategoryServiceTest {
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(categoryRepository.save(any(ServiceCategory.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ServiceCategoryDTO updated = service.updateCategory(1L, dto);
+        // No image provided for this test — service.updateCategory handles a null image gracefully
+        ServiceCategoryDTO updated = service.updateCategory(1L, dto, null);
 
         assertThat(updated.getName()).isEqualTo("Updated Services");
         assertThat(updated.getNameAr()).isEqualTo("خدمات محدثة");
@@ -135,8 +148,11 @@ class ServiceCategoryServiceTest {
     @DisplayName("deleteCategory should delete successfully when category exists")
     void testDeleteCategory() {
 
-        ServiceCategory category = new ServiceCategory();
-        category.setId(1L);
+        // Built via the builder so @Builder.Default initializes serviceTypes to an empty list
+        // (new ServiceCategory() + setId(1L) would leave serviceTypes null and NPE in the loop)
+        ServiceCategory category = ServiceCategory.builder()
+                .id(1L)
+                .build();
 
         when(categoryRepository.findById(1L))
                 .thenReturn(Optional.of(category));
@@ -148,6 +164,7 @@ class ServiceCategoryServiceTest {
         verify(categoryRepository).findById(1L);
         verify(categoryRepository).delete(category);
     }
+
     @Test
     @DisplayName("deleteCategory should throw exception when category not found")
     void testDeleteCategory_NotFound() {
@@ -158,6 +175,7 @@ class ServiceCategoryServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Category not found");
     }
+
     @Test
     @DisplayName("countCategories should return repository count")
     void testCountCategories() {

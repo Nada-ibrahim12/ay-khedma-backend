@@ -63,7 +63,7 @@ public class ProviderServiceImpl implements ProviderService {
     private final TimeSlotRepository timeSlotRepository;
     private final DocumentRepository documentRepository;
     private final ProviderMapper providerMapper;
-    private final ScheduleMapper scheduleMapper; // ADD THIS
+    private final ScheduleMapper scheduleMapper;
     private final FileStorageService fileStorageService;
     private final LocationService locationService;
 
@@ -363,104 +363,6 @@ public class ProviderServiceImpl implements ProviderService {
         return new PageImpl<>(pageContent, pageable, responses.size());
     }
 
-    // @Override
-    // @Transactional(readOnly = true)
-    // public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius,
-    // Pageable pageable) {
-    //
-    // if (consumerId == null) {
-    // throw new BadRequestException("consumerId is required");
-    // }
-    // if (radius == null || radius <= 0) {
-    // throw new BadRequestException("radius must be greater than 0");
-    // }
-    //
-    // Page<Provider> providersPage = providerRepository.searchProviders(null, null,
-    // null, Pageable.unpaged());
-    //
-    // List<SearchResponse> ranked = providersPage.getContent().stream()
-    // .filter(p -> p.getLocation() != null)
-    // .map(provider -> {
-    //
-    // try {
-    // double distance = locationService
-    // .calculateDistanceBetweenConsumerAndProvider(consumerId, provider.getId())
-    // .getDistanceKm();
-    //
-    // if (distance > radius)
-    // return null;
-    //
-    // SearchResponse res = providerMapper.toSearchResponse(provider);
-    //
-    // res.setDistance(distance);
-    // res.setEstimatedArrivalTime((int) Math.round((distance / 30.0) * 60));
-    //
-    // double score = calculateScore(provider, distance);
-    // res.setScore(score);
-    //
-    // return res;
-    //
-    // } catch (Exception e) {
-    // throw new BadRequestException("Distance calculation failed");
-    // }
-    // })
-    // .filter(Objects::nonNull)
-    // .sorted(Comparator.comparing(SearchResponse::getScore).reversed())
-    // .toList();
-    //
-    // return toPage(ranked, pageable);
-    // }
-//    @Transactional(readOnly = true)
-//    public Page<SearchResponse> topRatedNearMe(Long consumerId, Double radius, Pageable pageable) {
-//
-//        double radiusMeters = radius * 1000;
-//
-//        Page<ProviderDistanceProjection> result = providerRepository.findTopRatedNearConsumer(
-//                consumerId,
-//                radiusMeters,
-//                pageable);
-//
-//        List<SearchResponse> mapped = result.getContent()
-//                .stream()
-//                .map(this::map)
-//                .toList();
-//
-//        return new PageImpl<>(mapped, pageable, result.getTotalElements());
-//    }
-
-
-//    private SearchResponse map(ProviderDistanceProjection p) {
-//
-//        SearchResponse res = new SearchResponse();
-//
-//        res.setId(p.getId());
-//        res.setName(p.getName());
-//        res.setProfileImage(p.getProfileImage());
-//
-//        res.setServiceType(p.getServiceType());
-//        res.setServiceTypeAr(p.getServiceTypeAr());
-//        res.setCategoryName(p.getCategoryName());
-//
-//        res.setAverageRating(p.getAverageRating());
-//
-//        res.setPrice(p.getPrice());
-//        PriceType priceType = p.getPriceType() != null ? PriceType.valueOf(p.getPriceType()) : null;
-//        res.setPriceType(priceType);
-//        res.setPriceTypeAr(priceType != null ? priceType.getArabicLabel() : null);
-//
-//        res.setServiceAreaRadius(p.getServiceAreaRadius());
-//
-//        res.setAveragePunctualityRating(p.getAveragePunctualityRating());
-//        res.setAverageCommitmentRating(p.getAverageCommitmentRating());
-//        res.setAverageQualityOfWorkRating(p.getAverageQualityOfWorkRating());
-//
-//        res.setArea(p.getArea());
-//
-//        res.setDistance(p.getDistanceKm());
-//        res.setEstimatedArrivalTime(p.getEstimatedArrivalTime());
-//
-//        return res;
-//    }
 @Transactional(readOnly = true)
 public Page<SearchResponse> topRatedNearMe(
         Long consumerId,

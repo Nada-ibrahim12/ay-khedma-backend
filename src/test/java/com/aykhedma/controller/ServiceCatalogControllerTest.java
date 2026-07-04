@@ -25,7 +25,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -147,11 +149,24 @@ class ServiceCatalogControllerTest {
     @Test
     @DisplayName("POST /api/services/categories - Should create category")
     void createCategory_ShouldReturnCreatedCategory() throws Exception {
-        when(categoryService.createCategory(any(ServiceCategoryDTO.class))).thenReturn(category1);
+        when(categoryService.createCategory(any(ServiceCategoryDTO.class), any()))
+                .thenReturn(category1);
 
-        mockMvc.perform(post("/api/services/categories")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(category1)))
+        MockMultipartFile categoryPart = new MockMultipartFile(
+                "category",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(category1));
+
+        MockMultipartFile imagePart = new MockMultipartFile(
+                "image",
+                "photo.jpg",
+                MediaType.IMAGE_JPEG_VALUE,
+                "fake-image-bytes".getBytes());
+
+        mockMvc.perform(multipart("/api/services/categories")
+                        .file(categoryPart)
+                        .file(imagePart))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(CATEGORY_ID))
                 .andExpect(jsonPath("$.name").value("Home Maintenance"));
@@ -160,11 +175,17 @@ class ServiceCatalogControllerTest {
     @Test
     @DisplayName("PUT /api/services/categories/{id} - Should update category")
     void updateCategory_ShouldReturnUpdatedCategory() throws Exception {
-        when(categoryService.updateCategory(eq(CATEGORY_ID), any(ServiceCategoryDTO.class))).thenReturn(category1);
+        when(categoryService.updateCategory(eq(CATEGORY_ID), any(ServiceCategoryDTO.class), any()))
+                .thenReturn(category1);
 
-        mockMvc.perform(put("/api/services/categories/{id}", CATEGORY_ID)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(category1)))
+        MockMultipartFile categoryPart = new MockMultipartFile(
+                "category",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(category1));
+
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/services/categories/{id}", CATEGORY_ID)
+                        .file(categoryPart))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(CATEGORY_ID));
     }

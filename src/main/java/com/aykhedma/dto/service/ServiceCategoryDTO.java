@@ -17,4 +17,5 @@ public class ServiceCategoryDTO {
     private String nameAr;
     private String description;
     private List<ServiceTypeDTO> serviceTypes;
+    private String imageUrl;
 }

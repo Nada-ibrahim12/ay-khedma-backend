@@ -9,10 +9,13 @@ import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceCategoryRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
+import com.cloudinary.Cloudinary;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @Service
@@ -23,6 +26,8 @@ public class ServiceCategoryService {
     private final ServiceCategoryRepository categoryRepository;
     private final ServiceTypeRepository serviceTypeRepository;
     private final ProviderRepository providerRepository;
+    private final Cloudinary cloudinary;
+    private final FileStorageService fileStorageService;
 
     public List<ServiceCategoryDTO> getAllCategories() {
         return categoryRepository.findAllWithServiceTypes()
@@ -44,7 +49,7 @@ public class ServiceCategoryService {
         return mapToDTO(category);
     }
 
-    public ServiceCategoryDTO createCategory(ServiceCategoryDTO dto) {
+    public ServiceCategoryDTO createCategory(ServiceCategoryDTO dto, MultipartFile image) {
 
         validateCategoryRequest(dto);
 
@@ -52,10 +57,21 @@ public class ServiceCategoryService {
             throw new BadRequestException("Category name already exists");
         }
 
+        String imageUrl = null;
+
+        try {
+            if (image != null && !image.isEmpty()) {
+                imageUrl = fileStorageService.storeFile(image, "category-images");
+            }
+        } catch (IOException e) {
+            throw new BadRequestException("Failed to upload category image");
+        }
+
         ServiceCategory category = ServiceCategory.builder()
                 .name(dto.getName().trim())
                 .nameAr(dto.getNameAr())
                 .description(dto.getDescription())
+                .imageUrl(imageUrl)
                 .build();
 
         if (dto.getServiceTypes() != null && !dto.getServiceTypes().isEmpty()) {
@@ -85,10 +101,14 @@ public class ServiceCategoryService {
         }
 
         ServiceCategory saved = categoryRepository.save(category);
+
         return mapToDTO(saved);
     }
 
-    public ServiceCategoryDTO updateCategory(Long id, ServiceCategoryDTO dto) {
+    public ServiceCategoryDTO updateCategory(
+            Long id,
+            ServiceCategoryDTO dto,
+            MultipartFile image) {
 
         if (id == null) {
             throw new BadRequestException("Category id is required");
@@ -117,9 +137,25 @@ public class ServiceCategoryService {
             category.setDescription(dto.getDescription());
         }
 
-        return mapToDTO(categoryRepository.save(category));
-    }
+        if (image != null && !image.isEmpty()) {
+            String oldImageUrl = category.getImageUrl();
+            try {
+                String imageUrl = fileStorageService.storeFile(image, "category-images");
+                category.setImageUrl(imageUrl);
+            } catch (IOException e) {
+                throw new BadRequestException("Failed to upload category image");
+            }
 
+            // Clean up the old image now that the new one uploaded successfully
+            if (oldImageUrl != null && !oldImageUrl.isBlank()) {
+                fileStorageService.deleteFile(oldImageUrl);
+            }
+        }
+
+        ServiceCategory updated = categoryRepository.save(category);
+
+        return mapToDTO(updated);
+    }
     @Transactional
     public void deleteCategory(Long id) {
 
@@ -208,6 +244,7 @@ public class ServiceCategoryService {
                 .name(category.getName())
                 .nameAr(category.getNameAr())
                 .description(category.getDescription())
+                .imageUrl(category.getImageUrl())
                 .serviceTypes(types)
                 .build();
     }

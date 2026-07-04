@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @AutoConfigureTestEntityManager
 @Transactional
-@ActiveProfiles("test-postgresql")
+@ActiveProfiles("test")
 @DisplayName("BookingRepository Tests")
 class BookingRepositoryTest
 {
