@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ConsumerReviewResponse {
-    private Long id;
+    private String id;
     private Long providerId;
     private String providerName;
     private Double rating;

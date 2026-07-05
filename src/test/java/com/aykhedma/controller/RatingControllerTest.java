@@ -160,7 +160,7 @@ class RatingControllerTest {
     @DisplayName("GET /api/ratings/consumer/{consumerId} - Should get consumer reviews")
     void getConsumerReviews_ShouldReturnList() throws Exception {
         ConsumerReviewResponse response = ConsumerReviewResponse.builder()
-                .id(10L)
+                .id("booking-10")
                 .providerId(PROVIDER_ID)
                 .providerName("Provider One")
                 .rating(4.0)
@@ -172,7 +172,7 @@ class RatingControllerTest {
         mockMvc.perform(get("/api/ratings/consumer/{consumerId}", CONSUMER_ID)
                         .with(authenticatedUser(PROVIDER_ID, UserType.PROVIDER)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(10L))
+                .andExpect(jsonPath("$[0].id").value("booking-10"))
                 .andExpect(jsonPath("$[0].review").value("Great consumer"));
     }
 
@@ -234,7 +234,7 @@ class RatingControllerTest {
     @DisplayName("GET /api/ratings/consumer/my-ratings - Should return consumer reviews for authenticated consumer")
     void getMyRatings_ShouldReturnOk() throws Exception {
         ConsumerReviewResponse response = ConsumerReviewResponse.builder()
-                .id(10L)
+                .id("booking-10")
                 .providerId(PROVIDER_ID)
                 .providerName("Provider One")
                 .rating(4.0)
@@ -246,7 +246,7 @@ class RatingControllerTest {
         mockMvc.perform(get("/api/ratings/consumer/my-ratings")
                         .with(authenticatedUser(CONSUMER_ID, UserType.CONSUMER)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(10L))
+                .andExpect(jsonPath("$[0].id").value("booking-10"))
                 .andExpect(jsonPath("$[0].review").value("Great consumer"));
     }
 

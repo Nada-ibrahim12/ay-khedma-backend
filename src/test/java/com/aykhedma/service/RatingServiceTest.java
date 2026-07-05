@@ -593,7 +593,7 @@ class RatingServiceTest
 
             assertThat(reviews).hasSize(1);
             ConsumerReviewResponse review = reviews.get(0);
-            assertThat(review.getId()).isEqualTo(20L);
+            assertThat(review.getId()).isEqualTo("booking-20");
             assertThat(review.getProviderId()).isEqualTo(provider.getId());
             assertThat(review.getProviderName()).isEqualTo(provider.getName());
             assertThat(review.getRating()).isEqualTo(4.5);
@@ -638,9 +638,9 @@ class RatingServiceTest
             List<ConsumerReviewResponse> reviews = bookingService.getConsumerReviews(consumer.getId());
 
             assertThat(reviews).hasSize(2);
-            assertThat(reviews.get(0).getId()).isEqualTo(21L);
+            assertThat(reviews.get(0).getId()).isEqualTo("booking-21");
             assertThat(reviews.get(0).getRating()).isEqualTo(3.0);
-            assertThat(reviews.get(1).getId()).isEqualTo(20L);
+            assertThat(reviews.get(1).getId()).isEqualTo("booking-20");
             assertThat(reviews.get(1).getRating()).isEqualTo(5.0);
         }
 
@@ -667,11 +667,11 @@ class RatingServiceTest
             List<ConsumerReviewResponse> reviews = bookingService.getConsumerReviews(consumer.getId());
 
             assertThat(reviews).hasSize(2);
-            assertThat(reviews.get(0).getId()).isEqualTo(50L);
+            assertThat(reviews.get(0).getId()).isEqualTo("emergency-50");
             assertThat(reviews.get(0).getRating()).isEqualTo(5.0);
             assertThat(reviews.get(0).getReview()).isEqualTo("Amazing emergency client");
 
-            assertThat(reviews.get(1).getId()).isEqualTo(20L);
+            assertThat(reviews.get(1).getId()).isEqualTo("booking-20");
             assertThat(reviews.get(1).getRating()).isEqualTo(4.0);
             assertThat(reviews.get(1).getReview()).isEqualTo("Good booking client");
         }

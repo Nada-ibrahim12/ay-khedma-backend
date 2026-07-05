@@ -756,7 +756,7 @@ public class BookingServiceImpl implements BookingService {
 
         List<com.aykhedma.dto.response.ConsumerReviewResponse> bookingReviews = bookings.stream()
                 .map(booking -> com.aykhedma.dto.response.ConsumerReviewResponse.builder()
-                        .id(booking.getId())
+                        .id("booking-" + booking.getId())
                         .providerId(booking.getProvider().getId())
                         .providerName(booking.getProvider().getName())
                         .rating(booking.getProviderRating())
@@ -767,7 +767,7 @@ public class BookingServiceImpl implements BookingService {
 
         List<com.aykhedma.dto.response.ConsumerReviewResponse> emergencyReviews = emergencyRequests.stream()
                 .map(er -> com.aykhedma.dto.response.ConsumerReviewResponse.builder()
-                        .id(er.getId())
+                        .id("emergency-" + er.getId())
                         .providerId(er.getSelectedProvider() != null ? er.getSelectedProvider().getId() : null)
                         .providerName(er.getSelectedProvider() != null ? er.getSelectedProvider().getName() : null)
                         .rating(er.getProviderRating())
