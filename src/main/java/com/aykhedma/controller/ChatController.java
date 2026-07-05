@@ -8,6 +8,8 @@ import com.aykhedma.exception.UnauthorizedException;
 import com.aykhedma.model.chat.MessageType;
 import com.aykhedma.security.CustomUserDetails;
 import com.aykhedma.service.ChatService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import lombok.RequiredArgsConstructor;
@@ -50,18 +52,18 @@ public class ChatController {
         return ResponseEntity.ok(roomId);
     }
     @GetMapping("/rooms")
-    public ResponseEntity<Page<ChatRoomResponse>> getRooms(
+    public ResponseEntity<?> getRooms(
             @RequestParam int page,
             @RequestParam int size,
-            @AuthenticationPrincipal CustomUserDetails user
-    ) {
-        if (page < 0 || size <= 0) {
-            throw new BadRequestException("Invalid pagination parameters");
-        }
+            @AuthenticationPrincipal CustomUserDetails user) throws Exception {
+
         Page<ChatRoomResponse> rooms = chatService.getUserRooms(user.getUser(), page, size);
-        if (rooms.isEmpty()) {
-            return ResponseEntity.ok(Page.empty());
-        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+
+        System.out.println(mapper.writeValueAsString(rooms));
+
         return ResponseEntity.ok(rooms);
     }
 
