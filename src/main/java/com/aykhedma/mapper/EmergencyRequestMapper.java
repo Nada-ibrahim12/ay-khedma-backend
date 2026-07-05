@@ -26,6 +26,8 @@ public interface EmergencyRequestMapper {
     @Mapping(source = "selectedProvider", target = "selectedProvider", qualifiedByName = "providerSummary")
     @Mapping(source = "createdAt", target = "createdAt")
     @Mapping(source = "providerResponses", target = "providerResponses", qualifiedByName = "noEmergencyRequestAcceptedProviderResponses")
+    @Mapping(target = "consumerReview", expression = "java(emergencyRequest.getConsumerReview() != null && !emergencyRequest.getConsumerReview().trim().isEmpty() ? emergencyRequest.getConsumerReview() : null)")
+    @Mapping(target = "providerReview", expression = "java(emergencyRequest.getProviderReview() != null && !emergencyRequest.getProviderReview().trim().isEmpty() ? emergencyRequest.getProviderReview() : null)")
     EmergencyRequestResponse toEmergencyRequestResponse(EmergencyRequest emergencyRequest);
 
     @Mapping(source = "id", target = "id")

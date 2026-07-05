@@ -599,7 +599,7 @@ public class BookingServiceImpl implements BookingService {
         // Keep to 1 decimal place
         overallRating = Math.round(overallRating * 10.0) / 10.0;
         booking.setConsumerRating(overallRating);
-        booking.setConsumerReview(ratingRequest.getReview()); // consumerReview stores the review FROM consumer TO
+        booking.setConsumerReview(ratingRequest.getReview() != null && !ratingRequest.getReview().trim().isEmpty() ? ratingRequest.getReview() : null); // consumerReview stores the review FROM consumer TO
                                                               // provider
 
         bookingRepository.save(booking);
@@ -676,7 +676,7 @@ public class BookingServiceImpl implements BookingService {
             throw new BadRequestException("You have already rated this booking");
 
         booking.setProviderRating(ratingRequest.getRating().doubleValue());
-        booking.setProviderReview(ratingRequest.getReview());
+        booking.setProviderReview(ratingRequest.getReview() != null && !ratingRequest.getReview().trim().isEmpty() ? ratingRequest.getReview() : null);
 
         bookingRepository.save(booking);
         updateProviderRates(booking.getProvider());
@@ -760,7 +760,7 @@ public class BookingServiceImpl implements BookingService {
                         .providerId(booking.getProvider().getId())
                         .providerName(booking.getProvider().getName())
                         .rating(booking.getProviderRating())
-                        .review(booking.getProviderReview())
+                        .review(booking.getProviderReview() != null && !booking.getProviderReview().trim().isEmpty() ? booking.getProviderReview() : null)
                         .completedAt(booking.getCompletedAt())
                         .build())
                 .toList();
@@ -771,7 +771,7 @@ public class BookingServiceImpl implements BookingService {
                         .providerId(er.getSelectedProvider() != null ? er.getSelectedProvider().getId() : null)
                         .providerName(er.getSelectedProvider() != null ? er.getSelectedProvider().getName() : null)
                         .rating(er.getProviderRating())
-                        .review(er.getProviderReview())
+                        .review(er.getProviderReview() != null && !er.getProviderReview().trim().isEmpty() ? er.getProviderReview() : null)
                         .completedAt(er.getCompletedAt())
                         .build())
                 .toList();

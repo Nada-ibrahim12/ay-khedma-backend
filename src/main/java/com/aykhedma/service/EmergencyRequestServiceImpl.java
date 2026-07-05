@@ -708,7 +708,7 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
                 + emergencyRequest.getQualityOfWorkRating()) / 3.0;
         overallRating = Math.round(overallRating * 10.0) / 10.0;
         emergencyRequest.setConsumerRating(overallRating);
-        emergencyRequest.setConsumerReview(ratingRequest.getReview());
+        emergencyRequest.setConsumerReview(ratingRequest.getReview() != null && !ratingRequest.getReview().trim().isEmpty() ? ratingRequest.getReview() : null);
 
         emergencyRequestRepository.save(emergencyRequest);
 
@@ -766,7 +766,7 @@ public class EmergencyRequestServiceImpl implements EmergencyRequestService
             throw new BadRequestException("You have already rated this emergency request");
 
         emergencyRequest.setProviderRating(ratingRequest.getRating().doubleValue());
-        emergencyRequest.setProviderReview(ratingRequest.getReview());
+        emergencyRequest.setProviderReview(ratingRequest.getReview() != null && !ratingRequest.getReview().trim().isEmpty() ? ratingRequest.getReview() : null);
 
         emergencyRequestRepository.save(emergencyRequest);
 

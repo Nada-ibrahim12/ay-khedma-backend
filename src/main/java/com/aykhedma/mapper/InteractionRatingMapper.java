@@ -13,6 +13,7 @@ public interface InteractionRatingMapper {
 
     @Mapping(source = "consumer.id", target = "consumerId")
     @Mapping(source = "consumer.name", target = "consumerName")
+    @Mapping(target = "comment", expression = "java(rating.getComment() != null && !rating.getComment().trim().isEmpty() ? rating.getComment() : null)")
     InteractionRatingResponse toResponse(InteractionRating rating);
 
     List<InteractionRatingResponse> toResponseList(List<InteractionRating> ratings);
