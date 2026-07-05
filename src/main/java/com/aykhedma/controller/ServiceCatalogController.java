@@ -130,4 +130,14 @@ public class ServiceCatalogController {
 
         return ResponseEntity.ok(response);
     }
+    @DeleteMapping("/categories/{id}/image")
+    public ResponseEntity<?> deleteCategoryImage(@PathVariable Long id) {
+        categoryService.deleteCategoryImage(id);
+        return ResponseEntity.ok(
+                java.util.Map.of(
+                        "success", true,
+                        "message", "Category image deleted successfully"
+                )
+        );
+    }
 }

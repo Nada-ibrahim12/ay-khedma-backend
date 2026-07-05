@@ -248,4 +248,25 @@ public class ServiceCategoryService {
                 .serviceTypes(types)
                 .build();
     }
-}
+    @Transactional
+    public void deleteCategoryImage(Long id) {
+
+        if (id == null) {
+            throw new BadRequestException("Category id is required");
+        }
+
+        ServiceCategory category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+
+        if (category.getImageUrl() == null || category.getImageUrl().isBlank()) {
+            throw new BadRequestException("Category has no image");
+        }
+
+        // Delete from Cloudinary/storage
+        fileStorageService.deleteFile(category.getImageUrl());
+
+        // Remove image URL from database
+        category.setImageUrl(null);
+
+        categoryRepository.save(category);
+    }}
