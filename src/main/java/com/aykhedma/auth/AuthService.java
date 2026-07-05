@@ -69,6 +69,14 @@ public class AuthService {
             throw new UnauthorizedException("Your account is suspended. Please contact support.");
         }
 
+        if (user.getRole() == UserType.PROVIDER) {
+            Provider provider = providerRepository.findById(user.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Provider not found"));
+            if (provider.getVerificationStatus() != VerificationStatus.VERIFIED) {
+                throw new UnauthorizedException("Your account is pending admin verification. You cannot access the platform yet.");
+            }
+        }
+
         // 🔹 Generate access token
         String jwt = jwtService.generateToken(user);
 
@@ -415,7 +423,11 @@ public class AuthService {
 
             // 3. Set status and return specific error if failed
             if (nidMatched && faceResult.isMatch()) {
-                provider.setVerificationStatus(VerificationStatus.VERIFIED);
+                if (provider.getServiceType().getRiskLevel() == RiskLevel.HIGH) {
+                    provider.setVerificationStatus(VerificationStatus.PENDING);
+                } else {
+                    provider.setVerificationStatus(VerificationStatus.VERIFIED);
+                }
                 providerRepository.save(provider);
                 return null; // Success
             } else {

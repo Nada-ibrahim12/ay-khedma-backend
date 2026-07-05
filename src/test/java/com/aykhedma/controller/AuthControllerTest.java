@@ -13,6 +13,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import com.aykhedma.model.user.User;
+import com.aykhedma.model.user.Provider;
+import com.aykhedma.model.user.VerificationStatus;
+import com.aykhedma.model.service.PriceType;
+import com.aykhedma.model.service.RiskLevel;
+import com.aykhedma.model.service.ServiceType;
+import com.aykhedma.repository.ProviderRepository;
+import com.aykhedma.repository.ServiceTypeRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import com.aykhedma.model.service.ServiceCategory;
+import com.aykhedma.repository.ServiceCategoryRepository;
+import com.aykhedma.model.location.Location;
+import com.aykhedma.model.booking.Schedule;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
@@ -29,6 +41,14 @@ class AuthControllerTest extends BaseIntegrationTest {
         private UserRepository userRepository;
         @Autowired
         private ObjectMapper objectMapper;
+        @Autowired
+        private ProviderRepository providerRepository;
+        @Autowired
+        private ServiceTypeRepository serviceTypeRepository;
+        @Autowired
+        private ServiceCategoryRepository serviceCategoryRepository;
+        @Autowired
+        private PasswordEncoder passwordEncoder;
 
         // ─── Helpers ──────────────────────────────────────────
         private RegisterRequest validConsumerRequest() {
@@ -237,6 +257,116 @@ class AuthControllerTest extends BaseIntegrationTest {
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(loginReq)))
                                         .andExpect(status().isBadRequest());
+                }
+
+                @Test
+                @DisplayName("Should block login for provider pending verification")
+                void login_pendingProvider_returns401() throws Exception {
+                        ServiceCategory category = serviceCategoryRepository.save(ServiceCategory.builder()
+                                        .name("Category " + UUID.randomUUID().toString().substring(0, 8))
+                                        .build());
+
+                        ServiceType serviceType = serviceTypeRepository.save(ServiceType.builder()
+                                        .name("High Risk " + UUID.randomUUID().toString().substring(0, 8))
+                                        .riskLevel(RiskLevel.HIGH)
+                                        .category(category)
+                                        .defaultPriceType(PriceType.HOUR)
+                                        .basePrice(200.0)
+                                        .build());
+
+                        Location location1 = Location.builder()
+                                        .latitude(30.0444)
+                                        .longitude(31.2357)
+                                        .address("123 Test Street")
+                                        .area("Maadi")
+                                        .city("Cairo")
+                                        .build();
+
+                        Schedule schedule1 = Schedule.builder().build();
+
+                        Provider provider = Provider.builder()
+                                        .name("Pending Provider")
+                                        .email("pending_prov_" + UUID.randomUUID() + "@mail.com")
+                                        .password(passwordEncoder.encode("Password123"))
+                                        .phoneNumber("010" + String.format("%08d", (int) (Math.random() * 100_000_000)))
+                                        .role(UserType.PROVIDER)
+                                        .enabled(true)
+                                        .verificationStatus(VerificationStatus.PENDING)
+                                        .serviceType(serviceType)
+                                        .location(location1)
+                                        .schedule(schedule1)
+                                        .nationalId(String.format("%014d", (long) (Math.random() * 100_000_000_000_000L)))
+                                        .price(150.0)
+                                        .priceType(PriceType.HOUR)
+                                        .build();
+
+                        providerRepository.save(provider);
+
+                        LoginRequest loginReq = LoginRequest.builder()
+                                        .emailOrPhone(provider.getEmail())
+                                        .password("Password123")
+                                        .build();
+
+                        mockMvc.perform(post("/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(loginReq)))
+                                        .andExpect(status().isUnauthorized())
+                                        .andExpect(jsonPath("$.message", containsString("pending admin verification")));
+                }
+
+                @Test
+                @DisplayName("Should allow login for verified provider")
+                void login_verifiedProvider_returns200() throws Exception {
+                        ServiceCategory category = serviceCategoryRepository.save(ServiceCategory.builder()
+                                        .name("Category " + UUID.randomUUID().toString().substring(0, 8))
+                                        .build());
+
+                        ServiceType serviceType = serviceTypeRepository.save(ServiceType.builder()
+                                        .name("Low Risk " + UUID.randomUUID().toString().substring(0, 8))
+                                        .riskLevel(RiskLevel.LOW)
+                                        .category(category)
+                                        .defaultPriceType(PriceType.HOUR)
+                                        .basePrice(200.0)
+                                        .build());
+
+                        Location location2 = Location.builder()
+                                        .latitude(30.0444)
+                                        .longitude(31.2357)
+                                        .address("123 Test Street")
+                                        .area("Maadi")
+                                        .city("Cairo")
+                                        .build();
+
+                        Schedule schedule2 = Schedule.builder().build();
+
+                        Provider provider = Provider.builder()
+                                        .name("Verified Provider")
+                                        .email("verified_prov_" + UUID.randomUUID() + "@mail.com")
+                                        .password(passwordEncoder.encode("Password123"))
+                                        .phoneNumber("010" + String.format("%08d", (int) (Math.random() * 100_000_000)))
+                                        .role(UserType.PROVIDER)
+                                        .enabled(true)
+                                        .verificationStatus(VerificationStatus.VERIFIED)
+                                        .serviceType(serviceType)
+                                        .location(location2)
+                                        .schedule(schedule2)
+                                        .nationalId(String.format("%014d", (long) (Math.random() * 100_000_000_000_000L)))
+                                        .price(150.0)
+                                        .priceType(PriceType.HOUR)
+                                        .build();
+
+                        providerRepository.save(provider);
+
+                        LoginRequest loginReq = LoginRequest.builder()
+                                        .emailOrPhone(provider.getEmail())
+                                        .password("Password123")
+                                        .build();
+
+                        mockMvc.perform(post("/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(loginReq)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.token").isNotEmpty());
                 }
         }
 
