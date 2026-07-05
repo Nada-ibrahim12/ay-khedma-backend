@@ -5,6 +5,7 @@ import com.aykhedma.dto.request.RegisterRequest;
 import com.aykhedma.model.user.UserType;
 import com.aykhedma.repository.UserRepository;
 import com.aykhedma.security.JwtService;
+import com.aykhedma.model.user.Admin;
 import com.aykhedma.model.user.Consumer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -132,5 +133,32 @@ class SecurityIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(get("/provider/profile")
                 .header("Authorization", "Bearer " + jwt))
                 .andExpect(status().isForbidden());
+    }
+
+    private Admin createAndSaveAdmin() {
+        Admin admin = Admin.builder()
+                .name("Security Admin")
+                .email("admin_" + UUID.randomUUID() + "@mail.com")
+                .phoneNumber("011" + String.format("%08d", (int) (Math.random() * 100_000_000)))
+                .password(passwordEncoder.encode("Password123"))
+                .role(UserType.ADMIN)
+                .enabled(true)
+                .credentialsNonExpired(true)
+                .build();
+        return (Admin) userRepository.save(admin);
+    }
+
+    @Test
+    @DisplayName("GET /admin/users with ADMIN JWT should not return the calling admin themselves")
+    void adminUsersEndpoint_excludesCallingAdmin() throws Exception {
+        Admin admin = createAndSaveAdmin();
+        Consumer consumer = createAndSaveConsumer();
+        String jwt = jwtService.generateToken(admin);
+
+        mockMvc.perform(get("/admin/users")
+                .header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.email == '" + consumer.getEmail() + "')]").exists())
+                .andExpect(jsonPath("$.content[?(@.email == '" + admin.getEmail() + "')]").doesNotExist());
     }
 }

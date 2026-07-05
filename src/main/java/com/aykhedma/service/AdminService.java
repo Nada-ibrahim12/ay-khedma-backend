@@ -27,6 +27,7 @@ public interface AdminService {
             LocalDateTime startDate,
             LocalDateTime endDate,
             String keyword,
+            Long excludeUserId,
             Pageable pageable);
 
     Page<AdminProviderResponse> searchProviders(

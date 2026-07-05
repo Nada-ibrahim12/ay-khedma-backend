@@ -23,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -158,6 +159,7 @@ public class AdminController {
             @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(value = "search", required = false) String search,
             @RequestParam(value = "q", required = false) String q,
+            @AuthenticationPrincipal(expression = "user.id") Long currentAdminId,
             Pageable pageable) {
         return ResponseEntity.ok(adminService.searchUsers(
                 parseUserType(role),
@@ -165,6 +167,7 @@ public class AdminController {
                 startDate,
                 endDate,
                 firstPresent(keyword, search, q),
+                currentAdminId,
                 pageable));
     }
 

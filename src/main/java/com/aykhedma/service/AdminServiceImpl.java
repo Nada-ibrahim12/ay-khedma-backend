@@ -151,7 +151,7 @@ public class AdminServiceImpl implements AdminService {
     public Page<UserResponse> searchUsers(
             UserType role, Boolean status,
             LocalDateTime startDate, LocalDateTime endDate,
-            String keyword,
+            String keyword, Long excludeUserId,
             Pageable pageable) {
 
         // Cap page size to prevent expensive unbounded requests from admin UI
@@ -160,7 +160,7 @@ public class AdminServiceImpl implements AdminService {
                 pageable.getPageNumber(), Math.min(pageable.getPageSize(), maxPageSize), pageable.getSort());
 
         Page<User> users = userRepository.findAll(
-                buildUserSearchSpecification(role, status, startDate, endDate, normalizeKeyword(keyword)),
+                buildUserSearchSpecification(role, status, startDate, endDate, normalizeKeyword(keyword), excludeUserId),
                 cappedPageable);
 
         return users.map(userMapper::toUserResponse);
@@ -171,7 +171,8 @@ public class AdminServiceImpl implements AdminService {
             Boolean status,
             LocalDateTime startDate,
             LocalDateTime endDate,
-            String keyword) {
+            String keyword,
+            Long excludeUserId) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -193,6 +194,9 @@ public class AdminServiceImpl implements AdminService {
                         criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), pattern),
                         criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), pattern),
                         criteriaBuilder.like(criteriaBuilder.lower(root.get("phoneNumber")), pattern)));
+            }
+            if (excludeUserId != null) {
+                predicates.add(criteriaBuilder.notEqual(root.get("id"), excludeUserId));
             }
 
             return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
