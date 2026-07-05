@@ -5,6 +5,7 @@ import com.aykhedma.dto.response.AdminProviderResponse;
 import com.aykhedma.dto.response.DashboardStatsResponse;
 import com.aykhedma.dto.response.ProviderResponse;
 import com.aykhedma.dto.response.UserResponse;
+import com.aykhedma.exception.BadRequestException;
 import com.aykhedma.exception.ResourceNotFoundException;
 import com.aykhedma.mapper.ProviderMapper;
 import com.aykhedma.mapper.UserMapper;
@@ -30,6 +31,8 @@ import com.aykhedma.repository.ProviderRepository;
 import com.aykhedma.repository.ServiceTypeRepository;
 import com.aykhedma.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -94,9 +97,17 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "searchProvidersCache", allEntries = true),
+            @CacheEvict(value = "allProvidersCache", allEntries = true)
+    })
     public ProviderResponse approveProvider(Long providerId) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
+
+        if (provider.getVerificationStatus() == VerificationStatus.VERIFIED) {
+            throw new BadRequestException("Provider is already verified.");
+        }
 
         provider.setVerificationStatus(VerificationStatus.VERIFIED);
         provider.setRejectionReason(null);
@@ -120,9 +131,17 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "searchProvidersCache", allEntries = true),
+            @CacheEvict(value = "allProvidersCache", allEntries = true)
+    })
     public ProviderResponse rejectProvider(Long providerId, String reason) {
         Provider provider = providerRepository.findById(providerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provider not found with id: " + providerId));
+
+        if (provider.getVerificationStatus() == VerificationStatus.REJECTED) {
+            throw new BadRequestException("Provider is already rejected.");
+        }
 
         provider.setVerificationStatus(VerificationStatus.REJECTED);
         provider.setRejectionReason(reason);
