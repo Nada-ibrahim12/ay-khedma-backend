@@ -91,7 +91,7 @@ public class Provider extends User {
     @Builder.Default
     @NotNull(message = "Emergency enabled status is required")
     @Column(nullable = false)
-    private Boolean emergencyEnabled = false;
+    private Boolean emergencyEnabled = true;
 
     @NotBlank(message = "National ID is required")
     @Pattern(regexp = "^[0-9]{14}$", message = "National ID must be exactly 14 digits")
