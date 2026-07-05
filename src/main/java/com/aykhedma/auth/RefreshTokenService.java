@@ -29,9 +29,6 @@ public class RefreshTokenService {
     }
 
     public RefreshToken createRefreshToken(User user) {
-        // Delete any existing refresh tokens for this user (invalidates old sessions)
-        repository.deleteByUser(user);
-        repository.flush(); // Force deletion to happen immediately to avoid unique constraint violations
 
         RefreshToken token = RefreshToken.builder()
                 .user(user)

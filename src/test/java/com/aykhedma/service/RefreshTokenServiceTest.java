@@ -52,7 +52,7 @@ class RefreshTokenServiceTest {
     }
 
     @Test
-    @DisplayName("createRefreshToken() should delete old tokens and save new one")
+    @DisplayName("createRefreshToken() should save new one")
     void createRefreshToken_success() {
         User user = buildUser();
         when(repository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
@@ -63,7 +63,6 @@ class RefreshTokenServiceTest {
         assertThat(result.getToken()).isNotBlank();
         assertThat(result.getExpiryDate()).isAfter(LocalDateTime.now());
 
-        verify(repository).deleteByUser(user);
         verify(repository).save(any(RefreshToken.class));
     }
 
