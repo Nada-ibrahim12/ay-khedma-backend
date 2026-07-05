@@ -115,11 +115,26 @@ public class AuthService {
 
         String profileImageUrl = null;
 
-        if (userRepository.existsByEmail(request.getEmail()))
-            throw new RuntimeException("Email already exists");
+        // Allow re-registration if the existing user never verified their OTP
+        userRepository.findByEmail(request.getEmail()).ifPresent(existingUser -> {
+            if (existingUser.isEnabled()) {
+                throw new RuntimeException("Email already exists");
+            }
+            // User exists but never verified — delete and allow re-registration
+            userRepository.delete(existingUser);
+            userRepository.flush();
+        });
 
-        if (userRepository.existsByPhoneNumber(request.getPhoneNumber()))
-            throw new RuntimeException("Phone already exists");
+        userRepository.findByPhoneNumber(request.getPhoneNumber()).ifPresent(existingUser -> {
+            if (existingUser.isEnabled()) {
+                throw new RuntimeException("Phone already exists");
+            }
+            // Only delete if it's a different unverified user (not the same email re-registering)
+            if (!existingUser.getEmail().equalsIgnoreCase(request.getEmail())) {
+                userRepository.delete(existingUser);
+                userRepository.flush();
+            }
+        });
 
         String encodedPassword = passwordEncoder.encode(request.getPassword());
 
