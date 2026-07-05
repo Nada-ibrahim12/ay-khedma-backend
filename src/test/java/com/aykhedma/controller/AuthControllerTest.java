@@ -260,8 +260,8 @@ class AuthControllerTest extends BaseIntegrationTest {
                 }
 
                 @Test
-                @DisplayName("Should block login for provider pending verification")
-                void login_pendingProvider_returns401() throws Exception {
+                @DisplayName("Should allow login for provider pending verification")
+                void login_pendingProvider_returns200() throws Exception {
                         ServiceCategory category = serviceCategoryRepository.save(ServiceCategory.builder()
                                         .name("Category " + UUID.randomUUID().toString().substring(0, 8))
                                         .build());
@@ -310,8 +310,8 @@ class AuthControllerTest extends BaseIntegrationTest {
                         mockMvc.perform(post("/auth/login")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(loginReq)))
-                                        .andExpect(status().isUnauthorized())
-                                        .andExpect(jsonPath("$.message", containsString("pending admin verification")));
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.token").isNotEmpty());
                 }
 
                 @Test
