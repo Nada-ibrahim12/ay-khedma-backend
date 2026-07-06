@@ -146,7 +146,6 @@ public class ServiceCategoryService {
                 throw new BadRequestException("Failed to upload category image");
             }
 
-            // Clean up the old image now that the new one uploaded successfully
             if (oldImageUrl != null && !oldImageUrl.isBlank()) {
                 fileStorageService.deleteFile(oldImageUrl);
             }

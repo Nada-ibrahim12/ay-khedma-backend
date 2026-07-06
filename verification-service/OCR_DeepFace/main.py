@@ -62,16 +62,15 @@ def detect_digits(crop):
             cx = (x1 + x2) / 2  # Calculate center x coordinate
             w_box = x2 - x1  # Calculate box width
             digit_label = r.names[cls]  # Get digit label from class name
-            digits.append((cx, digit_label, conf, w_box))  # Add to list
+            digits.append((cx, digit_label, conf, w_box))
 
     if not digits:
         return ""
 
-    # Sort by x-coordinate (left to right)
     digits.sort(key=lambda x: x[0])
 
     deduped = [digits[0]]  # Start with first digit
-    for i in range(1, len(digits)):  # Iterate through remaining digits
+    for i in range(1, len(digits)):
         cx_prev = deduped[-1][0]  # Get previous digit's center x
         w_prev = deduped[-1][3]  # Get previous digit's width
         cx_curr, _, conf_curr, _ = digits[i]  # Get current digit's info
@@ -84,15 +83,15 @@ def detect_digits(crop):
             deduped.append(digits[i])  # Add as separate digit
 
     result = "".join(d for _, d, _, _ in deduped)  # Concatenate digits
-    print(f"[OCR] Extracted digits: {result} ({len(deduped)} digits)")  # Log result
-    return result  # Return extracted digits string
+    print(f"[OCR] Extracted digits: {result} ({len(deduped)} digits)")
+    return result
 
 
-def detect_fields(img):
+def detect_fields(img): #for objects detecion
 
-    results = object_model(img, verbose=False)  # Run object detection
+    results = object_model(img, verbose=False)
 
-    best_boxes = {}  # Dictionary to store best boxes by class name
+    best_boxes = {}
 
     for r in results:
         for box in r.boxes:
@@ -104,7 +103,7 @@ def detect_fields(img):
             if cls_name not in best_boxes or conf > best_boxes[cls_name][0]:
                 best_boxes[cls_name] = (conf, x1, y1, x2, y2)  # Store box with confidence
 
-    return best_boxes  # Return dictionary of best boxes
+    return best_boxes
 
 
 def crop_with_padding(img, box, pad_factor):
@@ -127,7 +126,7 @@ def crop_with_padding(img, box, pad_factor):
 def try_extract(img, best_boxes, pad_factor, filename):
     """Uses cached detection boxes — only the crop bounds change per pad_factor,
     so no re-run of the (expensive) object model here."""
-    best = ""  # Initialize best NID string
+    best = ""
 
     # Process photo field if detected
     if "photo" in best_boxes:  # If photo field is detected
@@ -144,10 +143,9 @@ def try_extract(img, best_boxes, pad_factor, filename):
         if validate_nid(nid):  # If valid 14-digit NID found
             return nid  # Return it immediately
 
-        # Bug fix: only keep `nid` as "best" if it's actually a better (longer)
-        # candidate than what we already have.
+
         if len(nid) > len(best):  # If new NID is longer than previous best
-            best = nid  # Update best
+            best = nid
 
     return best
 
@@ -156,13 +154,12 @@ def process_image(img, filename):
     """Process a single image orientation through detection pipeline"""
     img = preprocess_for_yolo(img)  # Preprocess image for YOLO
 
-    if DEBUG:  # If debug mode is enabled
+    if DEBUG:
         cv2.imwrite("debug_full.jpg", img)  # Save debug image
 
-    # Object detection runs exactly once per image now.
-    best_boxes = detect_fields(img)  # Detect fields in image
+    best_boxes = detect_fields(img)
 
-    best = ""  # Initialize best NID string
+    best = ""
     # Try different padding factors to improve detection
     for pad_factor in (0.20, 0.30, 0.40):  # Try increasing padding
         nid = try_extract(img, best_boxes, pad_factor, filename)  # Try to extract NID
@@ -206,16 +203,16 @@ def detect_and_process(img, filename):
     return best
 
 
-@app.post("/extract-nid")  # Define API endpoint for NID extraction
-async def extract_nid(file: UploadFile = File(...)):  # Accept file upload
-    image_bytes = await file.read()  # Read uploaded file bytes
+@app.post("/extract-nid")
+async def extract_nid(file: UploadFile = File(...)):
+    image_bytes = await file.read()
 
     try:
         img = read_image(image_bytes)  # Convert bytes to image
-    except ValueError:  # If image decoding fails
-        return {"error": "invalid image"}  # Return error response
+    except ValueError:
+        return {"error": "invalid image"}
 
-    filename = safe_filename(file.filename)  # Sanitize filename
+    filename = safe_filename(file.filename)
 
     # Offload the blocking YOLO/OpenCV work to the thread pool so the event
     # loop stays free to serve other requests concurrently.
