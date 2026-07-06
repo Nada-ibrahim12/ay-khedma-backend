@@ -11,7 +11,11 @@ import java.util.List;
 
 @Repository
 public interface InteractionRatingRepository extends JpaRepository<InteractionRating, Long> {
+
+    @Query("SELECT ir FROM InteractionRating ir JOIN FETCH ir.consumer WHERE ir.provider.id = :providerId ORDER BY ir.createdAt DESC")
     List<InteractionRating> findByProviderId(Long providerId);
+
+    @Query("SELECT ir FROM InteractionRating ir JOIN FETCH ir.consumer WHERE ir.consumer.id = :consumerId ORDER BY ir.createdAt DESC")
     List<InteractionRating> findByConsumerId(Long consumerId);
 
     @Modifying

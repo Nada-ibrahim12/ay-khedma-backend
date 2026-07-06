@@ -64,6 +64,7 @@ public class InteractionRatingServiceImpl implements InteractionRatingService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<InteractionRatingResponse> getProviderRatings(Long providerId) {
         if (!providerRepository.existsById(providerId)) {
             throw new ResourceNotFoundException("Provider not found");
