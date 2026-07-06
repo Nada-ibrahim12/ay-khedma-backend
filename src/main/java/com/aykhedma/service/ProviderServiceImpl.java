@@ -335,8 +335,9 @@ public class ProviderServiceImpl implements ProviderService {
                         "Additional documents (certificates) are required for HIGH risk services. Please upload them before updating your service type.");
             }
 
-            // Only set to PENDING if not already VERIFIED
-            if (provider.getVerificationStatus() != VerificationStatus.VERIFIED) {
+            // Keep final admin decisions intact; high-risk edits should only leave undecided providers pending.
+            if (provider.getVerificationStatus() != VerificationStatus.VERIFIED
+                    && provider.getVerificationStatus() != VerificationStatus.REJECTED) {
                 provider.setVerificationStatus(VerificationStatus.PENDING);
             }
 

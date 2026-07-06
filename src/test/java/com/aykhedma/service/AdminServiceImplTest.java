@@ -28,6 +28,7 @@ import com.aykhedma.mapper.ProviderMapper;
 import com.aykhedma.mapper.UserMapper;
 import com.aykhedma.model.location.Location;
 import com.aykhedma.model.notification.NotificationType;
+import com.aykhedma.dto.response.ProviderResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,8 +42,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
@@ -75,6 +78,33 @@ class AdminServiceImplTest {
 
     @InjectMocks
     private AdminServiceImpl adminService;
+
+    @Test
+    @DisplayName("rejectProvider should persist rejected status and rejection reason")
+    void rejectProvider_persistsRejectedStatusAndReason() {
+        Long providerId = 30L;
+        String reason = "Documents are not clear enough";
+        Provider provider = buildProvider(providerId);
+        provider.setVerificationStatus(VerificationStatus.PENDING);
+
+        ProviderResponse mappedResponse = ProviderResponse.builder()
+                .id(providerId)
+                .verificationStatus(VerificationStatus.REJECTED)
+                .rejectionReason(reason)
+                .build();
+
+        when(providerRepository.findById(providerId)).thenReturn(Optional.of(provider));
+        when(providerRepository.saveAndFlush(any(Provider.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(providerMapper.toProviderResponse(provider)).thenReturn(mappedResponse);
+
+        ProviderResponse response = adminService.rejectProvider(providerId, reason);
+
+        assertThat(provider.getVerificationStatus()).isEqualTo(VerificationStatus.REJECTED);
+        assertThat(provider.getRejectionReason()).isEqualTo(reason);
+        assertThat(response.getVerificationStatus()).isEqualTo(VerificationStatus.REJECTED);
+        verify(providerRepository).saveAndFlush(provider);
+        verify(notificationFactory).send(eq(providerId), eq(NotificationType.PROVIDER_REJECTED), any());
+    }
 
     @Test
     @DisplayName("deleteUser should purge provider-linked data before deleting the provider")

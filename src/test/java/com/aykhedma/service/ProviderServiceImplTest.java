@@ -16,6 +16,7 @@ import com.aykhedma.model.booking.TimeSlot;
 import com.aykhedma.model.booking.TimeSlotStatus;
 import com.aykhedma.model.booking.WorkingDay;
 import com.aykhedma.model.service.PriceType;
+import com.aykhedma.model.service.RiskLevel;
 import com.aykhedma.model.service.ServiceType;
 import com.aykhedma.model.user.Provider;
 import com.aykhedma.repository.DocumentRepository;
@@ -186,6 +187,39 @@ class ProviderServiceImplTest {
                         assertThat(provider.getEmergencyEnabled()).isEqualTo(request.getEmergencyEnabled());
 
                         verify(locationService).updateProviderLocation(eq(PROVIDER_ID), eq(request.getLocation()));
+                        verify(providerRepository).save(provider);
+                }
+
+                @Test
+                @DisplayName("Should keep rejected high-risk provider rejected when profile is updated")
+                void updateProviderProfile_RejectedHighRiskProvider_StaysRejected() {
+                        provider.getServiceType().setRiskLevel(RiskLevel.HIGH);
+                        provider.setVerificationStatus(VerificationStatus.REJECTED);
+
+                        ProviderProfileRequest request = ProviderProfileRequest.builder()
+                                        .name("Updated Provider")
+                                        .build();
+
+                        Document nationalIdDocument = Document.builder()
+                                        .id(1L)
+                                        .type("NATIONAL_ID")
+                                        .provider(provider)
+                                        .build();
+                        Document certificateDocument = Document.builder()
+                                        .id(2L)
+                                        .type("CERTIFICATE")
+                                        .provider(provider)
+                                        .build();
+
+                        when(providerRepository.findById(PROVIDER_ID)).thenReturn(Optional.of(provider));
+                        when(documentRepository.findByProviderId(PROVIDER_ID))
+                                        .thenReturn(List.of(nationalIdDocument, certificateDocument));
+                        when(providerRepository.save(any(Provider.class))).thenReturn(provider);
+                        when(providerMapper.toProviderResponse(any(Provider.class))).thenReturn(providerResponse);
+
+                        providerService.updateProviderProfile(PROVIDER_ID, request);
+
+                        assertThat(provider.getVerificationStatus()).isEqualTo(VerificationStatus.REJECTED);
                         verify(providerRepository).save(provider);
                 }
 

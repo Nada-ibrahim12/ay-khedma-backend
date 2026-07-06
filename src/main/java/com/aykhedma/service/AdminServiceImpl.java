@@ -146,7 +146,7 @@ public class AdminServiceImpl implements AdminService {
         provider.setVerificationStatus(VerificationStatus.REJECTED);
         provider.setRejectionReason(reason);
 
-        Provider savedProvider = providerRepository.save(provider);
+        Provider savedProvider = providerRepository.saveAndFlush(provider);
         String rejectionReason = (reason == null || reason.isBlank()) ? "No reason provided." : reason;
         notificationFactory.send(savedProvider.getId(),
                 NotificationType.PROVIDER_REJECTED,

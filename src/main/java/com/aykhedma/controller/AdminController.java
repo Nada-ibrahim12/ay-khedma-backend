@@ -91,8 +91,9 @@ public class AdminController {
     })
     public ResponseEntity<ProviderResponse> rejectProvider(
             @PathVariable Long id,
-            @Valid @RequestBody RejectProviderRequest request) {
-        return ResponseEntity.ok(adminService.rejectProvider(id, request.getReason()));
+            @RequestBody(required = false) RejectProviderRequest request,
+            @RequestParam(required = false) String reason) {
+        return ResponseEntity.ok(adminService.rejectProvider(id, validateRejectionReason(request, reason)));
     }
 
     @GetMapping("/providers")
@@ -273,5 +274,16 @@ public class AdminController {
             case "false", "disabled", "inactive", "suspended", "blocked", "0", "no" -> false;
             default -> throw new BadRequestException("Invalid enabled/status filter: " + value);
         };
+    }
+
+    private String validateRejectionReason(RejectProviderRequest request, String reasonParam) {
+        String reason = firstPresent(request != null ? request.getReason() : null, reasonParam);
+        if (reason == null) {
+            throw new BadRequestException("Rejection reason is required");
+        }
+        if (reason.length() < 10 || reason.length() > 500) {
+            throw new BadRequestException("Reason must be between 10 and 500 characters");
+        }
+        return reason;
     }
 }

@@ -1,5 +1,6 @@
 package com.aykhedma.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -14,5 +15,6 @@ import lombok.NoArgsConstructor;
 public class RejectProviderRequest {
     @NotBlank(message = "Rejection reason is required")
     @Size(min = 10, max = 500, message = "Reason must be between 10 and 500 characters")
+    @JsonAlias("rejectionReason")
     private String reason;
 }
