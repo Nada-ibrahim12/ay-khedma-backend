@@ -323,11 +323,18 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
     public ChatSession resolveSession(AiChatRequest request, Long userId) {
         if (StringUtils.hasText(request.getSessionId())) {
-            ChatSession session = chatSessionRepository.findBySessionIdAndIsActiveTrue(request.getSessionId())
+            ChatSession session = chatSessionRepository.findById(request.getSessionId())
                     .orElseThrow(() -> new BadRequestException("Invalid or expired session ID"));
 
             if (!Objects.equals(session.getUserId(), userId)) {
                 throw new ForbiddenException("You are not allowed to access this chat session");
+            }
+
+            // If session exists but is not active, reactivate it so the user can continue 
+            if (!Boolean.TRUE.equals(session.getIsActive())) {
+                session.setIsActive(true);
+                session.setEndTime(null);
+                chatSessionRepository.save(session);
             }
 
             return session;
@@ -621,47 +628,47 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     }
 
     private String buildMultipleProvidersReply(List<ProviderSummaryResponse> providers, String serviceName) {
-    StringBuilder reply = new StringBuilder();
-    reply.append("🔍 وجدت ").append(providers.size()).append(" ").append(serviceName).append(" مناسبين:\n\n");
+        StringBuilder reply = new StringBuilder();
+        reply.append("🔍 وجدت ").append(providers.size()).append(" ").append(serviceName).append(" مناسبين:\n\n");
 
-    int maxDisplay = Math.min(5, providers.size());
-    for (int i = 0; i < maxDisplay; i++) {
-        ProviderSummaryResponse p = providers.get(i);
-        
-        reply.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-        reply.append("【").append(i + 1).append("】 ").append(p.getName()).append("\n");
-        reply.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-        
-        if (p.getAverageRating() != null && p.getAverageRating() > 0) {
-            reply.append("⭐ التقييم: ").append(String.format("%.1f", p.getAverageRating())).append("\n");
-        }
-        
-        if (p.getDistance() != null) {
-            reply.append("📍 المسافة: ").append(String.format("%.1f", p.getDistance())).append(" كم\n");
-        }
-        
-        if (p.getPrice() != null) {
-            reply.append("💰 السعر: ").append(p.getPrice());
-            if (p.getPriceTypeAr() != null) {
-                reply.append("/").append(p.getPriceTypeAr());
+        int maxDisplay = Math.min(5, providers.size());
+        for (int i = 0; i < maxDisplay; i++) {
+            ProviderSummaryResponse p = providers.get(i);
+
+            reply.append("━━━━━━━━━━━━━━━━━━━━━\n");
+            reply.append("【").append(i + 1).append("】 ").append(p.getName()).append("\n");
+            reply.append("━━━━━━━━━━━━━━━━━━━━━\n");
+
+            if (p.getAverageRating() != null && p.getAverageRating() > 0) {
+                reply.append("⭐ التقييم: ").append(String.format("%.1f", p.getAverageRating())).append("\n");
             }
+
+            if (p.getDistance() != null) {
+                reply.append("📍 المسافة: ").append(String.format("%.1f", p.getDistance())).append(" كم\n");
+            }
+
+            if (p.getPrice() != null) {
+                reply.append("💰 السعر: ").append(p.getPrice());
+                if (p.getPriceTypeAr() != null) {
+                    reply.append("/").append(p.getPriceTypeAr());
+                }
+                reply.append("\n");
+            }
+
+            if (p.getArea() != null) {
+                reply.append("🏙️ المنطقة: ").append(p.getArea()).append("\n");
+            }
+
             reply.append("\n");
         }
-        
-        if (p.getArea() != null) {
-            reply.append("🏙️ المنطقة: ").append(p.getArea()).append("\n");
+
+        if (providers.size() > 5) {
+            reply.append("...و ").append(providers.size() - 5).append(" آخرين\n\n");
         }
-        
-        reply.append("\n");
-    }
 
-    if (providers.size() > 5) {
-        reply.append("...و ").append(providers.size() - 5).append(" آخرين\n\n");
+        reply.append("💡 اختر رقم المزود المناسب أو اسألني عن تفاصيل أكثر.");
+        return reply.toString();
     }
-
-    reply.append("💡 اختر رقم المزود المناسب أو اسألني عن تفاصيل أكثر.");
-    return reply.toString();
-}
 
     // public String buildSolutionSuggestionReply(String normalizedMessage) {
     // if (containsAny(normalizedMessage, "كهرب", "electric", "power", "نور",
