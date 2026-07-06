@@ -113,10 +113,6 @@ class SearchCacheService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(
-            value = "topRatedNearMeCache",
-            key = "#consumerId + '_' + #radius"
-    )
     public List<SearchResponse> topRatedNearMe(Long consumerId, Double radius) {
 
         if (consumerId == null) {

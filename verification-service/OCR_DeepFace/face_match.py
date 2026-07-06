@@ -10,12 +10,7 @@ def read_image(file_bytes):
 
 
 def detect_face_exists(img):
-    """
-    Check whether a face can actually be detected in the image
-    using RetinaFace. Returns True only if at least one face is found.
-    This prevents non-face images (blank photos, gradients, etc.)
-    from being accepted.
-    """
+
     try:
         faces = DeepFace.extract_faces(
             img_path=img,
@@ -29,11 +24,7 @@ def detect_face_exists(img):
 
 
 def extract_face_from_id(id_img, object_model):
-    """
-    Use the YOLO object model to crop the 'photo' region from
-    the national ID card. Returns the cropped face image, or
-    None if no photo region is detected.
-    """
+
     results = object_model(id_img, verbose=False)
     for r in results:
         for box in r.boxes:
