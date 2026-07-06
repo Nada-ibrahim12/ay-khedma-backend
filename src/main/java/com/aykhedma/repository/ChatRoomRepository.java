@@ -43,6 +43,7 @@ WHERE EXISTS (
     FROM r.participants me
     WHERE me.id = :userId
 )
+AND r.lastMessageAt IS NOT NULL
 ORDER BY r.lastMessageAt DESC
 """)
     Page<ChatRoom> findUserRooms(
