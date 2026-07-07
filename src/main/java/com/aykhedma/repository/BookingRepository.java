@@ -114,7 +114,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
             "WHERE provider_id = :providerId " +
             "AND requested_date BETWEEN " +
             "(date_trunc('week', CAST(:currentDate AS DATE)) - INTERVAL '2 days') " +
-            "AND (date_trunc('week', CAST(:currentDate AS DATE)) + INTERVAL '5 days')",
+            "AND (date_trunc('week', CAST(:currentDate AS DATE)) + INTERVAL '4 days')",
             nativeQuery = true)
     Object findBookingStatsCurrentWeek(@Param("providerId") Long providerId,
                                        @Param("currentDate") LocalDate currentDate);
@@ -125,8 +125,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long>
             "INTERVAL '1 month'" +
             ") AS month) " +
             "SELECT TO_CHAR(m.month, 'Mon') AS month, " +
-            "COALESCE(SUM(CASE WHEN b.status = 'COMPLETED' THEN 1 END), 0) AS completed, " +
-            "COALESCE(SUM(CASE WHEN b.status = 'CANCELLED' THEN 1 END), 0) AS cancelled " +
+            "SUM(CASE WHEN b.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed, " +
+            "SUM(CASE WHEN b.status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled " +
             "FROM months m LEFT JOIN bookings b " +
             "ON date_trunc('month', b.requested_date) = m.month " +
             "AND b.provider_id = :providerId " +
