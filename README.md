@@ -89,8 +89,8 @@ In short, this backend powers consumer–provider interaction, keeps bookings an
 
 - Java 21
 - Maven
-- PostgreSQL (local or remote)
-- Redis (optional depending on your configuration/needs)
+- PostgreSQL
+- Redis 
 - Environment variables / `app.env` file (required for external services)
 
 ## Configuration
@@ -129,17 +129,7 @@ An `app.env` file is already present in the repository root. Update it to match 
 
 ## Run the application (Local)
 
-### 1) Start required services
-
-If you use Docker Compose:
-```bash
-docker compose -f compose.yaml up -d
-```
-This will start:
-- PostgreSQL
-- Redis
-
-### 2) Start Spring Boot
+### 1) Start Spring Boot
 
 ```bash
 ./mvnw spring-boot:run
@@ -149,18 +139,10 @@ Or with Maven directly:
 mvn spring-boot:run
 ```
 
-### 3) Access
+### 2) Access
 
 - API server: `http://localhost:{SERVER_PORT:-8081}`
 - WebSocket endpoint: `ws://localhost:{port}/ws-notifications`
-
-## Docker Compose (Optional)
-
-`compose.yaml` includes:
-- `postgres:latest`
-- `redis:latest`
-
-If you deploy to production, pin image versions suitable for your environment.
 
 ## Observability & Debugging
 
